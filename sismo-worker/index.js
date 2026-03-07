@@ -23,6 +23,7 @@ async function fetchINGV(giorni = 2) {
               + `&minlongitude=${FVG.lon_min}&maxlongitude=${FVG.lon_max}&orderby=time`;
   const res   = await fetch(url, { headers:{"User-Agent":"SismoFVG/2.0 gimmycloud.com"} });
   if (!res.ok) throw new Error(`INGV ${res.status}`);
+  if (res.status === 204) return [];
   const data  = await res.json();
   return (data.features||[]).map(f => {
     const p = f.properties||{};
