@@ -1,10 +1,15 @@
-# 🌋 ECHO Monitor — Sismo FVG + Correlazione Solare
+# 🌋 ECHO Monitor v4 — Sismo FVG + Correlazione Solare
 
 **Progetto ECHO** · *Earth Correlation Hypothesis Observatory*
 Monitor sismico in tempo reale con correlazione solare — Cloudflare Worker + D1
-Gimmy Pignolo © 2026 — [gimmycloud.com](https://gimmycloud.com)
+Gimmy Pignolu © 2026 — [gimmycloud.com](https://gimmycloud.com)
 
-🔗 **Live:** [https://sismo-fvg.gimmy077.workers.dev](https://sismo-fvg.gimmy077.workers.dev)
+🔗 **Live:** [https://sismo-fvg.gimmy077.workers.dev](https://sismo-fvg.gimmy077.workers.dev/?updated=0)
+
+![Version](https://img.shields.io/badge/version-4.0-e040fb)
+![Platform](https://img.shields.io/badge/platform-Cloudflare%20Workers-orange)
+![DB](https://img.shields.io/badge/database-Cloudflare%20D1-blue)
+![License](https://img.shields.io/badge/license-Proprietary-red)
 
 ---
 
@@ -40,6 +45,16 @@ NOAA Solar API  ──→       (cron 5x/gg) ──→ D1: terremoti-cf
 ---
 
 ## 📋 Changelog
+
+### v4.0 — Repository SISMO-ECHO · Marzo 2026
+> Separazione definitiva da repo Forza4 — progetto ECHO come progetto indipendente
+
+- ✅ **Repository rinominato** da `forza4_adv` → `sismo-echo` su GitHub
+- ✅ **Remote URL aggiornato** nel repo locale
+- ✅ **Versioning corretto** — ECHO v4 come punto di partenza ufficiale del progetto
+- ✅ **README professionale** con badge, changelog completo, schema DB, metodologia
+
+---
 
 ### v3.0 — Progetto ECHO · Marzo 2026
 > Separazione DB, Campi Flegrei dedicato, correlazione solare avanzata
