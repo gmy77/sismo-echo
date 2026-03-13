@@ -10,17 +10,18 @@ const NOAA_WIND   = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json"
 const UPDATE_SECRET = "mira755colo";
 
 const FVG = { lat_min:45.5, lat_max:46.8, lon_min:12.4, lon_max:14.1 };
+const CF  = { lat_min:40.4, lat_max:41.1, lon_min:13.7, lon_max:14.8 }; // Campi Flegrei · Vesuvio · Ischia
 
 // ============================================================
 // INGV
 // ============================================================
-async function fetchINGV(giorni = 2) {
+async function fetchINGVArea(area, giorni = 2, minMag = 0.5) {
   const end   = new Date();
   const start = new Date(end - giorni * 86400000);
   const fmt   = d => d.toISOString().slice(0,19);
-  const url   = `${INGV_URL}?format=geojson&starttime=${fmt(start)}&endtime=${fmt(end)}&minmagnitude=0.5`
-              + `&minlatitude=${FVG.lat_min}&maxlatitude=${FVG.lat_max}`
-              + `&minlongitude=${FVG.lon_min}&maxlongitude=${FVG.lon_max}&orderby=time`;
+  const url   = `${INGV_URL}?format=geojson&starttime=${fmt(start)}&endtime=${fmt(end)}&minmagnitude=${minMag}`
+              + `&minlatitude=${area.lat_min}&maxlatitude=${area.lat_max}`
+              + `&minlongitude=${area.lon_min}&maxlongitude=${area.lon_max}&orderby=time`;
   const res   = await fetch(url, { headers:{"User-Agent":"SismoFVG/2.0 gimmycloud.com"} });
   if (!res.ok) throw new Error(`INGV ${res.status}`);
   if (res.status === 204) return [];
@@ -39,6 +40,11 @@ async function fetchINGV(giorni = 2) {
     };
   });
 }
+
+// FVG: soglia M0.5
+async function fetchINGV(giorni = 2) { return fetchINGVArea(FVG, giorni, 0.5); }
+// CF: soglia M0.0 — vogliamo OGNI micro-scosse
+async function fetchINGVCF(giorni = 2) { return fetchINGVArea(CF, giorni, 0.0); }
 
 async function salvaEventi(db, eventi) {
   let nuovi = 0;
@@ -139,6 +145,52 @@ async function getDashboardData(db) {
 }
 
 // ============================================================
+// CAMPI FLEGREI — init DB e query
+// ============================================================
+async function initCFDB(db) {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS terremoti (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id TEXT UNIQUE NOT NULL,
+      data_ora TEXT NOT NULL,
+      magnitudine REAL,
+      latitudine REAL,
+      longitudine REAL,
+      profondita REAL,
+      localita TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `).run();
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS fetch_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      data_fetch TEXT,
+      nuovi INTEGER,
+      totale INTEGER
+    )
+  `).run();
+}
+
+async function getCFData(db_cf) {
+  const [ultimi, stats, top, sismi30, n30d] = await Promise.all([
+    db_cf.prepare("SELECT * FROM terremoti ORDER BY data_ora DESC LIMIT 20").all(),
+    db_cf.prepare("SELECT COUNT(*) as totale, MAX(magnitudine) as max_mag, MIN(data_ora) as primo FROM terremoti").all(),
+    db_cf.prepare("SELECT * FROM terremoti ORDER BY magnitudine DESC LIMIT 5").all(),
+    db_cf.prepare(`SELECT date(data_ora) as giorno, COUNT(*) as n, MAX(magnitudine) as mag_max
+                   FROM terremoti WHERE data_ora >= datetime('now','-30 days')
+                   GROUP BY giorno ORDER BY giorno ASC`).all(),
+    db_cf.prepare("SELECT COUNT(*) as n FROM terremoti WHERE data_ora >= datetime('now','-30 days')").all(),
+  ]);
+  return {
+    ultimi:  ultimi.results,
+    stats:   stats.results[0],
+    top:     top.results,
+    sismi30: sismi30.results,
+    n30:     n30d.results[0]?.n || 0,
+  };
+}
+
+// ============================================================
 // COLORS
 // ============================================================
 const magColor = m => m>=4.0?'#ff1744':m>=3.0?'#ff6d00':m>=2.0?'#ffd600':'#69f0ae';
@@ -149,7 +201,7 @@ const kpLabel  = k => k>=7?'TEMPESTA FORTE':k>=5?'TEMPESTA MODERATA':k>=4?'ATTIV
 // ============================================================
 // HTML DASHBOARD v2
 // ============================================================
-function renderDashboard(data, ingvStatus) {
+function renderDashboard(data, cfData, ingvStatus) {
   const { ultimi, stats, mensile, top, solare30, sismi30, kpMax7 } = data;
   const now = new Date().toLocaleString("it-IT",{timeZone:"Europe/Rome"});
 
@@ -207,7 +259,8 @@ function renderDashboard(data, ingvStatus) {
     const x=PAD+i*((W-PAD*2)/nDays);
     const yBase=H_KP+GAP+H_SISMO;
     const c=s.mag>=3?'#ff6d00':s.mag>=2?'#ffd600':'#26c6da';
-    return h>0?`<rect x="${x}" y="${yBase-h}" width="${barW}" height="${h}" fill="${c}" rx="2" opacity="0.85"/>`:'' ;
+    if(h>0) return `<rect x="${x}" y="${yBase-h}" width="${barW}" height="${h}" fill="${c}" rx="2" opacity="0.85"/>`;
+    return `<rect x="${x}" y="${yBase-2}" width="${barW}" height="2" fill="#263238" rx="1"/>`;
   }).join("");
 
   const xLabels = allDays.filter((_,i)=>i%5===0||i===allDays.length-1).map(day=>{
@@ -232,6 +285,81 @@ function renderDashboard(data, ingvStatus) {
     <text x="${x+bW2/2}" y="${bH-h-3}" text-anchor="middle" fill="#78909c" font-size="8">${m.n}</text></g>`;
   }).join("");
   const svgMW=mensile.length*(bW2+3)||480;
+
+  // ---- CAMPI FLEGREI — calcoli timeline correlazione ----
+  const cfSismi30   = cfData?.sismi30 || [];
+  const cfStats     = cfData?.stats   || {};
+  const cfUltimi    = cfData?.ultimi  || [];
+  const cfN30       = cfData?.n30     || 0;
+
+  const cfAllDays   = [...new Set([
+    ...solare30.map(r=>r.giorno),
+    ...cfSismi30.map(r=>r.giorno),
+  ])].sort();
+  const cfSismiMap  = Object.fromEntries(cfSismi30.map(r=>[r.giorno,{n:parseInt(r.n)||0,mag:parseFloat(r.mag_max)||0}]));
+  const cfMaxN      = Math.max(...cfSismi30.map(r=>parseInt(r.n)||0), 1);
+
+  const cfYSismo = H_KP+GAP+H_SISMO; // baseline sismicità
+  const cfBars = cfAllDays.map((day,i)=>{
+    const s=cfSismiMap[day]||{n:0,mag:0};
+    const x=PAD+i*((W-PAD*2)/cfAllDays.length);
+    const c=s.mag>=3?'#ff6d00':s.mag>=2?'#ffd600':'#e040fb';
+    if(s.n>0){
+      const h=Math.max(4,Math.round((s.n/cfMaxN)*H_SISMO));
+      return `<rect x="${x}" y="${cfYSismo-h}" width="${barW}" height="${h}" fill="${c}" rx="2" opacity="0.85" title="${day}: ${s.n} eventi M${s.mag.toFixed(1)}"/>`;
+    }
+    // giorno senza sismi: pallino base
+    return `<rect x="${x}" y="${cfYSismo-2}" width="${barW}" height="2" fill="#263238" rx="1"/>`;
+  }).join("");
+
+  const cfKpBarsSync = cfAllDays.map((day,i)=>{
+    const kp=kpMap[day]||0;
+    const x=PAD+i*((W-PAD*2)/cfAllDays.length);
+    const c=kpColor(kp);
+    if(kp>0){
+      const h=Math.max(2,Math.round((kp/maxKp)*H_KP));
+      return `<rect x="${x}" y="${H_KP-h}" width="${barW}" height="${h}" fill="${c}" rx="2" opacity="0.9"/>`;
+    }
+    // Kp=0 o assente: linea piatta alla baseline
+    return `<rect x="${x}" y="${H_KP-2}" width="${barW}" height="2" fill="#263238" rx="1" opacity="0.8"/>`;
+  }).join("");
+
+  const cfXLabels = cfAllDays.filter((_,i)=>i%5===0||i===cfAllDays.length-1).map(day=>{
+    const idx=cfAllDays.indexOf(day);
+    const x=PAD+idx*((W-PAD*2)/cfAllDays.length)+barW/2;
+    return `<text x="${x}" y="${totalH+2}" text-anchor="middle" fill="#455a64" font-size="9" font-family="monospace">${day.slice(5)}</text>`;
+  }).join("");
+
+  const cfCoincidenze = cfAllDays.filter(day=>(kpMap[day]||0)>=4&&(cfSismiMap[day]?.n||0)>0);
+  const cfTotGiorni   = cfAllDays.filter(day=>(cfSismiMap[day]?.n||0)>0).length;
+  const cfHitRate     = cfTotGiorni>0?Math.round((cfCoincidenze.length/cfTotGiorni)*100):0;
+
+  const cfCoincRows = cfCoincidenze.length===0
+    ? '<p style="color:#455a64;font-size:.85em;font-family:\'Share Tech Mono\',monospace">Nessuna coincidenza nei dati disponibili.</p>'
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px">${
+        cfCoincidenze.map(day=>{
+          const kp=kpMap[day]||0;
+          const s=cfSismiMap[day]||{n:0,mag:0};
+          return `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.83em">
+            <span style="color:#e040fb;font-family:'Share Tech Mono',monospace;min-width:55px">${day.slice(5)}</span>
+            <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7em;font-weight:700;font-family:'Share Tech Mono',monospace;background:${kpColor(kp)}22;color:${kpColor(kp)};border:1px solid ${kpColor(kp)}44">Kp ${kp.toFixed(1)}</span>
+            <span style="color:#eceff1">${s.n} eventi</span>
+            <span style="color:${magColor(s.mag)};font-weight:700">M${s.mag.toFixed(1)}</span>
+          </div>`;
+        }).join("")
+      }</div>`;
+
+  const cfUltiRows = cfUltimi.map(e=>{
+    const d=new Date(e.data_ora);
+    const dIT=d.toLocaleString("it-IT",{timeZone:"Europe/Rome",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    const m=e.magnitudine;
+    return `<tr style="background:${magBg(m)};border-bottom:1px solid rgba(255,255,255,.04)">
+      <td style="padding:9px 14px;font-weight:700;color:${magColor(m)};font-size:1.1em;font-family:'Share Tech Mono',monospace">M${m.toFixed(1)}</td>
+      <td style="padding:9px 14px;color:#cfd8dc;font-size:.83em">${dIT}</td>
+      <td style="padding:9px 14px;color:#eceff1">${e.localita}</td>
+      <td style="padding:9px 14px;color:#90a4ae;font-size:.83em">${e.profondita?e.profondita.toFixed(1)+'km':'—'}</td>
+    </tr>`;
+  }).join("");
 
   const coincRows = coincidenze.length===0
     ? '<p style="color:#455a64;font-size:.85em;font-family:\'Share Tech Mono\',monospace">Nessuna coincidenza nei dati disponibili. I dati solari si accumulano ad ogni aggiornamento.</p>'
@@ -383,6 +511,89 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         Significatività statistica aumenta con l'accumulo dei dati.
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SEZIONE CAMPI FLEGREI                                       -->
+<!-- ============================================================ -->
+<div class="panel" style="margin-top:28px;border-color:rgba(224,64,251,.25)">
+  <div class="panel-header" style="color:#e040fb;border-bottom-color:rgba(224,64,251,.2)">
+    🌋 <span style="color:#e040fb">AREA CAMPI FLEGREI · VESUVIO · ISCHIA</span>
+    <span style="color:#455a64">LAT ${CF.lat_min}–${CF.lat_max} · LON ${CF.lon_min}–${CF.lon_max} · M≥0.0 · ogni micro-sisma</span>
+  </div>
+  <div class="panel-body">
+    <div class="stats-grid" style="margin-bottom:20px">
+      <div class="stat-card" style="border-color:rgba(224,64,251,.15)">
+        <div class="stat-label" style="color:#9c27b0">🌋 Totale eventi CF</div>
+        <div class="stat-value">${cfStats.totale||0}</div>
+        <div class="stat-sub">nel database</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(224,64,251,.15)">
+        <div class="stat-label" style="color:#9c27b0">⚡ Mag. massima CF</div>
+        <div class="stat-value" style="color:${magColor(cfStats.max_mag||0)}">${cfStats.max_mag?'M'+Number(cfStats.max_mag).toFixed(1):'—'}</div>
+        <div class="stat-sub">evento più forte</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(224,64,251,.15)">
+        <div class="stat-label" style="color:#9c27b0">📅 Ultimi 30 gg</div>
+        <div class="stat-value">${cfN30}</div>
+        <div class="stat-sub">eventi totali</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(224,64,251,.15)">
+        <div class="stat-label" style="color:#9c27b0">🔗 Hit rate CF</div>
+        <div class="stat-value" style="color:${cfHitRate>60?'#ff6d00':cfHitRate>30?'#ffd600':'#e040fb'}">${cfHitRate}%</div>
+        <div class="stat-sub">Kp≥4 + sismi CF stesso giorno (30gg)</div>
+      </div>
+    </div>
+
+    <!-- Timeline CF: Kp sincronizzato + sismicità CF -->
+    <div style="font-size:.73em;font-weight:600;color:#9c27b0;text-transform:uppercase;letter-spacing:.12em;font-family:'Share Tech Mono',monospace;margin-bottom:10px">
+      📡 TIMELINE CORRELAZIONE CF — ultimi 30 giorni
+    </div>
+    <div style="overflow-x:auto">
+      <svg width="100%" viewBox="0 0 ${W} ${totalH+14}" style="overflow:visible;min-width:520px">
+        <text x="${PAD}" y="11" fill="${kpColor(parseFloat(kpNow)||0)}" font-size="10" font-family="monospace" font-weight="700">☀ SOLARE — Kp index (max/giorno)</text>
+        ${cfKpBarsSync}
+        <text x="${W-PAD+4}" y="${H_KP-1}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
+        <line x1="${PAD}" y1="${H_KP+GAP/2}" x2="${W-PAD}" y2="${H_KP+GAP/2}" stroke="rgba(224,64,251,.12)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="${PAD}" y="${H_KP+GAP-4}" fill="#e040fb" font-size="10" font-family="monospace" font-weight="700">🌋 SISMICITÀ CF — eventi/giorno (M≥0.0)</text>
+        ${cfBars}
+        ${cfXLabels}
+      </svg>
+      <div style="display:flex;gap:18px;margin-top:14px;font-size:.7em;font-family:'Share Tech Mono',monospace;flex-wrap:wrap;color:#546e7a">
+        <span><span style="color:#ff1744">■</span> Kp≥7</span>
+        <span><span style="color:#ff6d00">■</span> Kp≥5</span>
+        <span><span style="color:#ffd600">■</span> Kp≥4</span>
+        <span><span style="color:#26c6da">■</span> Kp normale</span>
+        <span style="margin-left:12px"><span style="color:#ff6d00">■</span> CF M≥3</span>
+        <span><span style="color:#ffd600">■</span> CF M≥2</span>
+        <span><span style="color:#e040fb">■</span> CF M&lt;2</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Coincidenze CF -->
+<div class="panel">
+  <div class="panel-header" style="border-bottom-color:rgba(224,64,251,.2)">
+    <span>🔗 <span style="color:#e040fb">COINCIDENZE CF</span> — giorni Kp≥4 con sismicità Campi Flegrei</span>
+    <span style="color:${cfHitRate>60?'#ff6d00':cfHitRate>30?'#ffd600':'#e040fb'};font-size:1.1em;font-weight:700">${cfCoincidenze.length} / ${cfTotGiorni} giorni — ${cfHitRate}%</span>
+  </div>
+  <div class="panel-body">
+    ${cfCoincRows}
+  </div>
+</div>
+
+<!-- Ultimi 20 eventi CF -->
+<div class="panel">
+  <div class="panel-header" style="border-bottom-color:rgba(224,64,251,.2)">
+    🌋 <span style="color:#e040fb">Ultimi 20 eventi CF</span> ≥ M0.0
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Mag</th><th>Data/Ora</th><th>Località</th><th>Profondità</th></tr></thead>
+      <tbody>${cfUltiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato CF. <a href="/update?token=mira755colo" style="color:#e040fb">Aggiorna →</a></td></tr>'}</tbody>
+    </table>
   </div>
 </div>
 
@@ -545,10 +756,14 @@ export default {
       if (url.searchParams.get("token") !== UPDATE_SECRET) return new Response("Non autorizzato 🔒",{status:401});
       try {
         await initDB();
+        if (env.DB_CF) await initCFDB(env.DB_CF);
         const giorni = parseInt(url.searchParams.get("giorni"))||3;
-        let eventi = [], ingvOffline = false;
+        let eventi = [], eventiCF = [], ingvOffline = false;
         try {
-          eventi = await fetchINGV(giorni);
+          [eventi, eventiCF] = await Promise.all([
+            fetchINGV(giorni),
+            fetchINGVCF(giorni),
+          ]);
           if (env.F4_LEARN) await env.F4_LEARN.put("ingv_status", JSON.stringify({online:true, last_check:new Date().toISOString()}));
         } catch(ingvErr) {
           ingvOffline = true;
@@ -556,6 +771,7 @@ export default {
         }
         let nuovi = 0;
         if (eventi.length > 0) ({ nuovi } = await salvaEventi(db, eventi));
+        if (eventiCF.length > 0 && env.DB_CF) await salvaEventi(env.DB_CF, eventiCF);
         const solare = await fetchSolare();
         if (solare.kpData.length>0) await salvaSolare(db, solare.kpData);
         return Response.redirect(url.origin+"/?updated="+nuovi+(ingvOffline?"&ingv_offline=1":""), 302);
@@ -626,10 +842,14 @@ export default {
 
     try {
       await initDB();
-      const d    = await getDashboardData(db);
+      if (env.DB_CF) await initCFDB(env.DB_CF);
+      const [d, cfData] = await Promise.all([
+        getDashboardData(db),
+        env.DB_CF ? getCFData(env.DB_CF) : Promise.resolve(null),
+      ]);
       let ingvStatus = null;
       try { if (env.F4_LEARN) { const raw = await env.F4_LEARN.get("ingv_status"); if (raw) ingvStatus = JSON.parse(raw); } } catch(_) {}
-      const html = renderDashboard(d, ingvStatus);
+      const html = renderDashboard(d, cfData, ingvStatus);
       return new Response(html,{headers:{"Content-Type":"text/html;charset=UTF-8"}});
     } catch(e) {
       return new Response(`<h1>Errore dashboard</h1><pre>${e.message}</pre>`,{status:500,headers:{"Content-Type":"text/html"}});
@@ -643,9 +863,14 @@ export default {
         time_tag TEXT UNIQUE NOT NULL,
         kp_index REAL
       )`).run();
-      let eventi = [];
+      if (env.DB_CF) await initCFDB(env.DB_CF);
+
+      let eventi = [], eventiCF = [];
       try {
-        eventi = await fetchINGV(2);
+        [eventi, eventiCF] = await Promise.all([
+          fetchINGV(2),
+          fetchINGVCF(2),
+        ]);
         if (env.F4_LEARN) await env.F4_LEARN.put("ingv_status", JSON.stringify({online:true, last_check:new Date().toISOString()}));
       } catch(ingvErr) {
         if (env.F4_LEARN) await env.F4_LEARN.put("ingv_status", JSON.stringify({online:false, last_error:ingvErr.message, last_check:new Date().toISOString()}));
@@ -653,6 +878,7 @@ export default {
       }
       const solare = await fetchSolare();
       if (eventi.length>0) await salvaEventi(env.DB, eventi);
+      if (eventiCF.length>0 && env.DB_CF) await salvaEventi(env.DB_CF, eventiCF);
       if (solare.kpData.length>0) await salvaSolare(env.DB, solare.kpData);
     } catch(e) {
       console.error("Cron error:", e.message);
