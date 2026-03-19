@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Brain, ChevronRight, Cpu, RotateCcw, Sparkles, User, Zap } from "lucide-react";
+import { Brain, ChevronRight, Cpu, RotateCcw, Sparkles, User, Volume2, VolumeX, Zap } from "lucide-react";
 
 /**
  * FORZA 4 — Feature-Based Q-Learning Edition
@@ -56,6 +56,104 @@ const FEAT_LABELS = {
 const TACTICAL = new Set(["vince_ora", "blocca", "blunder"]);
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// ─────────────────────────────────────────────────────────
+// AUDIO ENGINE  (Web Audio API — zero file esterni)
+// ─────────────────────────────────────────────────────────
+const audio = (() => {
+  let ctx = null;
+  let _muted = false;
+
+  const ac = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+  };
+
+  /** Oscillatore con fade-in e fade-out */
+  const tone = (freq, type, t0, dur, vol = 0.28, fi = 0.008) => {
+    const c = ac();
+    const osc  = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(vol, t0 + fi);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain); gain.connect(c.destination);
+    osc.start(t0); osc.stop(t0 + dur);
+  };
+
+  /** Rumore filtrato (botta percussiva) */
+  const thud = (t0, dur, vol = 0.18, fc = 500) => {
+    const c = ac();
+    const buf = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate);
+    const d   = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(); src.buffer = buf;
+    const flt = c.createBiquadFilter(); flt.type = "lowpass"; flt.frequency.value = fc;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(vol, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(flt); flt.connect(gain); gain.connect(c.destination);
+    src.start(t0); src.stop(t0 + dur);
+  };
+
+  return {
+    get muted() { return _muted; },
+    toggle()    { _muted = !_muted; return _muted; },
+
+    /** Clic sul dischetto — rosso più grave, giallo più acuto */
+    drop(player) {
+      if (_muted) return;
+      const c = ac(), t = c.currentTime;
+      const f = player === "yellow" ? 200 : 140;
+      tone(f,      "sine",     t,      0.18, 0.35);
+      tone(f * 2,  "triangle", t,      0.08, 0.12);
+      thud(t, 0.09, 0.20, 700);
+    },
+
+    /** Fanfara ascendente — hai vinto! */
+    win() {
+      if (_muted) return;
+      const c = ac(), t = c.currentTime;
+      [[523, 0], [659, 0.11], [784, 0.22], [1047, 0.35]].forEach(([f, dt]) => {
+        tone(f,       "sine",     t + dt, 0.45, 0.32);
+        tone(f * 0.5, "triangle", t + dt, 0.38, 0.12);
+      });
+    },
+
+    /** Melodia discendente — ha vinto l'IA */
+    loss() {
+      if (_muted) return;
+      const c = ac(), t = c.currentTime;
+      [[392, 0], [330, 0.17], [262, 0.34], [196, 0.52]].forEach(([f, dt]) => {
+        tone(f, "sawtooth", t + dt, 0.38, 0.18);
+      });
+    },
+
+    /** Accordo neutro — pareggio */
+    draw() {
+      if (_muted) return;
+      const c = ac(), t = c.currentTime;
+      [262, 330, 392].forEach(f => tone(f, "sine", t, 0.65, 0.14, 0.025));
+    },
+
+    /** Tick sottile per ogni pensiero IA */
+    tick() {
+      if (_muted) return;
+      const c = ac(), t = c.currentTime;
+      tone(1400, "square", t, 0.035, 0.045, 0.004);
+    },
+
+    /** Bip leggero su hover colonna */
+    hover() {
+      if (_muted) return;
+      const c = ac(), t = c.currentTime;
+      tone(900, "sine", t, 0.04, 0.04, 0.005);
+    },
+  };
+})();
 
 // ─────────────────────────────────────────────────────────
 // SISTEMA DI APPRENDIMENTO
@@ -397,6 +495,7 @@ export default function Forza4() {
   // Learning
   const [brain, setBrain]         = useState(loadBrain);
   const [learnFlash, setLearnFlash] = useState(null);
+  const [muted, setMuted]         = useState(false);
   const brainRef   = useRef(brain);
   const histRef    = useRef([]);  // [{features, player}] per la partita corrente
 
@@ -431,6 +530,7 @@ export default function Forza4() {
     const row = getRow(board, col);
     if (row === -1) return null;
     const id = `${row}-${col}`;
+    audio.drop(player);
     setAnim(p => { const n = new Set(p); n.add(id); return n; });
     const next = cloneBoard(board);
     next[row][col] = player;
@@ -450,7 +550,9 @@ export default function Forza4() {
     setWinner(res.winner); setWinCells(res.cells); setGs("over"); setThinking(false);
     setScore(p => ({ h: p.h + (res.winner === "red" ? 1 : 0), ai: p.ai + (res.winner === "yellow" ? 1 : 0), d: p.d }));
     setHistory(h => [{ w: res.winner, diff, moves }, ...h]);
-    finishGame(res.winner === "yellow" ? "win" : "loss");
+    const result = res.winner === "yellow" ? "win" : "loss";
+    setTimeout(() => result === "win" ? audio.loss() : audio.win(), 120); // win = umano, loss = IA
+    finishGame(result);
     return true;
   };
 
@@ -472,6 +574,7 @@ export default function Forza4() {
       setWinner("draw"); setGs("over"); setThinking(false);
       setScore(p => ({ ...p, d: p.d + 1 }));
       setHistory(h => [{ w: "draw", diff, moves: moveCount + 1 }, ...h]);
+      setTimeout(() => audio.draw(), 120);
       finishGame("draw"); return;
     }
     setTurn("ai");
@@ -517,6 +620,7 @@ export default function Forza4() {
 
       for (const line of lines) {
         await wait(140);
+        audio.tick();
         setThoughts(p => [{ round, text: line }, ...p]);
       }
       await wait(280);
@@ -534,6 +638,7 @@ export default function Forza4() {
         setWinner("draw"); setGs("over"); setThinking(false);
         setScore(p => ({ ...p, d: p.d + 1 }));
         setHistory(h => [{ w: "draw", diff, moves: moveCount + 2 }, ...h]);
+        setTimeout(() => audio.draw(), 120);
         finishGame("draw"); return;
       }
       setThinking(false); setTurn("human");
@@ -678,6 +783,14 @@ export default function Forza4() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { const m = audio.toggle(); setMuted(m); }}
+                      className="p-2 rounded-full bg-white/8 hover:bg-white/15 transition-colors"
+                      title={muted ? "Attiva audio" : "Disattiva audio"}>
+                      {muted
+                        ? <VolumeX className="w-4 h-4 text-white/35" />
+                        : <Volume2 className="w-4 h-4 text-white/60" />}
+                    </button>
                     <div className="px-3 py-1 rounded-full bg-white/8 text-white/45 font-mono text-xs">
                       {score.h}:{score.ai}:{score.d}
                     </div>
@@ -703,7 +816,7 @@ export default function Forza4() {
                   <div className="grid grid-cols-7 gap-1.5">
                     {Array.from({ length: COLS }, (_, col) => (
                       <div key={col} className="relative cursor-pointer"
-                        onMouseEnter={() => setHover(col)}
+                        onMouseEnter={() => { setHover(col); if (turn === "human" && !thinking && gs === "playing") audio.hover(); }}
                         onMouseLeave={() => setHover(null)}
                         onClick={() => onHumanMove(col)}>
                         {hover === col && turn === "human" && !thinking && gs === "playing" && (
