@@ -647,6 +647,54 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   </div>
 </div>
 
+<div class="panel" style="margin-top:20px">
+  <div class="panel-header">🤖 <span class="acc">ECHO CHAT</span></div>
+  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <div style="font-size:2.5em;line-height:1">🧠</div>
+    <div>
+      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Chatbot IA <span style="background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-size:.65em;color:#26c6da;font-family:'Share Tech Mono',monospace;vertical-align:middle">LLaMA 3</span></div>
+      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">assistente personale IA // accesso privato // powered by Cloudflare AI</div>
+      <a href="/chat" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">🤖 Apri Chat</a>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:20px">
+  <div class="panel-header">💻 <span class="acc">ECHO CODE</span></div>
+  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <div style="font-size:2.5em;line-height:1">⌨️</div>
+    <div>
+      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Assistente Codice <span style="background:rgba(102,187,106,.1);border:1px solid rgba(102,187,106,.3);border-radius:20px;padding:2px 10px;font-size:.65em;color:#66bb6a;font-family:'Share Tech Mono',monospace;vertical-align:middle">Code Llama</span></div>
+      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">debug // spiega // ottimizza // genera codice // accesso privato</div>
+      <a href="/code" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(102,187,106,.3);background:rgba(102,187,106,.1);color:#66bb6a;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">💻 Apri Code</a>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:20px">
+  <div class="panel-header">🌍 <span class="acc">ECHO TRANSLATE</span></div>
+  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <div style="font-size:2.5em;line-height:1">🇮🇹⇄🇬🇧</div>
+    <div>
+      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Traduttore IA <span style="background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-size:.65em;color:#26c6da;font-family:'Share Tech Mono',monospace;vertical-align:middle">AI</span></div>
+      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">traduzione EN ↔ IT // powered by Cloudflare AI // istantaneo</div>
+      <a href="/traduttore" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">⚡ Apri Traduttore</a>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:20px">
+  <div class="panel-header">💾 <span class="acc">ECHO STORAGE</span></div>
+  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <div style="font-size:2.5em;line-height:1">📁</div>
+    <div>
+      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">PixelDrain Files</div>
+      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">file manager privato // accesso riservato // cloud storage</div>
+      <a href="/pixeldrain" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">&#128193; Apri Storage</a>
+    </div>
+  </div>
+</div>
+
 <footer>
   ECHO MONITOR v2 — <a href="https://gimmycloud.com">gimmycloud.com</a> //
   sismicità: <a href="https://www.ingv.it" target="_blank">INGV</a> —
@@ -823,6 +871,790 @@ function a0_0x26da(_0x517a64,_0x9c7876){_0x517a64=_0x517a64-0xb4;var _0x4861a5=a
 }
 
 // ============================================================
+// ECHO CHAT — LLaMA 3 Chatbot
+// ============================================================
+function renderChat() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ECHO Chat — AI</title>
+<meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.topbar{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(38,198,218,.15);flex-shrink:0}
+.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
+.back:hover{background:rgba(38,198,218,.2)}
+.title{text-align:center}
+.title h1{font-size:1.4em;font-weight:800;color:#26c6da;letter-spacing:.05em}
+.title sub{font-size:.68em;color:#546e7a;font-family:'Share Tech Mono',monospace}
+.ai-badge{display:inline-block;background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#26c6da;vertical-align:middle}
+/* auth */
+#auth-overlay{position:fixed;inset:0;background:#080e14;z-index:100;display:flex;align-items:center;justify-content:center}
+#auth-box{background:rgba(255,255,255,.03);border:1px solid rgba(38,198,218,.2);border-radius:14px;padding:36px;max-width:360px;width:90%;text-align:center}
+#auth-box h2{color:#26c6da;margin-bottom:8px}
+#auth-box p{color:#546e7a;font-size:.8em;font-family:'Share Tech Mono',monospace;margin-bottom:20px}
+#pwd-input{width:100%;background:#0d1820;border:1px solid rgba(38,198,218,.3);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.9em;margin-bottom:12px;outline:none}
+#pwd-input:focus{border-color:#26c6da}
+#pwd-btn{width:100%;background:rgba(38,198,218,.15);border:1px solid rgba(38,198,218,.4);color:#26c6da;padding:10px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.9em}
+#pwd-btn:hover{background:rgba(38,198,218,.3)}
+#pwd-err{color:#ef5350;font-size:.78em;margin-top:8px;display:none}
+/* chat */
+#chat-wrap{position:relative;z-index:1;flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:75%;padding:12px 16px;border-radius:12px;font-size:.9em;line-height:1.55;word-break:break-word}
+.msg.user{align-self:flex-end;background:rgba(38,198,218,.15);border:1px solid rgba(38,198,218,.3);color:#eceff1;border-bottom-right-radius:3px}
+.msg.ai{align-self:flex-start;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cfd8dc;border-bottom-left-radius:3px}
+.msg.ai .sender{font-family:'Share Tech Mono',monospace;font-size:.7em;color:#26c6da;margin-bottom:4px}
+.msg.thinking{opacity:.5;font-family:'Share Tech Mono',monospace;font-size:.8em}
+.msg pre{background:#0d1820;border-radius:6px;padding:10px;overflow-x:auto;font-size:.85em;margin-top:6px}
+/* input bar */
+#input-bar{position:relative;z-index:1;display:flex;gap:10px;padding:14px 20px;border-top:1px solid rgba(38,198,218,.12);flex-shrink:0}
+#msg-input{flex:1;background:#0d1820;border:1px solid rgba(38,198,218,.2);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Exo 2',sans-serif;font-size:.9em;outline:none;resize:none;max-height:120px}
+#msg-input:focus{border-color:#26c6da}
+#send-btn{background:rgba(38,198,218,.15);border:1px solid rgba(38,198,218,.4);color:#26c6da;padding:10px 20px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.85em;transition:background .15s;white-space:nowrap}
+#send-btn:hover{background:rgba(38,198,218,.3)}
+#send-btn:disabled{opacity:.4;cursor:not-allowed}
+#clear-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#546e7a;padding:10px 14px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.85em}
+#clear-btn:hover{background:rgba(255,255,255,.08);color:#90a4ae}
+footer{text-align:center;font-size:.65em;color:#1c2a33;font-family:'Share Tech Mono',monospace;padding:6px;flex-shrink:0}
+footer a{color:#26c6da;text-decoration:none}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>🤖 ECHO Chat</h2>
+    <p>Inserisci la password per accedere</p>
+    <input id="pwd-input" type="password" placeholder="password..." onkeydown="if(event.key==='Enter') checkPwd()">
+    <button id="pwd-btn" onclick="checkPwd()">Accedi</button>
+    <div id="pwd-err">Password non valida</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <a href="/" class="back">&#8592; ECHO Monitor</a>
+  <div class="title">
+    <h1>ECHO Chat <span class="ai-badge">LLaMA 3</span></h1>
+    <sub>Chatbot IA // powered by Cloudflare AI</sub>
+  </div>
+  <div style="width:110px;display:flex;justify-content:flex-end">
+    <button id="clear-btn" onclick="clearChat()">🗑 Reset</button>
+  </div>
+</div>
+
+<div id="chat-wrap" id="chat-wrap"></div>
+
+<div id="input-bar">
+  <textarea id="msg-input" placeholder="Scrivi un messaggio... (Invio per inviare)" rows="1"></textarea>
+  <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
+</div>
+<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+
+<script>
+const CORRECT_PWD = 'mira755colo';
+let _history = [];
+let _authed = localStorage.getItem('echo_chat_auth') === '1';
+
+if (_authed) document.getElementById('auth-overlay').style.display = 'none';
+
+function checkPwd() {
+  if (document.getElementById('pwd-input').value.trim() === CORRECT_PWD) {
+    localStorage.setItem('echo_chat_auth','1');
+    document.getElementById('auth-overlay').style.display = 'none';
+    _authed = true;
+  } else {
+    document.getElementById('pwd-err').style.display = 'block';
+  }
+}
+
+const chatWrap = document.getElementById('chat-wrap');
+
+function addMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  if (role === 'ai') {
+    div.innerHTML = '<div class="sender">🤖 ECHO AI</div>' + escHtml(text).replace(/\\n/g,'<br>');
+  } else {
+    div.textContent = text;
+  }
+  chatWrap.appendChild(div);
+  chatWrap.scrollTop = chatWrap.scrollHeight;
+  return div;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function clearChat() {
+  _history = [];
+  chatWrap.innerHTML = '';
+  addMsg('ai', 'Ciao! Sono ECHO AI, il tuo assistente personale. Come posso aiutarti?');
+}
+
+async function sendMsg() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('send-btn').disabled = true;
+
+  addMsg('user', text);
+  _history.push({ role:'user', content: text });
+
+  const thinking = addMsg('ai thinking', '⏳ Sto pensando...');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ messages: _history })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore AI');
+    chatWrap.removeChild(thinking);
+    const reply = data.reply;
+    _history.push({ role:'assistant', content: reply });
+    addMsg('ai', reply);
+  } catch(e) {
+    thinking.textContent = '⚠ Errore: ' + e.message;
+    thinking.className = 'msg ai';
+  } finally {
+    document.getElementById('send-btn').disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// Messaggio di benvenuto
+addMsg('ai', 'Ciao! Sono ECHO AI, il tuo assistente personale. Come posso aiutarti?');
+</script>
+</body>
+</html>`;
+}
+
+// ============================================================
+// ECHO CODE — Code Llama Assistente
+// ============================================================
+function renderCode() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ECHO Code — AI</title>
+<meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.topbar{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(38,198,218,.15);flex-shrink:0}
+.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
+.back:hover{background:rgba(38,198,218,.2)}
+.title{text-align:center}
+.title h1{font-size:1.4em;font-weight:800;color:#26c6da;letter-spacing:.05em}
+.title sub{font-size:.68em;color:#546e7a;font-family:'Share Tech Mono',monospace}
+.ai-badge{display:inline-block;background:rgba(102,187,106,.15);border:1px solid rgba(102,187,106,.35);border-radius:20px;padding:2px 10px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#66bb6a;vertical-align:middle}
+/* auth */
+#auth-overlay{position:fixed;inset:0;background:#080e14;z-index:100;display:flex;align-items:center;justify-content:center}
+#auth-box{background:rgba(255,255,255,.03);border:1px solid rgba(102,187,106,.2);border-radius:14px;padding:36px;max-width:360px;width:90%;text-align:center}
+#auth-box h2{color:#66bb6a;margin-bottom:8px}
+#auth-box p{color:#546e7a;font-size:.8em;font-family:'Share Tech Mono',monospace;margin-bottom:20px}
+#pwd-input{width:100%;background:#0d1820;border:1px solid rgba(102,187,106,.3);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.9em;margin-bottom:12px;outline:none}
+#pwd-input:focus{border-color:#66bb6a}
+#pwd-btn{width:100%;background:rgba(102,187,106,.15);border:1px solid rgba(102,187,106,.4);color:#66bb6a;padding:10px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.9em}
+#pwd-btn:hover{background:rgba(102,187,106,.3)}
+#pwd-err{color:#ef5350;font-size:.78em;margin-top:8px;display:none}
+/* layout */
+#main{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden}
+/* chat */
+#chat-wrap{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:80%;padding:12px 16px;border-radius:12px;font-size:.88em;line-height:1.6;word-break:break-word}
+.msg.user{align-self:flex-end;background:rgba(102,187,106,.12);border:1px solid rgba(102,187,106,.3);color:#eceff1;border-bottom-right-radius:3px}
+.msg.ai{align-self:flex-start;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cfd8dc;border-bottom-left-radius:3px;max-width:90%}
+.msg.ai .sender{font-family:'Share Tech Mono',monospace;font-size:.7em;color:#66bb6a;margin-bottom:6px}
+.msg.thinking{opacity:.5;font-family:'Share Tech Mono',monospace;font-size:.8em}
+.msg pre{background:#0a1218;border:1px solid rgba(102,187,106,.15);border-radius:8px;padding:12px;overflow-x:auto;font-family:'Share Tech Mono',monospace;font-size:.82em;margin-top:8px;white-space:pre-wrap}
+.msg code{font-family:'Share Tech Mono',monospace;background:#0a1218;padding:1px 5px;border-radius:3px;font-size:.88em;color:#a5d6a7}
+.copy-code{float:right;background:rgba(102,187,106,.1);border:1px solid rgba(102,187,106,.25);color:#66bb6a;padding:2px 8px;border-radius:4px;font-size:.7em;cursor:pointer;font-family:'Share Tech Mono',monospace;margin-left:8px}
+.copy-code:hover{background:rgba(102,187,106,.25)}
+/* input */
+#input-bar{display:flex;gap:10px;padding:14px 20px;border-top:1px solid rgba(102,187,106,.1);flex-shrink:0}
+#msg-input{flex:1;background:#0d1820;border:1px solid rgba(102,187,106,.2);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.88em;outline:none;resize:none;max-height:140px}
+#msg-input:focus{border-color:#66bb6a}
+#msg-input::placeholder{color:#37474f}
+#send-btn{background:rgba(102,187,106,.15);border:1px solid rgba(102,187,106,.4);color:#66bb6a;padding:10px 20px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.85em;transition:background .15s;white-space:nowrap}
+#send-btn:hover{background:rgba(102,187,106,.3)}
+#send-btn:disabled{opacity:.4;cursor:not-allowed}
+#clear-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#546e7a;padding:10px 14px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.85em}
+#clear-btn:hover{background:rgba(255,255,255,.08);color:#90a4ae}
+/* quick prompts */
+.quick-bar{display:flex;gap:8px;padding:0 20px 12px;flex-wrap:wrap;flex-shrink:0}
+.qbtn{background:rgba(102,187,106,.06);border:1px solid rgba(102,187,106,.18);color:#66bb6a;padding:4px 12px;border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.7em;cursor:pointer;transition:background .12s}
+.qbtn:hover{background:rgba(102,187,106,.18)}
+footer{text-align:center;font-size:.65em;color:#1c2a33;font-family:'Share Tech Mono',monospace;padding:6px;flex-shrink:0}
+footer a{color:#66bb6a;text-decoration:none}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>💻 ECHO Code</h2>
+    <p>Inserisci la password per accedere</p>
+    <input id="pwd-input" type="password" placeholder="password..." onkeydown="if(event.key==='Enter') checkPwd()">
+    <button id="pwd-btn" onclick="checkPwd()">Accedi</button>
+    <div id="pwd-err">Password non valida</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <a href="/" class="back">&#8592; ECHO Monitor</a>
+  <div class="title">
+    <h1>ECHO Code <span class="ai-badge">Code Llama</span></h1>
+    <sub>Assistente codice IA // powered by Cloudflare AI</sub>
+  </div>
+  <div style="width:110px;display:flex;justify-content:flex-end">
+    <button id="clear-btn" onclick="clearChat()">🗑 Reset</button>
+  </div>
+</div>
+
+<div id="main">
+  <div class="quick-bar">
+    <button class="qbtn" onclick="quickPrompt('Spiega questo codice:')">📖 Spiega codice</button>
+    <button class="qbtn" onclick="quickPrompt('Trova e correggi i bug in questo codice:')">🐛 Debug</button>
+    <button class="qbtn" onclick="quickPrompt('Ottimizza questo codice:')">⚡ Ottimizza</button>
+    <button class="qbtn" onclick="quickPrompt('Scrivi un esempio di codice per:')">✏️ Genera codice</button>
+    <button class="qbtn" onclick="quickPrompt('Converti questo codice in JavaScript:')">🔄 Converti</button>
+  </div>
+  <div id="chat-wrap"></div>
+  <div id="input-bar">
+    <textarea id="msg-input" placeholder="Incolla il tuo codice o fai una domanda... (Invio per inviare)" rows="1"></textarea>
+    <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
+  </div>
+</div>
+<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+
+<script>
+const CORRECT_PWD = 'mira755colo';
+let _history = [];
+let _authed = localStorage.getItem('echo_code_auth') === '1';
+
+if (_authed) document.getElementById('auth-overlay').style.display = 'none';
+
+document.getElementById('pwd-btn').addEventListener('click', checkPwd);
+function checkPwd() {
+  if (document.getElementById('pwd-input').value.trim() === CORRECT_PWD) {
+    localStorage.setItem('echo_code_auth','1');
+    document.getElementById('auth-overlay').style.display = 'none';
+    _authed = true;
+  } else {
+    document.getElementById('pwd-err').style.display = 'block';
+  }
+}
+
+const chatWrap = document.getElementById('chat-wrap');
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatMsg(text) {
+  // Formatta blocchi di codice triple-backtick
+  return escHtml(text).replace(/\`\`\`([\s\S]*?)\`\`\`/g, (_, code) => {
+    return '<pre><button class="copy-code" onclick="copyCode(this)">📋 Copia</button>' + code.trim() + '</pre>';
+  }).replace(/\`([^\`]+)\`/g, '<code>$1</code>').replace(/\\n/g,'<br>');
+}
+
+function copyCode(btn) {
+  const pre = btn.parentElement;
+  const text = pre.textContent.replace('📋 Copia','').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✅ Copiato!';
+    setTimeout(() => btn.textContent = '📋 Copia', 1500);
+  });
+}
+
+function addMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  if (role === 'ai') {
+    div.innerHTML = '<div class="sender">💻 ECHO Code</div>' + formatMsg(text);
+  } else {
+    div.textContent = text;
+  }
+  chatWrap.appendChild(div);
+  chatWrap.scrollTop = chatWrap.scrollHeight;
+  return div;
+}
+
+function clearChat() {
+  _history = [];
+  chatWrap.innerHTML = '';
+  addMsg('ai', 'Ciao! Sono ECHO Code, il tuo assistente per la programmazione. Incolla il tuo codice o dimmi cosa vuoi creare!');
+}
+
+function quickPrompt(text) {
+  document.getElementById('msg-input').value = text + ' ';
+  document.getElementById('msg-input').focus();
+}
+
+async function sendMsg() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('send-btn').disabled = true;
+
+  addMsg('user', text);
+  _history.push({ role:'user', content: text });
+
+  const thinking = addMsg('ai thinking', '⏳ Analizzo il codice...');
+
+  try {
+    const res = await fetch('/api/code', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ messages: _history })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore AI');
+    chatWrap.removeChild(thinking);
+    const reply = data.reply;
+    _history.push({ role:'assistant', content: reply });
+    addMsg('ai', reply);
+  } catch(e) {
+    thinking.textContent = '⚠ Errore: ' + e.message;
+    thinking.className = 'msg ai';
+  } finally {
+    document.getElementById('send-btn').disabled = false;
+    input.focus();
+  }
+}
+
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 140) + 'px';
+});
+
+addMsg('ai', 'Ciao! Sono ECHO Code, il tuo assistente per la programmazione. Incolla il tuo codice o dimmi cosa vuoi creare!');
+</script>
+</body>
+</html>`;
+}
+
+// ============================================================
+// TRADUTTORE IA — EN ↔ IT
+// ============================================================
+function renderTraduttore() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traduttore IA — ECHO</title>
+<meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;padding:20px;overflow-x:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:900px;margin:0 auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 18px;border-bottom:1px solid rgba(38,198,218,.15);margin-bottom:28px}
+.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
+.back:hover{background:rgba(38,198,218,.2)}
+.title{text-align:center}
+.title h1{font-size:1.6em;font-weight:800;color:#26c6da;letter-spacing:.05em}
+.title sub{font-size:.7em;color:#546e7a;font-family:'Share Tech Mono',monospace}
+
+/* direction bar */
+.dir-bar{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px}
+.lang-label{background:rgba(38,198,218,.08);border:1px solid rgba(38,198,218,.25);border-radius:8px;padding:8px 24px;font-family:'Share Tech Mono',monospace;font-size:.95em;color:#26c6da;font-weight:700;min-width:130px;text-align:center}
+.swap-btn{background:rgba(38,198,218,.12);border:1px solid rgba(38,198,218,.35);color:#26c6da;width:44px;height:44px;border-radius:50%;font-size:1.3em;cursor:pointer;transition:background .15s,transform .2s;display:flex;align-items:center;justify-content:center}
+.swap-btn:hover{background:rgba(38,198,218,.28);transform:rotate(180deg)}
+
+/* panels */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.panels{grid-template-columns:1fr}}
+.panel-box{background:rgba(255,255,255,.03);border:1px solid rgba(38,198,218,.15);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.panel-box label{font-family:'Share Tech Mono',monospace;font-size:.72em;color:#546e7a;text-transform:uppercase;letter-spacing:.08em}
+textarea{width:100%;background:#0d1820;border:1px solid rgba(38,198,218,.2);color:#eceff1;padding:12px;border-radius:8px;font-family:'Exo 2',sans-serif;font-size:.95em;resize:vertical;min-height:160px;outline:none;transition:border-color .15s}
+textarea:focus{border-color:#26c6da}
+textarea[readonly]{background:#0a1520;color:#80deea;cursor:default}
+.char-count{font-family:'Share Tech Mono',monospace;font-size:.68em;color:#37474f;text-align:right}
+
+/* translate button */
+.translate-wrap{display:flex;justify-content:center;margin:20px 0}
+.translate-btn{background:rgba(38,198,218,.15);border:2px solid rgba(38,198,218,.5);color:#26c6da;padding:12px 48px;border-radius:10px;font-family:'Share Tech Mono',monospace;font-size:1em;cursor:pointer;transition:background .15s,transform .1s;letter-spacing:.05em}
+.translate-btn:hover{background:rgba(38,198,218,.3);transform:translateY(-1px)}
+.translate-btn:active{transform:translateY(0)}
+.translate-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* spinner */
+.spinner{display:none;width:20px;height:20px;border:2px solid rgba(38,198,218,.2);border-top-color:#26c6da;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* copy btn */
+.copy-btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#90a4ae;padding:5px 14px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.72em;cursor:pointer;transition:background .12s;align-self:flex-end}
+.copy-btn:hover{background:rgba(38,198,218,.15);color:#26c6da;border-color:rgba(38,198,218,.3)}
+
+/* error */
+#error-msg{display:none;text-align:center;color:#ef5350;font-family:'Share Tech Mono',monospace;font-size:.82em;margin-top:8px}
+
+/* badge AI */
+.ai-badge{display:inline-block;background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:3px 12px;font-family:'Share Tech Mono',monospace;font-size:.68em;color:#26c6da;margin-left:8px;vertical-align:middle}
+
+footer{margin-top:30px;text-align:center;font-size:.7em;color:#263238;font-family:'Share Tech Mono',monospace}
+footer a{color:#26c6da;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/" class="back">&#8592; ECHO Monitor</a>
+    <div class="title">
+      <h1>ECHO Translate <span class="ai-badge">AI</span></h1>
+      <sub>Traduttore IA // EN ↔ IT // powered by Cloudflare AI</sub>
+    </div>
+    <div style="width:110px"></div>
+  </div>
+
+  <!-- DIRECTION -->
+  <div class="dir-bar">
+    <div class="lang-label" id="lang-src">🇮🇹 Italiano</div>
+    <button class="swap-btn" id="swap-btn" title="Inverti direzione">⇄</button>
+    <div class="lang-label" id="lang-dst">🇬🇧 English</div>
+  </div>
+
+  <!-- PANELS -->
+  <div class="panels">
+    <div class="panel-box">
+      <label id="lbl-src">Testo da tradurre</label>
+      <textarea id="src-text" placeholder="Scrivi qui il testo..." oninput="updateCount()"></textarea>
+      <div class="char-count"><span id="char-n">0</span> caratteri</div>
+    </div>
+    <div class="panel-box">
+      <label id="lbl-dst">Traduzione</label>
+      <textarea id="dst-text" readonly placeholder="La traduzione apparirà qui..."></textarea>
+      <button class="copy-btn" id="copy-btn" onclick="copyResult()">📋 Copia</button>
+    </div>
+  </div>
+
+  <!-- TRANSLATE BTN -->
+  <div class="translate-wrap">
+    <button class="translate-btn" id="translate-btn" onclick="doTranslate()">⚡ TRADUCI</button>
+  </div>
+  <div class="spinner" id="spinner"></div>
+  <div id="error-msg"></div>
+</div>
+<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+
+<script>
+let _dir = 'it-en'; // it→en oppure en→it
+
+const LANGS = {
+  'it-en': { src:'🇮🇹 Italiano', dst:'🇬🇧 English', srcLbl:'Testo in italiano', dstLbl:'Traduzione in inglese', ph:'Scrivi qui il testo in italiano...' },
+  'en-it': { src:'🇬🇧 English', dst:'🇮🇹 Italiano', srcLbl:'Text in English', dstLbl:'Traduzione in italiano', ph:'Write here the text in English...' },
+};
+
+document.getElementById('swap-btn').addEventListener('click', () => {
+  const prev = document.getElementById('dst-text').value;
+  _dir = _dir === 'it-en' ? 'en-it' : 'it-en';
+  const l = LANGS[_dir];
+  document.getElementById('lang-src').textContent = l.src;
+  document.getElementById('lang-dst').textContent = l.dst;
+  document.getElementById('lbl-src').textContent = l.srcLbl;
+  document.getElementById('lbl-dst').textContent = l.dstLbl;
+  document.getElementById('src-text').placeholder = l.ph;
+  document.getElementById('src-text').value = prev;
+  document.getElementById('dst-text').value = '';
+  updateCount();
+});
+
+function updateCount() {
+  document.getElementById('char-n').textContent = document.getElementById('src-text').value.length;
+}
+
+async function doTranslate() {
+  const text = document.getElementById('src-text').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('translate-btn');
+  const spinner = document.getElementById('spinner');
+  const errEl = document.getElementById('error-msg');
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  errEl.style.display = 'none';
+  document.getElementById('dst-text').value = '';
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ text, dir: _dir })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore traduzione');
+    document.getElementById('dst-text').value = data.translated;
+  } catch(e) {
+    errEl.textContent = '⚠ ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+function copyResult() {
+  const t = document.getElementById('dst-text').value;
+  if (!t) return;
+  navigator.clipboard.writeText(t).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ Copiato!';
+    setTimeout(() => btn.textContent = '📋 Copia', 1500);
+  });
+}
+
+document.getElementById('src-text').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') doTranslate();
+});
+</script>
+</body>
+</html>`;
+}
+
+// ============================================================
+// PIXELDRAIN FILE MANAGER
+// ============================================================
+function renderPixeldrain() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PixelDrain — ECHO Storage</title>
+<meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;padding:20px;overflow-x:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:960px;margin:0 auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 18px;border-bottom:1px solid rgba(38,198,218,.15);margin-bottom:20px}
+.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
+.back:hover{background:rgba(38,198,218,.2)}
+.title{text-align:center}
+.title h1{font-size:1.6em;font-weight:800;color:#26c6da;letter-spacing:.05em}
+.title sub{font-size:.7em;color:#546e7a;font-family:'Share Tech Mono',monospace}
+
+/* auth panel */
+#auth-panel{background:rgba(255,255,255,.03);border:1px solid rgba(38,198,218,.2);border-radius:14px;padding:36px;max-width:400px;margin:60px auto;text-align:center}
+#auth-panel h2{color:#26c6da;margin-bottom:8px;font-size:1.2em}
+#auth-panel p{color:#546e7a;font-size:.82em;margin-bottom:20px;font-family:'Share Tech Mono',monospace}
+#token-input{width:100%;background:#0d1820;border:1px solid rgba(38,198,218,.3);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.9em;margin-bottom:12px;outline:none}
+#token-input:focus{border-color:#26c6da}
+#auth-btn{width:100%;background:rgba(38,198,218,.15);border:1px solid rgba(38,198,218,.4);color:#26c6da;padding:10px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.9em;transition:background .15s}
+#auth-btn:hover{background:rgba(38,198,218,.3)}
+#auth-err{color:#ef5350;font-size:.8em;margin-top:8px;display:none}
+
+/* stats bar */
+#stats-bar{display:flex;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.stat-chip{background:rgba(38,198,218,.07);border:1px solid rgba(38,198,218,.15);border-radius:8px;padding:8px 16px;font-family:'Share Tech Mono',monospace;font-size:.78em;color:#80deea}
+.stat-chip span{color:#26c6da;font-weight:700}
+
+/* search */
+#search-wrap{margin-bottom:16px}
+#search{width:100%;background:#0d1820;border:1px solid rgba(38,198,218,.2);color:#eceff1;padding:9px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.85em;outline:none}
+#search:focus{border-color:#26c6da}
+
+/* file grid */
+#file-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.file-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px;transition:border-color .15s,background .15s;cursor:default}
+.file-card:hover{border-color:rgba(38,198,218,.35);background:rgba(38,198,218,.04)}
+.file-icon{font-size:1.8em;margin-bottom:6px;line-height:1}
+.file-name{font-size:.82em;color:#eceff1;word-break:break-all;margin-bottom:6px;font-weight:600}
+.file-meta{font-size:.72em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:10px;line-height:1.6}
+.file-actions{display:flex;gap:8px}
+.btn-view,.btn-dl{padding:5px 12px;border-radius:6px;font-size:.74em;font-family:'Share Tech Mono',monospace;text-decoration:none;border:1px solid;transition:background .12s}
+.btn-view{background:rgba(38,198,218,.1);border-color:rgba(38,198,218,.3);color:#26c6da}
+.btn-view:hover{background:rgba(38,198,218,.25)}
+.btn-dl{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:#90a4ae}
+.btn-dl:hover{background:rgba(255,255,255,.1)}
+
+/* loading / empty */
+#loading{text-align:center;padding:60px;color:#546e7a;font-family:'Share Tech Mono',monospace;display:none}
+#loading .spinner{width:36px;height:36px;border:3px solid rgba(38,198,218,.15);border-top-color:#26c6da;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#empty{text-align:center;padding:60px;color:#546e7a;font-family:'Share Tech Mono',monospace;display:none}
+#main-panel{display:none}
+
+footer{margin-top:30px;text-align:center;font-size:.7em;color:#263238;font-family:'Share Tech Mono',monospace}
+footer a{color:#26c6da;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/" class="back">&#8592; ECHO Monitor</a>
+    <div class="title">
+      <h1>ECHO Storage</h1>
+      <sub>PixelDrain File Manager // privato</sub>
+    </div>
+    <div style="width:90px"></div>
+  </div>
+
+  <!-- AUTH -->
+  <div id="auth-panel">
+    <h2>Accesso richiesto</h2>
+    <p>Inserisci il token di accesso ECHO</p>
+    <input id="token-input" type="password" placeholder="token...">
+    <button id="auth-btn">Accedi</button>
+    <div id="auth-err">Token non valido</div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main-panel">
+    <div id="stats-bar">
+      <div class="stat-chip">File: <span id="s-count">—</span></div>
+      <div class="stat-chip">Dimensione: <span id="s-size">—</span></div>
+    </div>
+    <div id="search-wrap">
+      <input id="search" type="text" placeholder="Cerca file..." oninput="filterFiles()">
+    </div>
+    <div id="loading"><div class="spinner"></div>Caricamento file...</div>
+    <div id="empty">Nessun file trovato</div>
+    <div id="file-list"></div>
+  </div>
+</div>
+<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+
+<script>
+let _allFiles = [];
+let _token = localStorage.getItem('pd_token') || '';
+
+const ICONS = {
+  video: '🎬', audio: '🎵', image: '🖼️', pdf: '📄',
+  zip: '🗜️', rar: '🗜️', '7z': '🗜️', tar: '🗜️', gz: '🗜️',
+  txt: '📝', json: '📋', xml: '📋', csv: '📊',
+  exe: '⚙️', dmg: '⚙️', iso: '💿', default: '📁'
+};
+
+function fileIcon(name, mime) {
+  if (mime && mime.startsWith('video')) return ICONS.video;
+  if (mime && mime.startsWith('audio')) return ICONS.audio;
+  if (mime && mime.startsWith('image')) return ICONS.image;
+  if (mime === 'application/pdf') return ICONS.pdf;
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  return ICONS[ext] || ICONS.default;
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes/1048576).toFixed(1) + ' MB';
+  return (bytes/1073741824).toFixed(2) + ' GB';
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function totalSize(files) {
+  return files.reduce((a,f) => a + (f.size||0), 0);
+}
+
+function renderCard(f) {
+  return '<div class="file-card">' +
+    '<div class="file-icon">' + fileIcon(f.name, f.mime_type) + '</div>' +
+    '<div class="file-name">' + escHtml(f.name) + '</div>' +
+    '<div class="file-meta">' +
+      fmtSize(f.size) + '<br>' +
+      fmtDate(f.date_upload) +
+      (f.views ? '<br>' + f.views + ' visualizzazioni' : '') +
+    '</div>' +
+    '<div class="file-actions">' +
+      '<a class="btn-view" href="https://pixeldrain.com/u/' + f.id + '" target="_blank">Apri</a>' +
+      '<a class="btn-dl" href="https://pixeldrain.com/api/file/' + f.id + '?download" target="_blank">Download</a>' +
+    '</div>' +
+  '</div>';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function filterFiles() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = q ? _allFiles.filter(f => f.name.toLowerCase().includes(q)) : _allFiles;
+  document.getElementById('file-list').innerHTML = filtered.map(renderCard).join('');
+  document.getElementById('empty').style.display = filtered.length ? 'none' : 'block';
+  document.getElementById('file-list').style.display = filtered.length ? 'grid' : 'none';
+}
+
+async function loadFiles(token) {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('file-list').style.display = 'none';
+  document.getElementById('empty').style.display = 'none';
+  try {
+    const res = await fetch('/api/pd/files?token=' + encodeURIComponent(token));
+    if (res.status === 401) { document.getElementById('loading').style.display='none'; return false; }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore API');
+    _allFiles = (data.files || []).sort((a,b) => new Date(b.date_upload) - new Date(a.date_upload));
+    document.getElementById('s-count').textContent = _allFiles.length;
+    document.getElementById('s-size').textContent = fmtSize(totalSize(_allFiles));
+    document.getElementById('loading').style.display = 'none';
+    filterFiles();
+    return true;
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('empty').textContent = 'Errore: ' + e.message;
+    document.getElementById('empty').style.display = 'block';
+    return true;
+  }
+}
+
+async function tryAuth(token) {
+  const ok = await loadFiles(token);
+  if (ok) {
+    localStorage.setItem('pd_token', token);
+    document.getElementById('auth-panel').style.display = 'none';
+    document.getElementById('main-panel').style.display = 'block';
+  } else {
+    document.getElementById('auth-err').style.display = 'block';
+  }
+}
+
+document.getElementById('auth-btn').addEventListener('click', () => {
+  const t = document.getElementById('token-input').value.trim();
+  if (t) tryAuth(t);
+});
+document.getElementById('token-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('auth-btn').click();
+});
+
+// Auto-login se token in localStorage
+if (_token) tryAuth(_token).then(ok => {
+  if (!ok) localStorage.removeItem('pd_token');
+});
+</script>
+</body>
+</html>`;
+}
+
+// ============================================================
 // HANDLER PRINCIPALE
 // ============================================================
 export default {
@@ -936,6 +1768,80 @@ export default {
       } catch(e) {
         return new Response(JSON.stringify({error:e.message}), {status:500,headers:{"Content-Type":"application/json"}});
       }
+    }
+
+    if (url.pathname === "/chat") {
+      return new Response(renderChat(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
+    }
+
+    if (url.pathname === "/api/chat" && request.method === "POST") {
+      try {
+        const { messages } = await request.json();
+        if (!messages || !messages.length) return new Response(JSON.stringify({error:"Messaggio mancante"}), {status:400, headers:{"Content-Type":"application/json"}});
+        const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+          messages: [
+            { role:"system", content:"Sei ECHO AI, un assistente personale intelligente e amichevole. Rispondi in italiano a meno che non ti venga chiesto altro. Sii conciso ma completo." },
+            ...messages
+          ]
+        });
+        return new Response(JSON.stringify({reply: result.response}), {headers:{"Content-Type":"application/json"}});
+      } catch(e) {
+        return new Response(JSON.stringify({error: e.message}), {status:500, headers:{"Content-Type":"application/json"}});
+      }
+    }
+
+    if (url.pathname === "/code") {
+      return new Response(renderCode(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
+    }
+
+    if (url.pathname === "/api/code" && request.method === "POST") {
+      try {
+        const { messages } = await request.json();
+        if (!messages || !messages.length) return new Response(JSON.stringify({error:"Messaggio mancante"}), {status:400, headers:{"Content-Type":"application/json"}});
+        const result = await env.AI.run("@cf/meta/llama-3-8b-instruct-awq", {
+          messages: [
+            { role:"system", content:"Sei ECHO Code, un esperto assistente di programmazione. Aiuta con debug, spiegazioni di codice, ottimizzazioni e generazione di codice. Usa blocchi ```codice``` per il codice. Rispondi in italiano a meno che non ti venga chiesto altro." },
+            ...messages
+          ]
+        });
+        return new Response(JSON.stringify({reply: result.response}), {headers:{"Content-Type":"application/json"}});
+      } catch(e) {
+        return new Response(JSON.stringify({error: e.message}), {status:500, headers:{"Content-Type":"application/json"}});
+      }
+    }
+
+    if (url.pathname === "/traduttore") {
+      return new Response(renderTraduttore(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
+    }
+
+    if (url.pathname === "/api/translate" && request.method === "POST") {
+      try {
+        const { text, dir } = await request.json();
+        if (!text) return new Response(JSON.stringify({error:"Testo mancante"}), {status:400, headers:{"Content-Type":"application/json"}});
+        const source_lang = dir === "en-it" ? "en" : "it";
+        const target_lang = dir === "en-it" ? "it" : "en";
+        const result = await env.AI.run("@cf/meta/m2m100-1.2b", { text, source_lang, target_lang });
+        return new Response(JSON.stringify({translated: result.translated_text}), {headers:{"Content-Type":"application/json"}});
+      } catch(e) {
+        return new Response(JSON.stringify({error: e.message}), {status:500, headers:{"Content-Type":"application/json"}});
+      }
+    }
+
+    if (url.pathname === "/pixeldrain") {
+      return new Response(renderPixeldrain(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
+    }
+
+    if (url.pathname === "/api/pd/files") {
+      if (url.searchParams.get("token") !== UPDATE_SECRET)
+        return new Response(JSON.stringify({error:"Non autorizzato"}), {status:401, headers:{"Content-Type":"application/json"}});
+      if (!env.PIXELDRAIN_KEY)
+        return new Response(JSON.stringify({error:"PIXELDRAIN_KEY non configurata nell'ambiente Cloudflare"}), {status:500, headers:{"Content-Type":"application/json"}});
+      const auth = btoa(`:${env.PIXELDRAIN_KEY}`);
+      const pdRes = await fetch("https://pixeldrain.com/api/user/files", {
+        headers: {"Authorization": `Basic ${auth}`, "User-Agent": "SismoFVG/2.0 gimmycloud.com"}
+      });
+      const pdData = await pdRes.json();
+      return new Response(JSON.stringify(pdData), {status: pdRes.status, headers:{"Content-Type":"application/json"}});
     }
 
     if (url.pathname === "/forza4") {

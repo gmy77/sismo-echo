@@ -17,8 +17,11 @@ database_id = "099379c7-a46f-4cc6-93ed-36931d694074"
 binding = "F4_LEARN"
 id = "7ed7834f05f64969ae9b8753df1a3708"
 
+[ai]
+binding = "AI"
+
 [triggers]
-crons = ["0 3 * * *", "0 8 * * *", "0 13 * * *", "0 18 * * *", "0 23 * * *"]
+crons = ["0 8 * * *", "0 13 * * *", "0 18 * * *", "0 23 * * *"]
 
 [observability]
 enabled = true
