@@ -7,7 +7,7 @@
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
 const NOAA_WIND   = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json";
-const UPDATE_SECRET = "mira755colo";
+function getUpdateSecret(env) { return env?.UPDATE_SECRET || ""; }
 
 const FVG = { lat_min:45.5, lat_max:46.8, lon_min:12.4, lon_max:14.1 };
 const CF  = { lat_min:40.4, lat_max:41.1, lon_min:13.7, lon_max:14.8 }; // Campi Flegrei · Vesuvio · Ischia
@@ -1893,3 +1893,4 @@ export default {
     }
   },
 };
+
