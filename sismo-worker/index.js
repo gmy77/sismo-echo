@@ -7,7 +7,7 @@
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
 const NOAA_WIND   = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json";
-const UPDATE_SECRET = "mira755colo";
+function getUpdateSecret(env) { return (env && env.UPDATE_SECRET) ? env.UPDATE_SECRET : ''; }
 
 const FVG = { lat_min:45.5, lat_max:46.8, lon_min:12.4, lon_max:14.1 };
 const CF  = { lat_min:40.4, lat_max:41.1, lon_min:13.7, lon_max:14.8 }; // Campi Flegrei · Vesuvio · Ischia
@@ -441,7 +441,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div class="update-info">
     <div><span class="live-dot"></span>LIVE — INGV + NOAA SWPC</div>
     <div>${now}</div>
-    <a href="/update?token=mira755colo" class="btn">↻ Aggiorna ora</a>
+    <a href="/update" class="btn">↻ Aggiorna ora</a>
   </div>
 </header>
 
@@ -592,7 +592,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div style="overflow-x:auto">
     <table>
       <thead><tr><th>Mag</th><th>Data/Ora</th><th>Località</th><th>Profondità</th></tr></thead>
-      <tbody>${cfUltiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato CF. <a href="/update?token=mira755colo" style="color:#e040fb">Aggiorna →</a></td></tr>'}</tbody>
+      <tbody>${cfUltiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato CF. <a href="/update" style="color:#e040fb">Aggiorna →</a></td></tr>'}</tbody>
     </table>
   </div>
 </div>
@@ -618,7 +618,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div style="overflow-x:auto">
     <table>
       <thead><tr><th>Mag</th><th>Data/Ora</th><th>Località</th><th>Profondità</th></tr></thead>
-      <tbody>${ultiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato. <a href="/update?token=mira755colo" style="color:#26c6da">Aggiorna →</a></td></tr>'}</tbody>
+      <tbody>${ultiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato. <a href="/update" style="color:#26c6da">Aggiorna →</a></td></tr>'}</tbody>
     </table>
   </div>
 </div>
@@ -840,7 +840,7 @@ export default {
     )`).run();
 
     if (url.pathname === "/update-solar") {
-      if (url.searchParams.get("token") !== UPDATE_SECRET) return new Response("Non autorizzato 🔒",{status:401});
+      if (url.searchParams.get("token") !== getUpdateSecret(env)) return new Response("Non autorizzato 🔒",{status:401});
       try {
         await initDB();
         const solare = await fetchSolare();
@@ -855,7 +855,7 @@ export default {
     }
 
     if (url.pathname === "/update") {
-      if (url.searchParams.get("token") !== UPDATE_SECRET) return new Response("Non autorizzato 🔒",{status:401});
+      if (url.searchParams.get("token") !== getUpdateSecret(env)) return new Response("Non autorizzato 🔒",{status:401});
       try {
         await initDB();
         if (env.DB_CF) await initCFDB(env.DB_CF);
