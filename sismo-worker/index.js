@@ -593,7 +593,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div style="overflow-x:auto">
     <table>
       <thead><tr><th>Mag</th><th>Data/Ora</th><th>Località</th><th>Profondità</th></tr></thead>
-      <tbody>${cfUltiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato CF. <a href="#" onclick="var t=prompt('Token:');if(t)location.href='/update?token='+encodeURIComponent(t);return false;" style="color:#e040fb">Aggiorna →</a></td></tr>'}</tbody>
+      <tbody>${cfUltiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato CF. <a href="#" onclick="var t=prompt(\'Token:\');if(t)location.href=\'/update?token=\'+encodeURIComponent(t);return false;" style="color:#e040fb">Aggiorna →</a></td></tr>'}</tbody>
     </table>
   </div>
 </div>
@@ -619,7 +619,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div style="overflow-x:auto">
     <table>
       <thead><tr><th>Mag</th><th>Data/Ora</th><th>Località</th><th>Profondità</th></tr></thead>
-      <tbody>${ultiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato. <a href="#" onclick="var t=prompt('Token:');if(t)location.href='/update?token='+encodeURIComponent(t);return false;" style="color:#26c6da">Aggiorna →</a></td></tr>'}</tbody>
+      <tbody>${ultiRows||'<tr><td colspan="4" style="padding:20px;color:#455a64;text-align:center">Nessun dato. <a href="#" onclick="var t=prompt(\'Token:\');if(t)location.href=\'/update?token=\'+encodeURIComponent(t);return false;" style="color:#26c6da">Aggiorna →</a></td></tr>'}</tbody>
     </table>
   </div>
 </div>
@@ -956,7 +956,7 @@ footer a{color:#26c6da;text-decoration:none}
 <footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
-const CORRECT_PWD = 'mira755colo';
+const CORRECT_PWD = '${getUpdateSecret(env)}';
 let _history = [];
 let _authed = localStorage.getItem('echo_chat_auth') === '1';
 
@@ -1149,7 +1149,7 @@ footer a{color:#66bb6a;text-decoration:none}
 <footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
-const CORRECT_PWD = 'mira755colo';
+const CORRECT_PWD = '${getUpdateSecret(env)}';
 let _history = [];
 let _authed = localStorage.getItem('echo_code_auth') === '1';
 
@@ -1674,7 +1674,7 @@ export default {
     )`).run();
 
     if (url.pathname === "/update-solar") {
-      if (url.searchParams.get("token") !== SECRET) return new Response("Non autorizzato 🔒",{status:401});
+      if (url.searchParams.get("token") !== getUpdateSecret(env)) return new Response("Non autorizzato 🔒",{status:401});
       try {
         await initDB();
         const solare = await fetchSolare();
@@ -1689,7 +1689,7 @@ export default {
     }
 
     if (url.pathname === "/update") {
-      if (url.searchParams.get("token") !== SECRET) return new Response("Non autorizzato 🔒",{status:401});
+      if (url.searchParams.get("token") !== getUpdateSecret(env)) return new Response("Non autorizzato 🔒",{status:401});
       try {
         await initDB();
         if (env.DB_CF) await initCFDB(env.DB_CF);
