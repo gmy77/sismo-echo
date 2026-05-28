@@ -934,16 +934,6 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-
 .title h1{font-size:1.4em;font-weight:800;color:#26c6da;letter-spacing:.05em}
 .title sub{font-size:.68em;color:#546e7a;font-family:'Share Tech Mono',monospace}
 .ai-badge{display:inline-block;background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#26c6da;vertical-align:middle}
-/* auth */
-#auth-overlay{position:fixed;inset:0;background:#080e14;z-index:100;display:flex;align-items:center;justify-content:center}
-#auth-box{background:rgba(255,255,255,.03);border:1px solid rgba(38,198,218,.2);border-radius:14px;padding:36px;max-width:360px;width:90%;text-align:center}
-#auth-box h2{color:#26c6da;margin-bottom:8px}
-#auth-box p{color:#546e7a;font-size:.8em;font-family:'Share Tech Mono',monospace;margin-bottom:20px}
-#pwd-input{width:100%;background:#0d1820;border:1px solid rgba(38,198,218,.3);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.9em;margin-bottom:12px;outline:none}
-#pwd-input:focus{border-color:#26c6da}
-#pwd-btn{width:100%;background:rgba(38,198,218,.15);border:1px solid rgba(38,198,218,.4);color:#26c6da;padding:10px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.9em}
-#pwd-btn:hover{background:rgba(38,198,218,.3)}
-#pwd-err{color:#ef5350;font-size:.78em;margin-top:8px;display:none}
 /* chat */
 #chat-wrap{position:relative;z-index:1;flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
 .msg{max-width:75%;padding:12px 16px;border-radius:12px;font-size:.9em;line-height:1.55;word-break:break-word}
@@ -967,17 +957,6 @@ footer a{color:#26c6da;text-decoration:none}
 </head>
 <body>
 
-<!-- AUTH -->
-<div id="auth-overlay">
-  <div id="auth-box">
-    <h2>🤖 ECHO Chat</h2>
-    <p>Inserisci la password per accedere</p>
-    <input id="pwd-input" type="password" placeholder="password..." onkeydown="if(event.key==='Enter') checkPwd()">
-    <button id="pwd-btn" onclick="checkPwd()">Accedi</button>
-    <div id="pwd-err">Password non valida</div>
-  </div>
-</div>
-
 <div class="topbar">
   <a href="/" class="back">&#8592; ECHO Monitor</a>
   <div class="title">
@@ -998,21 +977,7 @@ footer a{color:#26c6da;text-decoration:none}
 <footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
-const CORRECT_PWD = '${getUpdateSecret(env)}';
 let _history = [];
-let _authed = localStorage.getItem('echo_chat_auth') === '1';
-
-if (_authed) document.getElementById('auth-overlay').style.display = 'none';
-
-function checkPwd() {
-  if (document.getElementById('pwd-input').value.trim() === CORRECT_PWD) {
-    localStorage.setItem('echo_chat_auth','1');
-    document.getElementById('auth-overlay').style.display = 'none';
-    _authed = true;
-  } else {
-    document.getElementById('pwd-err').style.display = 'block';
-  }
-}
 
 const chatWrap = document.getElementById('chat-wrap');
 
@@ -1109,16 +1074,6 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-
 .title h1{font-size:1.4em;font-weight:800;color:#26c6da;letter-spacing:.05em}
 .title sub{font-size:.68em;color:#546e7a;font-family:'Share Tech Mono',monospace}
 .ai-badge{display:inline-block;background:rgba(102,187,106,.15);border:1px solid rgba(102,187,106,.35);border-radius:20px;padding:2px 10px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#66bb6a;vertical-align:middle}
-/* auth */
-#auth-overlay{position:fixed;inset:0;background:#080e14;z-index:100;display:flex;align-items:center;justify-content:center}
-#auth-box{background:rgba(255,255,255,.03);border:1px solid rgba(102,187,106,.2);border-radius:14px;padding:36px;max-width:360px;width:90%;text-align:center}
-#auth-box h2{color:#66bb6a;margin-bottom:8px}
-#auth-box p{color:#546e7a;font-size:.8em;font-family:'Share Tech Mono',monospace;margin-bottom:20px}
-#pwd-input{width:100%;background:#0d1820;border:1px solid rgba(102,187,106,.3);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.9em;margin-bottom:12px;outline:none}
-#pwd-input:focus{border-color:#66bb6a}
-#pwd-btn{width:100%;background:rgba(102,187,106,.15);border:1px solid rgba(102,187,106,.4);color:#66bb6a;padding:10px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.9em}
-#pwd-btn:hover{background:rgba(102,187,106,.3)}
-#pwd-err{color:#ef5350;font-size:.78em;margin-top:8px;display:none}
 /* layout */
 #main{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden}
 /* chat */
@@ -1152,17 +1107,6 @@ footer a{color:#66bb6a;text-decoration:none}
 </head>
 <body>
 
-<!-- AUTH -->
-<div id="auth-overlay">
-  <div id="auth-box">
-    <h2>💻 ECHO Code</h2>
-    <p>Inserisci la password per accedere</p>
-    <input id="pwd-input" type="password" placeholder="password..." onkeydown="if(event.key==='Enter') checkPwd()">
-    <button id="pwd-btn" onclick="checkPwd()">Accedi</button>
-    <div id="pwd-err">Password non valida</div>
-  </div>
-</div>
-
 <div class="topbar">
   <a href="/" class="back">&#8592; ECHO Monitor</a>
   <div class="title">
@@ -1191,22 +1135,7 @@ footer a{color:#66bb6a;text-decoration:none}
 <footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
-const CORRECT_PWD = '${getUpdateSecret(env)}';
 let _history = [];
-let _authed = localStorage.getItem('echo_code_auth') === '1';
-
-if (_authed) document.getElementById('auth-overlay').style.display = 'none';
-
-document.getElementById('pwd-btn').addEventListener('click', checkPwd);
-function checkPwd() {
-  if (document.getElementById('pwd-input').value.trim() === CORRECT_PWD) {
-    localStorage.setItem('echo_code_auth','1');
-    document.getElementById('auth-overlay').style.display = 'none';
-    _authed = true;
-  } else {
-    document.getElementById('pwd-err').style.display = 'block';
-  }
-}
 
 const chatWrap = document.getElementById('chat-wrap');
 
