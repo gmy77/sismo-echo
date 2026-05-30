@@ -1,0 +1,27 @@
+name = "sismo-fvg"
+main = "index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "terremoti-fvg"
+database_id = "6504ff40-54b2-4a79-8860-99c9279da534"
+
+[[d1_databases]]
+binding = "DB_CF"
+database_name = "terremoti-cf"
+database_id = "099379c7-a46f-4cc6-93ed-36931d694074"
+
+[[kv_namespaces]]
+binding = "F4_LEARN"
+id = "7ed7834f05f64969ae9b8753df1a3708"
+
+[ai]
+binding = "AI"
+
+[triggers]
+crons = ["0 8 * * *", "0 13 * * *", "0 18 * * *", "0 23 * * *"]
+
+[observability]
+enabled = true

@@ -1,0 +1,13 @@
+{
+  "name": "sismo-fvg",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^5.3.0",
+    "wrangler": "^4.70.0"
+  }
+}
