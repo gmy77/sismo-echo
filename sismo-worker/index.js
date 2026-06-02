@@ -964,7 +964,7 @@ function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   // Board background
   ctx.fillStyle='#1a5c32';
-  ctx.beginPath();ctx.roundRect(0,0,canvas.width,canvas.height,8);ctx.fill();
+  ctx.fillStyle='#1a5c32';ctx.fillRect(0,0,canvas.width,canvas.height);
   // Grid
   for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++){
     var x=BX+c*CS,y=BY+r*CS;
@@ -1049,6 +1049,8 @@ canvas.addEventListener('touchstart',function(e){
 document.addEventListener('keydown',function(e){if(e.key==='r'||e.key==='R')newGame();});
 
 // ─── Init ─────────────────────────────────────────────────────
+window.newGame = newGame;
+window.toggleCpu = toggleCpu;
 resize();
 window.addEventListener('resize',function(){resize();newGame();});
 newGame();
