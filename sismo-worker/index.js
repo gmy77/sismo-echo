@@ -733,86 +733,62 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-
 .back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
 .back:hover{background:rgba(38,198,218,.2)}
 .title-box{text-align:center}
-.title-box h1{font-size:1.6em;font-weight:800;letter-spacing:.08em}
-.title-box h1 span.b{color:#181818;text-shadow:0 0 8px rgba(255,255,255,.3)}
-.title-box h1 span.w{color:#e0e0e0;text-shadow:0 0 8px rgba(255,255,255,.5)}
+.title-box h1{font-size:1.5em;font-weight:800;letter-spacing:.08em;color:#eceff1}
 .title-box sub{font-size:.66em;color:#546e7a;font-family:'Share Tech Mono',monospace}
-.sbar{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:10px}
-.ps{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono',monospace;font-size:.9em}
-.disc{width:20px;height:20px;border-radius:50%;display:inline-block}
-.disc.b{background:radial-gradient(circle at 35% 35%,#555,#111)}
-.disc.w{background:radial-gradient(circle at 35% 35%,#fff,#b0b0b0)}
-#ti{font-family:'Share Tech Mono',monospace;font-size:.82em;color:#66bb6a}
-#turn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#66bb6a;margin-right:5px;animation:pulse 1s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-#cvs{border-radius:10px;cursor:pointer;touch-action:none;max-width:100%;display:block;margin:0 auto}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:10px;font-family:'Share Tech Mono',monospace;font-size:.88em}
+#ti{color:#66bb6a;font-size:.82em}
+canvas{display:block;margin:0 auto;border-radius:8px;cursor:pointer;touch-action:none;max-width:100%}
 .btns{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
 .btn{background:rgba(102,187,106,.12);border:1px solid rgba(102,187,106,.3);color:#66bb6a;padding:8px 18px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.8em;cursor:pointer;transition:background .15s}
 .btn:hover{background:rgba(102,187,106,.28)}
-.btn.cpu-on{background:rgba(102,187,106,.28);border-color:#66bb6a;color:#a5d6a7}
-#lg{font-family:'Share Tech Mono',monospace;font-size:.68em;color:#37474f;margin-top:8px;text-align:center;min-height:18px}
-footer{margin-top:18px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#1c2a33;text-align:center}
+.btn.on{background:rgba(102,187,106,.28);border-color:#66bb6a}
+#lg{font-family:'Share Tech Mono',monospace;font-size:.68em;color:#37474f;margin-top:8px;min-height:18px}
+footer{margin-top:18px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#1c2a33}
 footer a{color:#26c6da;text-decoration:none}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="topbar">
-    <a href="/" class="back">&#8592; ECHO Monitor</a>
+    <a href="/" class="back">← ECHO Monitor</a>
     <div class="title-box">
-      <h1><span class="b">&#9899;</span> OTHELLO <span class="w">&#9898;</span></h1>
+      <h1>&#9899; OTHELLO &#9898;</h1>
       <sub>Reversi // AI adattiva // ECHO Games</sub>
     </div>
     <div style="width:80px"></div>
   </div>
   <div class="sbar">
-    <div class="ps"><span class="disc b"></span> Nero (Tu): <strong id="s1">2</strong></div>
-    <div id="ti"><span id="turn-dot"></span>Il tuo turno</div>
-    <div class="ps"><span class="disc w"></span> Bianco (AI): <strong id="s2">2</strong></div>
+    <span>&#9899; Nero (Tu): <strong id="s1">2</strong></span>
+    <span id="ti">Il tuo turno</span>
+    <span>&#9898; Bianco (AI): <strong id="s2">2</strong></span>
   </div>
-  <canvas id="cvs"></canvas>
+  <canvas id="cvs" width="400" height="400"></canvas>
   <div class="btns">
-    <button class="btn" id="btn-new" onclick="newGame()">&#8635; Nuova partita</button>
-    <button class="btn" id="btn-cpu" onclick="toggleCpu()">vs CPU: ON &#129302;</button>
+    <button class="btn" id="btn-new">&#8635; Nuova partita</button>
+    <button class="btn on" id="btn-cpu">vs CPU: ON &#129302;</button>
   </div>
   <div id="lg"></div>
-  <footer>ECHO Games // <a href="/">&#8592; monitor sismico</a> &nbsp;&copy; 2026 Gimmy Pignolo</footer>
+  <footer>ECHO Games // <a href="/">← monitor sismico</a> &nbsp;&copy; 2026 Gimmy Pignolo</footer>
 </div>
 <script>
-(function(){
-var SZ=8,DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+var SZ=8;
+var DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
 var BW=[[120,-20,20,5,5,20,-20,120],[-20,-40,-5,-5,-5,-5,-40,-20],[20,-5,15,3,3,15,-5,20],[5,-5,3,3,3,3,-5,5],[5,-5,3,3,3,3,-5,5],[20,-5,15,3,3,15,-5,20],[-20,-40,-5,-5,-5,-5,-40,-20],[120,-20,20,5,5,20,-20,120]];
-var learnW=BW.map(function(r){return r.map(function(){return 0;});});
-var grid,player,gameOver,winner,cpuOn=true,cpuBusy=false;
-var history=[];
-var canvas=document.getElementById('cvs'),ctx=canvas.getContext('2d');
-var CS,BX,BY,valid=[];
-var hovR=-1,hovC=-1;
-
-// Carica pesi appresi
-fetch('/api/othello/stats').then(function(r){return r.json();}).then(function(d){
-  if(d&&d.weights)learnW=d.weights;
-  var lg=document.getElementById('lg');
-  if(d&&d.games>0)lg.textContent='Brain: '+d.games+' partite — N:'+(d.win_b||0)+' B:'+(d.win_w||0)+' P:'+(d.draws||0);
-}).catch(function(){});
+var learnW=BW.map(function(row){return row.map(function(){return 0;});});
+var grid,player,gameOver,winner,cpuOn=true,cpuBusy=false,history=[];
+var canvas=document.getElementById('cvs');
+var ctx=canvas.getContext('2d');
+var CS=50,BX=0,BY=0,valid=[],hovR=-1,hovC=-1;
 
 function resize(){
   var w=Math.min(window.innerWidth-32,480);
   CS=Math.floor(w/SZ);
-  BX=0;BY=0;
-  canvas.width=SZ*CS;canvas.height=SZ*CS;
-  canvas.style.width=SZ*CS+'px';canvas.style.height=SZ*CS+'px';
+  canvas.width=SZ*CS;
+  canvas.height=SZ*CS;
 }
 
-function mkGrid(){return Array.from({length:SZ},function(){return Array(SZ).fill(0);});}
-
-function newGame(){
-  grid=mkGrid();
-  var m=SZ/2;
-  grid[m-1][m-1]=-1;grid[m-1][m]=1;grid[m][m-1]=1;grid[m][m]=-1;
-  player=1;gameOver=false;winner=0;cpuBusy=false;history=[];
-  valid=getValid(grid,player);
-  updScore();setTurn();draw();
+function mkGrid(){
+  return Array.from({length:SZ},function(){return Array(SZ).fill(0);});
 }
 
 function getFlips(g,r,c,p){
@@ -820,8 +796,12 @@ function getFlips(g,r,c,p){
   var res=[];
   for(var d=0;d<DIRS.length;d++){
     var dr=DIRS[d][0],dc=DIRS[d][1],line=[],nr=r+dr,nc=c+dc;
-    while(nr>=0&&nr<SZ&&nc>=0&&nc<SZ&&g[nr][nc]===-p){line.push([nr,nc]);nr+=dr;nc+=dc;}
-    if(line.length&&nr>=0&&nr<SZ&&nc>=0&&nc<SZ&&g[nr][nc]===p)res=res.concat(line);
+    while(nr>=0&&nr<SZ&&nc>=0&&nc<SZ&&g[nr][nc]===-p){
+      line.push([nr,nc]);nr+=dr;nc+=dc;
+    }
+    if(line.length&&nr>=0&&nr<SZ&&nc>=0&&nc<SZ&&g[nr][nc]===p){
+      for(var i=0;i<line.length;i++)res.push(line[i]);
+    }
   }
   return res;
 }
@@ -834,19 +814,37 @@ function getValid(g,p){
 
 function applyMove(g,r,c,p){
   var b=g.map(function(row){return row.slice();});
-  getFlips(b,r,c,p).forEach(function(f){b[f[0]][f[1]]=p;});
-  b[r][c]=p;return b;
+  var fl=getFlips(b,r,c,p);
+  for(var i=0;i<fl.length;i++)b[fl[i][0]][fl[i][1]]=p;
+  b[r][c]=p;
+  return b;
 }
 
-function countP(g,p){var n=0;for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++)if(g[r][c]===p)n++;return n;}
-function isEmpty(g){for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++)if(g[r][c]===0)return true;return false;}
-function isTerminal(g){return!isEmpty(g)||(!getValid(g,1).length&&!getValid(g,-1).length);}
+function countP(g,p){
+  var n=0;
+  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++)if(g[r][c]===p)n++;
+  return n;
+}
+
+function isTerminal(g){
+  if(getValid(g,1).length>0)return false;
+  if(getValid(g,-1).length>0)return false;
+  return true;
+}
+
+function hasEmpty(g){
+  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++)if(g[r][c]===0)return true;
+  return false;
+}
 
 function evalBoard(g,p){
   var sc=0;
   for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++){
     var v=g[r][c];
-    if(v!==0){var w=(BW[r][c]||0)+(learnW[r][c]||0);sc+=v*w;}
+    if(v!==0){
+      var w=(BW[r][c]||0)+(learnW[r][c]||0);
+      sc+=v*w;
+    }
   }
   var my=getValid(g,p).length,op=getValid(g,-p).length;
   if(my+op>0)sc+=p*10*(my-op)/(my+op);
@@ -856,209 +854,234 @@ function evalBoard(g,p){
 function minimax(g,depth,alpha,beta,p,rootP){
   if(depth===0||isTerminal(g))return[evalBoard(g,rootP),null];
   var moves=getValid(g,p);
-  if(!moves.length){var rv=minimax(g,depth-1,alpha,beta,-p,rootP);return[rv[0],null];}
-  var best=moves[0];
-  if(p===rootP){
-    var val=-Infinity;
-    for(var i=0;i<moves.length;i++){
-      var nb=applyMove(g,moves[i][0],moves[i][1],p);
-      var rv=minimax(nb,depth-1,alpha,beta,-p,rootP);
-      if(rv[0]>val){val=rv[0];best=moves[i];}
-      alpha=Math.max(alpha,val);if(beta<=alpha)break;
-    }
-    return[val,best];
-  } else {
-    var val=Infinity;
-    for(var i=0;i<moves.length;i++){
-      var nb=applyMove(g,moves[i][0],moves[i][1],p);
-      var rv=minimax(nb,depth-1,alpha,beta,-p,rootP);
-      if(rv[0]<val){val=rv[0];best=moves[i];}
-      beta=Math.min(beta,val);if(beta<=alpha)break;
-    }
-    return[val,best];
+  if(!moves.length){
+    var rv=minimax(g,depth-1,alpha,beta,-p,rootP);
+    return[rv[0],null];
   }
+  var best=moves[0];
+  var val,i,nb,rv;
+  if(p===rootP){
+    val=-Infinity;
+    for(i=0;i<moves.length;i++){
+      nb=applyMove(g,moves[i][0],moves[i][1],p);
+      rv=minimax(nb,depth-1,alpha,beta,-p,rootP);
+      if(rv[0]>val){val=rv[0];best=moves[i];}
+      if(val>alpha)alpha=val;
+      if(beta<=alpha)break;
+    }
+  } else {
+    val=Infinity;
+    for(i=0;i<moves.length;i++){
+      nb=applyMove(g,moves[i][0],moves[i][1],p);
+      rv=minimax(nb,depth-1,alpha,beta,-p,rootP);
+      if(rv[0]<val){val=rv[0];best=moves[i];}
+      if(val<beta)beta=val;
+      if(beta<=alpha)break;
+    }
+  }
+  return[val,best];
 }
 
-function cpuMove(){
-  if(!cpuOn||gameOver||player!=-1)return;
-  cpuBusy=true;setTurn();
-  setTimeout(function(){
-    var empty=countP(grid,0);
-    var depth=empty<=10?8:(empty<=18?6:4);
-    var res=minimax(grid,depth,-Infinity,Infinity,-1,-1);
-    var mv=res[1];
-    if(mv){history.push([mv[0],mv[1],-1]);grid=applyMove(grid,mv[0],mv[1],-1);}
-    player=1;cpuBusy=false;
-    valid=getValid(grid,1);
-    if(!valid.length){
-      if(!getValid(grid,-1).length)endGame();
-      else{player=-1;cpuMove();}
-    }
-    if(isTerminal(grid))endGame();
-    updScore();setTurn();draw();
-  },350);
+function newGame(){
+  grid=mkGrid();
+  var m=SZ/2;
+  grid[m-1][m-1]=-1;grid[m-1][m]=1;
+  grid[m][m-1]=1;grid[m][m]=-1;
+  player=1;gameOver=false;winner=0;cpuBusy=false;history=[];
+  valid=getValid(grid,1);
+  updUI();draw();
 }
 
 function doMove(r,c){
-  if(gameOver||!cpuOn&&player===-1)return;
-  if(cpuBusy||player!=1)return;
+  if(gameOver||cpuBusy||player!==1)return;
   if(!getFlips(grid,r,c,1).length)return;
   history.push([r,c,1]);
   grid=applyMove(grid,r,c,1);
   player=-1;
   valid=getValid(grid,-1);
   if(!valid.length){
-    if(!getValid(grid,1).length)endGame();
-    else{player=1;valid=getValid(grid,1);updScore();setTurn();draw();return;}
+    if(!getValid(grid,1).length){endGame();return;}
+    player=1;valid=getValid(grid,1);updUI();draw();return;
   }
   if(isTerminal(grid)){endGame();return;}
-  updScore();setTurn();draw();
-  if(cpuOn)cpuMove();
+  updUI();draw();
+  if(cpuOn)doCpu();
+}
+
+function doCpu(){
+  if(!cpuOn||gameOver||player!==-1)return;
+  cpuBusy=true;updUI();draw();
+  setTimeout(function(){
+    var empty=countP(grid,0);
+    var depth=empty<=10?8:(empty<=18?6:4);
+    var res=minimax(grid,depth,-Infinity,Infinity,-1,-1);
+    var mv=res[1];
+    if(mv){
+      history.push([mv[0],mv[1],-1]);
+      grid=applyMove(grid,mv[0],mv[1],-1);
+    }
+    player=1;cpuBusy=false;
+    valid=getValid(grid,1);
+    if(!valid.length){
+      if(!getValid(grid,-1).length){endGame();return;}
+      player=-1;doCpu();return;
+    }
+    if(isTerminal(grid)){endGame();return;}
+    updUI();draw();
+  },400);
 }
 
 function endGame(){
   gameOver=true;
   var b=countP(grid,1),w=countP(grid,-1);
   winner=b>w?1:(w>b?-1:0);
-  setTurn();draw();
-  // Invia risultato al server
-  fetch('/api/othello/learn',{method:'POST',headers:{'Content-Type':'application/json'},
+  updUI();draw();
+  fetch('/api/othello/learn',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({winner:winner,moves:history})
   }).then(function(r){return r.json();}).then(function(d){
-    if(d.games){var lg=document.getElementById('lg');if(lg)lg.textContent='Brain aggiornato: '+d.games+' partite totali';}
+    if(d.games)document.getElementById('lg').textContent='Brain: '+d.games+' partite';
   }).catch(function(){});
 }
 
-function updScore(){
+function updUI(){
   document.getElementById('s1').textContent=countP(grid,1);
   document.getElementById('s2').textContent=countP(grid,-1);
-}
-
-function setTurn(){
   var ti=document.getElementById('ti');
   if(gameOver){
-    if(winner===1)ti.innerHTML='&#127942; Hai vinto! ('+countP(grid,1)+' vs '+countP(grid,-1)+')';
-    else if(winner===-1)ti.innerHTML='&#129302; Vince AI ('+countP(grid,-1)+' vs '+countP(grid,1)+')';
-    else ti.innerHTML='Pareggio! '+countP(grid,1)+' – '+countP(grid,-1);
+    if(winner===1)ti.textContent='Hai vinto! '+countP(grid,1)+'-'+countP(grid,-1);
+    else if(winner===-1)ti.textContent='Vince AI '+countP(grid,-1)+'-'+countP(grid,1);
+    else ti.textContent='Pareggio '+countP(grid,1)+'-'+countP(grid,-1);
     ti.style.color='#ffd600';
   } else if(cpuBusy){
-    ti.innerHTML='<span id="turn-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef5350;margin-right:5px;animation:pulse 1s ease-in-out infinite"></span>AI sta pensando...';
+    ti.textContent='AI pensa...';
     ti.style.color='#ef9a9a';
   } else {
-    var n=valid.length;
-    ti.innerHTML='<span id="turn-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#66bb6a;margin-right:5px;animation:pulse 1s ease-in-out infinite"></span>Il tuo turno ('+n+' mosse)';
+    ti.textContent='Il tuo turno ('+valid.length+')';
     ti.style.color='#66bb6a';
   }
 }
 
-function toggleCpu(){
-  cpuOn=!cpuOn;
-  var btn=document.getElementById('btn-cpu');
-  btn.textContent=cpuOn?'vs CPU: ON \u{1F916}':'vs CPU: OFF';
-  btn.className='btn'+(cpuOn?' cpu-on':'');
-  if(cpuOn&&!gameOver&&player===-1)cpuMove();
+function isValid(r,c){
+  for(var i=0;i<valid.length;i++)if(valid[i][0]===r&&valid[i][1]===c)return true;
+  return false;
 }
 
-// ─── Rendering ───────────────────────────────────────────────
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  // Board background
-  ctx.fillStyle='#1a5c32';
-  ctx.fillStyle='#1a5c32';ctx.fillRect(0,0,canvas.width,canvas.height);
-  // Grid
-  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++){
-    var x=BX+c*CS,y=BY+r*CS;
-    ctx.strokeStyle='rgba(38,160,70,.5)';ctx.lineWidth=1;
-    ctx.strokeRect(x+.5,y+.5,CS,CS);
-    // Valid moves
-    if(!gameOver&&!cpuBusy&&valid.some(function(m){return m[0]===r&&m[1]===c;})){
-      ctx.save();ctx.globalAlpha=0.45;ctx.fillStyle='#a5d6a7';
-      ctx.beginPath();ctx.arc(x+CS/2,y+CS/2,CS*0.14,0,Math.PI*2);ctx.fill();
-      ctx.restore();
+  var w=canvas.width,h=canvas.height;
+  // Board
+  ctx.fillStyle='#1d6e3a';
+  ctx.fillRect(0,0,w,h);
+  // Cells
+  for(var r=0;r<SZ;r++){
+    for(var c=0;c<SZ;c++){
+      var x=c*CS,y=r*CS;
+      // Alternate cell shade
+      ctx.fillStyle=(r+c)%2===0?'#1d6e3a':'#1a6435';
+      ctx.fillRect(x,y,CS,CS);
+      // Grid border
+      ctx.strokeStyle='rgba(0,0,0,.25)';
+      ctx.lineWidth=1;
+      ctx.strokeRect(x+.5,y+.5,CS-1,CS-1);
+      // Valid move dot
+      if(!gameOver&&!cpuBusy&&isValid(r,c)){
+        ctx.fillStyle='rgba(165,214,167,.5)';
+        ctx.beginPath();
+        ctx.arc(x+CS/2,y+CS/2,CS*0.13,0,Math.PI*2);
+        ctx.fill();
+      }
+      // Hover highlight
+      if(!gameOver&&!cpuBusy&&hovR===r&&hovC===c&&isValid(r,c)){
+        ctx.fillStyle='rgba(165,214,167,.22)';
+        ctx.fillRect(x,y,CS,CS);
+      }
+      // Piece
+      var v=grid[r][c];
+      if(v!==0){
+        var cx=x+CS/2,cy=y+CS/2,rad=CS*0.4;
+        ctx.fillStyle=v===1?'#1a1a1a':'#e8e8e8';
+        ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.fill();
+        // highlight
+        ctx.fillStyle=v===1?'rgba(255,255,255,.12)':'rgba(255,255,255,.55)';
+        ctx.beginPath();ctx.arc(cx-rad*0.25,cy-rad*0.25,rad*0.35,0,Math.PI*2);ctx.fill();
+      }
     }
-    // Hover
-    if(!gameOver&&!cpuBusy&&hovR===r&&hovC===c&&valid.some(function(m){return m[0]===r&&m[1]===c;})){
-      ctx.save();ctx.globalAlpha=0.18;ctx.fillStyle='#a5d6a7';ctx.fillRect(x,y,CS,CS);ctx.restore();
-    }
-    // Piece
-    var v=grid[r][c];
-    if(v!==0)drawPiece(x+CS/2,y+CS/2,CS*0.42,v);
   }
   // Corner dots
-  [[2,2],[2,6],[6,2],[6,6]].forEach(function(p){
-    ctx.fillStyle='rgba(38,160,70,.7)';
-    ctx.beginPath();ctx.arc(BX+p[1]*CS,BY+p[0]*CS,3,0,Math.PI*2);ctx.fill();
-  });
+  var pts=[[2,2],[2,6],[6,2],[6,6]];
+  for(var i=0;i<pts.length;i++){
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.beginPath();ctx.arc(pts[i][1]*CS,pts[i][0]*CS,3,0,Math.PI*2);ctx.fill();
+  }
   // End overlay
   if(gameOver){
-    ctx.save();ctx.globalAlpha=0.55;ctx.fillStyle='#080e14';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.restore();
-    ctx.save();
-    var msg=winner===1?'HAI VINTO!':winner===-1?'VINCE L\'AI':'PAREGGIO!';
+    ctx.fillStyle='rgba(8,14,20,.6)';
+    ctx.fillRect(0,0,w,h);
+    var msg=winner===1?'HAI VINTO!':winner===-1?"VINCE L'AI":'PAREGGIO!';
     var col=winner===1?'#ffd600':winner===-1?'#ef5350':'#66bb6a';
-    ctx.font='bold '+Math.floor(CS*0.7)+'px "Exo 2",sans-serif';
+    var fs=Math.max(22,Math.floor(CS*0.65));
+    ctx.font='bold '+fs+'px "Exo 2",sans-serif';
     ctx.textAlign='center';ctx.fillStyle=col;
-    ctx.fillText(msg,canvas.width/2,canvas.height/2-CS*0.15);
-    ctx.font=Math.floor(CS*0.35)+'px "Share Tech Mono",monospace';
+    ctx.fillText(msg,w/2,h/2);
+    ctx.font=Math.floor(fs*0.55)+'px "Share Tech Mono",monospace';
     ctx.fillStyle='#90a4ae';
-    ctx.fillText(countP(grid,1)+' – '+countP(grid,-1),canvas.width/2,canvas.height/2+CS*0.4);
-    ctx.restore();
+    ctx.fillText(countP(grid,1)+' – '+countP(grid,-1),w/2,h/2+fs*0.9);
   }
 }
 
-function drawPiece(cx,cy,r,player){
-  var base=player===1?'#181818':'#e0e0e0';
-  var edge=player===1?'#000':'#aaa';
-  ctx.save();
-  ctx.shadowColor=player===1?'rgba(0,0,0,.6)':'rgba(200,200,200,.4)';
-  ctx.shadowBlur=4;ctx.shadowOffsetY=2;
-  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=edge;ctx.fill();
-  ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
-  ctx.beginPath();ctx.arc(cx,cy,r-1.5,0,Math.PI*2);ctx.fillStyle=base;ctx.fill();
-  // Radial highlight
-  var grd=ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,0,cx,cy,r);
-  if(player===1){grd.addColorStop(0,'rgba(255,255,255,.18)');grd.addColorStop(1,'rgba(0,0,0,.0)');}
-  else{grd.addColorStop(0,'rgba(255,255,255,.7)');grd.addColorStop(0.5,'rgba(255,255,255,.1)');grd.addColorStop(1,'rgba(0,0,0,.0)');}
-  ctx.beginPath();ctx.arc(cx,cy,r-1.5,0,Math.PI*2);ctx.fillStyle=grd;ctx.fill();
-  ctx.restore();
-}
-
-// ─── Events ──────────────────────────────────────────────────
+// Events
 canvas.addEventListener('mousemove',function(e){
-  var rect=canvas.getBoundingClientRect(),sc=canvas.width/rect.width;
-  var mx=(e.clientX-rect.left)*sc,my=(e.clientY-rect.top)*sc;
-  hovC=Math.floor((mx-BX)/CS);hovR=Math.floor((my-BY)/CS);
-  if(hovR<0||hovR>=SZ||hovC<0||hovC>=SZ){hovR=-1;hovC=-1;}
-  draw();
+  var rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width;
+  var mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
+  var nc=Math.floor(mx/CS),nr=Math.floor(my/CS);
+  if(nr!==hovR||nc!==hovC){
+    hovR=(nr>=0&&nr<SZ)?nr:-1;
+    hovC=(nc>=0&&nc<SZ)?nc:-1;
+    draw();
+  }
 });
 canvas.addEventListener('mouseleave',function(){hovR=-1;hovC=-1;draw();});
 canvas.addEventListener('click',function(e){
   if(gameOver||cpuBusy||player!==1)return;
-  var rect=canvas.getBoundingClientRect(),sc=canvas.width/rect.width;
-  var mx=(e.clientX-rect.left)*sc,my=(e.clientY-rect.top)*sc;
-  var c=Math.floor((mx-BX)/CS),r=Math.floor((my-BY)/CS);
-  if(r>=0&&r<SZ&&c>=0&&c<SZ)doMove(r,c);
+  var rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width;
+  var mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
+  doMove(Math.floor(my/CS),Math.floor(mx/CS));
 });
 canvas.addEventListener('touchstart',function(e){
   e.preventDefault();
   if(gameOver||cpuBusy||player!==1)return;
-  var t=e.touches[0],rect=canvas.getBoundingClientRect(),sc=canvas.width/rect.width;
-  var mx=(t.clientX-rect.left)*sc,my=(t.clientY-rect.top)*sc;
-  var c=Math.floor((mx-BX)/CS),r=Math.floor((my-BY)/CS);
-  if(r>=0&&r<SZ&&c>=0&&c<SZ)doMove(r,c);
+  var t=e.touches[0],rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width;
+  var mx=(t.clientX-rect.left)*sx,my=(t.clientY-rect.top)*sx;
+  doMove(Math.floor(my/CS),Math.floor(mx/CS));
 },{passive:false});
-document.addEventListener('keydown',function(e){if(e.key==='r'||e.key==='R')newGame();});
+document.addEventListener('keydown',function(e){
+  if(e.key==='r'||e.key==='R')newGame();
+});
+document.getElementById('btn-new').addEventListener('click',newGame);
+document.getElementById('btn-cpu').addEventListener('click',function(){
+  cpuOn=!cpuOn;
+  var btn=document.getElementById('btn-cpu');
+  if(cpuOn){btn.textContent='vs CPU: ON \u{1F916}';btn.className='btn on';}
+  else{btn.textContent='vs CPU: OFF';btn.className='btn';}
+  if(cpuOn&&!gameOver&&!cpuBusy&&player===-1)doCpu();
+});
 
-// ─── Init ─────────────────────────────────────────────────────
-window.newGame = newGame;
-window.toggleCpu = toggleCpu;
+// Carica brain
+fetch('/api/othello/stats').then(function(r){return r.json();}).then(function(d){
+  if(d&&d.weights)learnW=d.weights;
+  if(d&&d.games>0)document.getElementById('lg').textContent='Brain: '+d.games+' partite';
+}).catch(function(){});
+
+// Avvia
 resize();
-window.addEventListener('resize',function(){resize();newGame();});
 newGame();
-})();
+window.addEventListener('resize',function(){resize();newGame();});
 </script>
 </body>
 </html>`;
 }
+
 
 // FORZA 4 — ECHO Games
 // ============================================================
