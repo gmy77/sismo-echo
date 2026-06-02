@@ -1048,15 +1048,9 @@ canvas.addEventListener('mousedown',function(e){
   var sx=canvas.width/rect.width,sy=canvas.height/rect.height;
   var col=Math.floor((e.clientX-rect.left)*sx/CS);
   var row=Math.floor((e.clientY-rect.top)*sy/CS);
-  var lg=document.getElementById('lg');
-  if(row<0||row>=SZ||col<0||col>=SZ){lg.textContent='fuori';return;}
-  if(gameOver){lg.textContent='fine partita';return;}
-  if(cpuBusy){lg.textContent='CPU pensa';return;}
-  if(player!==1){lg.textContent='attendi (p='+player+')';return;}
-  var fl=getFlips(grid,row,col,1);
-  if(!fl.length){lg.textContent='non valida ('+row+','+col+')';return;}
-  lg.textContent='';
-  try{doMove(row,col);}catch(err){lg.textContent='ERR:'+err.message;}
+  if(row<0||row>=SZ||col<0||col>=SZ)return;
+  if(gameOver||cpuBusy||player!==1)return;
+  doMove(row,col);
 });
 canvas.addEventListener('touchstart',function(e){
   e.preventDefault();
@@ -1066,9 +1060,8 @@ canvas.addEventListener('touchstart',function(e){
   var row=Math.floor((t.clientY-rect.top)*sy/CS);
   if(row<0||row>=SZ||col<0||col>=SZ)return;
   if(gameOver||cpuBusy||player!==1)return;
-  try{doMove(row,col);}catch(err){document.getElementById('lg').textContent='ERR:'+err.message;}
+  doMove(row,col);
 },{passive:false});
-document.addEventListener('keydown',function(e){
   if(e.key==='r'||e.key==='R')newGame();
 });
 document.getElementById('btn-new').addEventListener('click',newGame);
