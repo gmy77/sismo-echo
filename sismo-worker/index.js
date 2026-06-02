@@ -775,7 +775,7 @@ var SZ=8;
 var DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
 var BW=[[120,-20,20,5,5,20,-20,120],[-20,-40,-5,-5,-5,-5,-40,-20],[20,-5,15,3,3,15,-5,20],[5,-5,3,3,3,3,-5,5],[5,-5,3,3,3,3,-5,5],[20,-5,15,3,3,15,-5,20],[-20,-40,-5,-5,-5,-5,-40,-20],[120,-20,20,5,5,20,-20,120]];
 var learnW=BW.map(function(row){return row.map(function(){return 0;});});
-var grid,player,gameOver,winner,cpuOn=true,cpuBusy=false,history=[];
+var grid,player,gameOver,winner,cpuOn=true,cpuBusy=false,moveLog=[];
 var canvas=document.getElementById('cvs');
 var ctx=canvas.getContext('2d');
 var CS=50,BX=0,BY=0,valid=[],hovR=-1,hovC=-1;
@@ -887,7 +887,7 @@ function newGame(){
   var m=SZ/2;
   grid[m-1][m-1]=-1;grid[m-1][m]=1;
   grid[m][m-1]=1;grid[m][m]=-1;
-  player=1;gameOver=false;winner=0;cpuBusy=false;history=[];
+  player=1;gameOver=false;winner=0;cpuBusy=false;moveLog=[];
   valid=getValid(grid,1);
   updUI();draw();
 }
@@ -895,7 +895,7 @@ function newGame(){
 function doMove(r,c){
   if(gameOver||cpuBusy||player!==1)return;
   if(!getFlips(grid,r,c,1).length)return;
-  history.push([r,c,1]);
+  moveLog.push([r,c,1]);
   grid=applyMove(grid,r,c,1);
   player=-1;
   valid=getValid(grid,-1);
@@ -917,7 +917,7 @@ function doCpu(){
     var res=minimax(grid,depth,-Infinity,Infinity,-1,-1);
     var mv=res[1];
     if(mv){
-      history.push([mv[0],mv[1],-1]);
+      moveLog.push([mv[0],mv[1],-1]);
       grid=applyMove(grid,mv[0],mv[1],-1);
     }
     player=1;cpuBusy=false;
@@ -939,7 +939,7 @@ function endGame(){
   fetch('/api/othello/learn',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({winner:winner,moves:history})
+    body:JSON.stringify({winner:winner,moves:moveLog})
   }).then(function(r){return r.json();}).then(function(d){
     if(d.games)document.getElementById('lg').textContent='Brain: '+d.games+' partite';
   }).catch(function(){});
