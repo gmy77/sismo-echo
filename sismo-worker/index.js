@@ -1042,18 +1042,31 @@ canvas.addEventListener('mousemove',function(e){
   }
 });
 canvas.addEventListener('mouseleave',function(){hovR=-1;hovC=-1;draw();});
-canvas.addEventListener('click',function(e){
-  if(gameOver||cpuBusy||player!==1)return;
-  var rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width;
-  var mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
-  doMove(Math.floor(my/CS),Math.floor(mx/CS));
+canvas.addEventListener('mousedown',function(e){
+  e.preventDefault();
+  var rect=canvas.getBoundingClientRect();
+  var sx=canvas.width/rect.width,sy=canvas.height/rect.height;
+  var col=Math.floor((e.clientX-rect.left)*sx/CS);
+  var row=Math.floor((e.clientY-rect.top)*sy/CS);
+  var lg=document.getElementById('lg');
+  if(row<0||row>=SZ||col<0||col>=SZ){lg.textContent='fuori';return;}
+  if(gameOver){lg.textContent='fine partita';return;}
+  if(cpuBusy){lg.textContent='CPU pensa';return;}
+  if(player!==1){lg.textContent='attendi (p='+player+')';return;}
+  var fl=getFlips(grid,row,col,1);
+  if(!fl.length){lg.textContent='non valida ('+row+','+col+')';return;}
+  lg.textContent='';
+  try{doMove(row,col);}catch(err){lg.textContent='ERR:'+err.message;}
 });
 canvas.addEventListener('touchstart',function(e){
   e.preventDefault();
+  var t=e.touches[0],rect=canvas.getBoundingClientRect();
+  var sx=canvas.width/rect.width,sy=canvas.height/rect.height;
+  var col=Math.floor((t.clientX-rect.left)*sx/CS);
+  var row=Math.floor((t.clientY-rect.top)*sy/CS);
+  if(row<0||row>=SZ||col<0||col>=SZ)return;
   if(gameOver||cpuBusy||player!==1)return;
-  var t=e.touches[0],rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width;
-  var mx=(t.clientX-rect.left)*sx,my=(t.clientY-rect.top)*sx;
-  doMove(Math.floor(my/CS),Math.floor(mx/CS));
+  try{doMove(row,col);}catch(err){document.getElementById('lg').textContent='ERR:'+err.message;}
 },{passive:false});
 document.addEventListener('keydown',function(e){
   if(e.key==='r'||e.key==='R')newGame();
