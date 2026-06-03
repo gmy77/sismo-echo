@@ -2009,6 +2009,306 @@ if (_token) tryAuth(_token).then(ok => {
 }
 
 // ============================================================
+// OTHELLO — gioco Othello/Reversi con AI Minimax
+// ============================================================
+function renderOthello() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Othello &#9679; ECHO Games</title>
+<meta name="author" content="Gimmy Pignolo">
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;overflow-x:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;width:100%;max-width:540px;text-align:center}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 18px;border-bottom:1px solid rgba(38,198,218,.15);margin-bottom:14px}
+.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
+.back:hover{background:rgba(38,198,218,.2)}
+.gtitle{font-family:'Share Tech Mono',monospace;font-size:.95em;color:#26c6da;letter-spacing:.1em}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:10px;gap:8px}
+.ps{display:flex;align-items:center;gap:7px;font-family:'Share Tech Mono',monospace;font-size:.82em}
+.disc{width:18px;height:18px;border-radius:50%;flex-shrink:0}
+.disc-b{background:radial-gradient(circle at 35% 35%,#666,#111)}
+.disc-w{background:radial-gradient(circle at 35% 35%,#fff,#ccc)}
+.sv{font-size:1.3em;font-weight:700}
+#status{font-family:'Share Tech Mono',monospace;font-size:.78em;color:#90a4ae;flex:1;text-align:center}
+#cvs{border-radius:12px;cursor:pointer;touch-action:none;max-width:100%;display:block;margin:0 auto}
+.brow{display:flex;gap:10px;justify-content:center;margin-top:10px}
+.gbtn{padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.82em;transition:background .1s,transform .1s}
+.gbtn:hover{background:rgba(38,198,218,.25)}
+.gbtn:active{background:rgba(38,198,218,.45);transform:scale(.96)}
+.diff{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:8px}
+.dlbl{font-family:'Share Tech Mono',monospace;font-size:.7em;color:#546e7a}
+.dbtn{padding:4px 12px;border-radius:5px;border:1px solid rgba(38,198,218,.18);background:transparent;color:#546e7a;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.7em;transition:all .15s}
+.dbtn.on{background:rgba(38,198,218,.15);border-color:rgba(38,198,218,.45);color:#26c6da}
+footer{margin-top:16px;font-size:.7em;color:#263238;font-family:'Share Tech Mono',monospace}
+footer a{color:#26c6da;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="/newtab">&#8592; Home</a>
+    <span class="gtitle">&#9679; OTHELLO</span>
+    <span style="width:80px"></span>
+  </div>
+  <div class="sbar">
+    <div class="ps"><div class="disc disc-b"></div><span>Tu</span><span class="sv" id="sb">2</span></div>
+    <div id="status">Il tuo turno (&#9679;)</div>
+    <div class="ps"><span class="sv" id="sw">2</span><span>AI</span><div class="disc disc-w"></div></div>
+  </div>
+  <canvas id="cvs" width="480" height="480"></canvas>
+  <div class="brow">
+    <button class="gbtn" onclick="newGame()">&#8635; Nuova partita</button>
+    <button class="gbtn" onclick="undoMove()">&#8592; Annulla</button>
+  </div>
+  <div class="diff">
+    <span class="dlbl">Difficolt&agrave;:</span>
+    <button class="dbtn" id="d0" onclick="setDiff(0)">Facile</button>
+    <button class="dbtn on" id="d1" onclick="setDiff(1)">Normale</button>
+    <button class="dbtn" id="d2" onclick="setDiff(2)">Esperto</button>
+  </div>
+  <footer>ECHO Games // <a href="/newtab">&#8592; home</a> &nbsp;|&nbsp; &copy; 2026 Gimmy Pignolo</footer>
+</div>
+<script>
+var SIZE=8,CELL=60;
+var BLACK=1,WHITE=-1,EMPTY=0;
+var DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+var WEIGHTS=[
+  [120,-20,20,5,5,20,-20,120],
+  [-20,-40,-5,-5,-5,-5,-40,-20],
+  [20,-5,15,3,3,15,-5,20],
+  [5,-5,3,3,3,3,-5,5],
+  [5,-5,3,3,3,3,-5,5],
+  [20,-5,15,3,3,15,-5,20],
+  [-20,-40,-5,-5,-5,-5,-40,-20],
+  [120,-20,20,5,5,20,-20,120]
+];
+var DEPTHS=[3,5,7];
+var board,turn,over,validMoves,history,thinking,diffLevel=1;
+var cvs=document.getElementById('cvs');
+var ctx=cvs.getContext('2d');
+var statusEl=document.getElementById('status');
+
+function resize(){var m=Math.min(window.innerWidth-40,480);cvs.style.width=m+'px';cvs.style.height=m+'px';}
+resize();window.addEventListener('resize',resize);
+
+function setDiff(d){
+  diffLevel=d;
+  for(var i=0;i<3;i++)document.getElementById('d'+i).classList.toggle('on',i===d);
+  newGame();
+}
+
+function mkBoard(){
+  var b=[];for(var r=0;r<8;r++){b[r]=[];for(var c=0;c<8;c++)b[r][c]=EMPTY;}
+  b[3][3]=WHITE;b[3][4]=BLACK;b[4][3]=BLACK;b[4][4]=WHITE;
+  return b;
+}
+
+function cloneBoard(bd){return bd.map(function(row){return row.slice();});}
+
+function getFlips(bd,r,c,p){
+  if(bd[r][c]!==EMPTY)return[];
+  var res=[];
+  for(var d=0;d<DIRS.length;d++){
+    var dr=DIRS[d][0],dc=DIRS[d][1],line=[];
+    var nr=r+dr,nc=c+dc;
+    while(nr>=0&&nr<8&&nc>=0&&nc<8&&bd[nr][nc]===-p){line.push([nr,nc]);nr+=dr;nc+=dc;}
+    if(line.length&&nr>=0&&nr<8&&nc>=0&&nc<8&&bd[nr][nc]===p)
+      for(var i=0;i<line.length;i++)res.push(line[i]);
+  }
+  return res;
+}
+
+function getValid(bd,p){
+  var m=[];
+  for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(getFlips(bd,r,c,p).length)m.push([r,c]);
+  return m;
+}
+
+function applyMove(bd,r,c,p){
+  var nb=cloneBoard(bd),flips=getFlips(nb,r,c,p);
+  for(var i=0;i<flips.length;i++)nb[flips[i][0]][flips[i][1]]=p;
+  nb[r][c]=p;return nb;
+}
+
+function countPieces(bd,p){var n=0;for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]===p)n++;return n;}
+function countEmpty(bd){var n=0;for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]===EMPTY)n++;return n;}
+
+function evalBoard(bd,rp){
+  var score=0;
+  for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]!==EMPTY)score+=bd[r][c]*WEIGHTS[r][c];
+  var my=getValid(bd,rp).length,opp=getValid(bd,-rp).length;
+  if(my+opp>0)score+=rp*10*(my-opp)/(my+opp);
+  return score*rp;
+}
+
+function minimax(bd,depth,alpha,beta,p,rp){
+  var moves=getValid(bd,p);
+  if(depth===0||(moves.length===0&&getValid(bd,-p).length===0))return[evalBoard(bd,rp),null];
+  if(moves.length===0){var r2=minimax(bd,depth-1,alpha,beta,-p,rp);return[r2[0],null];}
+  var bestM=moves[0];
+  if(p===rp){
+    var best=-1e9;
+    for(var i=0;i<moves.length;i++){
+      var v=minimax(applyMove(bd,moves[i][0],moves[i][1],p),depth-1,alpha,beta,-p,rp)[0];
+      if(v>best){best=v;bestM=moves[i];}
+      if(v>alpha)alpha=v;if(beta<=alpha)break;
+    }
+    return[best,bestM];
+  }else{
+    var best2=1e9;
+    for(var j=0;j<moves.length;j++){
+      var v2=minimax(applyMove(bd,moves[j][0],moves[j][1],p),depth-1,alpha,beta,-p,rp)[0];
+      if(v2<best2){best2=v2;bestM=moves[j];}
+      if(v2<beta)beta=v2;if(beta<=alpha)break;
+    }
+    return[best2,bestM];
+  }
+}
+
+function chooseAI(bd){
+  var empty=countEmpty(bd),depth=DEPTHS[diffLevel];
+  if(empty<=10)depth=Math.max(depth,8);
+  else if(empty<=16)depth=Math.max(depth,depth+1);
+  return minimax(bd,depth,-1e9,1e9,WHITE,WHITE)[1];
+}
+
+function updateScores(){
+  document.getElementById('sb').textContent=countPieces(board,BLACK);
+  document.getElementById('sw').textContent=countPieces(board,WHITE);
+}
+
+function newGame(){
+  board=mkBoard();turn=BLACK;over=false;history=[];thinking=false;
+  validMoves=getValid(board,BLACK);
+  statusEl.style.color='#90a4ae';statusEl.textContent='Il tuo turno (●)';
+  updateScores();draw();
+}
+
+function undoMove(){
+  if(thinking||history.length<2)return;
+  board=history[history.length-2];history.splice(-2);
+  turn=BLACK;over=false;thinking=false;
+  validMoves=getValid(board,BLACK);
+  statusEl.style.color='#90a4ae';statusEl.textContent='Annullato — il tuo turno (●)';
+  updateScores();draw();
+}
+
+function draw(){
+  var W=480,H=480;
+  ctx.fillStyle='#0d4c28';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#136634';ctx.lineWidth=1;
+  for(var i=1;i<8;i++){
+    ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(W,i*CELL);ctx.stroke();
+  }
+  // star points
+  ctx.fillStyle='#1a7040';
+  [[2,2],[2,5],[5,2],[5,5]].forEach(function(p){
+    ctx.beginPath();ctx.arc(p[1]*CELL+CELL/2,p[0]*CELL+CELL/2,4,0,Math.PI*2);ctx.fill();
+  });
+  // valid move hints
+  if(turn===BLACK&&!over){
+    for(var m=0;m<validMoves.length;m++){
+      var vr=validMoves[m][0],vc=validMoves[m][1];
+      ctx.fillStyle='rgba(105,240,174,0.2)';
+      ctx.beginPath();ctx.arc(vc*CELL+30,vr*CELL+30,16,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(105,240,174,0.45)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(vc*CELL+30,vr*CELL+30,16,0,Math.PI*2);ctx.stroke();
+    }
+  }
+  // pieces
+  for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+    if(board[r][c]===EMPTY)continue;
+    var x=c*CELL+30,y=r*CELL+30,isB=board[r][c]===BLACK;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,.65)';ctx.shadowBlur=8;ctx.shadowOffsetX=2;ctx.shadowOffsetY=3;
+    var g=ctx.createRadialGradient(x-7,y-7,2,x,y,23);
+    if(isB){g.addColorStop(0,'#5a5a5a');g.addColorStop(1,'#101010');}
+    else{g.addColorStop(0,'#ffffff');g.addColorStop(1,'#c8c8c8');}
+    ctx.fillStyle=g;
+    ctx.beginPath();ctx.arc(x,y,23,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+}
+
+cvs.addEventListener('click',function(e){
+  if(turn!==BLACK||over||thinking)return;
+  var rect=cvs.getBoundingClientRect();
+  var sx=480/rect.width,sy=480/rect.height;
+  var x=(e.clientX-rect.left)*sx,y=(e.clientY-rect.top)*sy;
+  var c=Math.floor(x/CELL),r=Math.floor(y/CELL);
+  if(r<0||r>=8||c<0||c>=8)return;
+  var ok=false;
+  for(var i=0;i<validMoves.length;i++)if(validMoves[i][0]===r&&validMoves[i][1]===c){ok=true;break;}
+  if(!ok)return;
+  history.push(cloneBoard(board));
+  board=applyMove(board,r,c,BLACK);
+  updateScores();draw();
+  var aiM=getValid(board,WHITE);
+  if(aiM.length===0){
+    var plM=getValid(board,BLACK);
+    if(plM.length===0){endGame();return;}
+    statusEl.style.color='#ffb347';
+    statusEl.textContent='L\'AI salta — ancora il tuo turno (●)';
+    validMoves=plM;draw();return;
+  }
+  turn=WHITE;aiMove();
+});
+
+cvs.addEventListener('touchend',function(e){
+  e.preventDefault();
+  var t=e.changedTouches[0];
+  cvs.dispatchEvent(new MouseEvent('click',{clientX:t.clientX,clientY:t.clientY}));
+},{passive:false});
+
+function aiMove(){
+  thinking=true;
+  statusEl.style.color='#69f0ae';statusEl.textContent='AI sta pensando…';
+  setTimeout(function(){
+    var move=chooseAI(board);
+    if(move){
+      history.push(cloneBoard(board));
+      board=applyMove(board,move[0],move[1],WHITE);
+      updateScores();
+    }
+    turn=BLACK;thinking=false;
+    validMoves=getValid(board,BLACK);
+    draw();
+    if(validMoves.length===0){
+      var aiM2=getValid(board,WHITE);
+      if(aiM2.length===0){endGame();return;}
+      turn=WHITE;
+      statusEl.style.color='#ffb347';
+      statusEl.textContent='Nessuna mossa — l\'AI gioca ancora';
+      setTimeout(aiMove,600);
+    }else{
+      statusEl.style.color='#90a4ae';statusEl.textContent='Il tuo turno (●)';
+    }
+  },30);
+}
+
+function endGame(){
+  over=true;
+  var b=countPieces(board,BLACK),w=countPieces(board,WHITE);
+  if(b>w){statusEl.style.color='#69f0ae';statusEl.textContent='Hai vinto! ● '+b+' – '+w+' ○';}
+  else if(w>b){statusEl.style.color='#ff5252';statusEl.textContent='Ha vinto l\'AI! ● '+b+' – '+w+' ○';}
+  else{statusEl.style.color='#ffd600';statusEl.textContent='Pareggio! ● '+b+' – '+w+' ○';}
+  draw();
+}
+
+newGame();
+</script>
+</body>
+</html>`;
+}
+
+// ============================================================
 // NEWTAB — pagina nuova scheda personalizzata
 // ============================================================
 function renderNewtab() {
@@ -2161,6 +2461,7 @@ body::after{
   <a class="lc" href="https://www.youtube.com" target="_blank"><img src="https://www.youtube.com/favicon.ico" onerror="this.style.display='none'">YouTube</a>
   <a class="lc" href="/chat" target="_blank">🧠 Echo Chat</a>
   <a class="lc" href="/forza4" target="_blank">🎮 Forza 4</a>
+  <a class="lc" href="/othello" target="_blank">&#9679; Othello</a>
 </div>
 
 <!-- CENTER -->
@@ -2463,6 +2764,10 @@ export default {
 
     if (url.pathname === "/forza4") {
       return new Response(renderForza4(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
+    }
+
+    if (url.pathname === "/othello") {
+      return new Response(renderOthello(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
     }
 
     if (url.pathname === "/newtab") {
