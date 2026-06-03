@@ -2008,15 +2008,13 @@ if (_token) tryAuth(_token).then(ok => {
 </html>`;
 }
 
-// ============================================================
-// OTHELLO — gioco Othello/Reversi con AI Minimax
-// ============================================================
-function renderOthello() {
+// (renderOthello già definita sopra)
+function _deleteme() {
   return `<!DOCTYPE html>
 <html lang="it">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Othello &#9679; ECHO Games</title>
+<title>Othello &#9679; ECHO Games UNUSED</title>
 <meta name="author" content="Gimmy Pignolo">
 <meta name="robots" content="noindex">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
@@ -2764,10 +2762,6 @@ export default {
 
     if (url.pathname === "/forza4") {
       return new Response(renderForza4(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
-    }
-
-    if (url.pathname === "/othello") {
-      return new Response(renderOthello(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
     }
 
     if (url.pathname === "/newtab") {
