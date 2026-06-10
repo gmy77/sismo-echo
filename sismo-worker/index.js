@@ -1,8 +1,11 @@
 // ============================================================
-// SISMO FVG — Cloudflare Worker v2.0
+// SISMO FVG — Cloudflare Worker
 // Monitor Sismico FVG + Correlazione Solare NOAA
 // Gimmy Pignolo © 2026 — gimmycloud.com
 // ============================================================
+
+// auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
+const ECHO_VERSION = "3.0";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -572,7 +575,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div class="logo">
     <div class="logo-icon"><img src="data:image/png;base64,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" style="width:100%;height:100%;border-radius:50%;object-fit:cover"></div>
     <div class="logo-text">
-      <h1>SISMO FVG <span class="echo-badge">☀ PROGETTO ECHO v2</span></h1>
+      <h1>SISMO FVG <span class="echo-badge">☀ PROGETTO ECHO v${ECHO_VERSION}</span></h1>
       <p>monitor sismico + correlazione solare NOAA // friuli venezia giulia</p>
     </div>
   </div>
@@ -844,7 +847,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 </div>
 
 <footer>
-  ECHO MONITOR v2 — <a href="https://gimmycloud.com">gimmycloud.com</a> //
+  ECHO MONITOR v${ECHO_VERSION} — <a href="https://gimmycloud.com">gimmycloud.com</a> //
   sismicità: <a href="https://www.ingv.it" target="_blank">INGV</a> —
   dati solari: <a href="https://www.swpc.noaa.gov" target="_blank">NOAA SWPC</a> //
   Gimmy Pignolo © 2026 // <span style="color:#26c6da">Progetto ECHO</span>
@@ -1587,7 +1590,7 @@ footer a{color:#26c6da;text-decoration:none}
   <textarea id="msg-input" placeholder="Scrivi un messaggio... (Invio per inviare)" rows="1"></textarea>
   <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
 let _history = [];
@@ -1745,7 +1748,7 @@ footer a{color:#66bb6a;text-decoration:none}
     <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
   </div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
 let _history = [];
@@ -1946,7 +1949,7 @@ footer a{color:#26c6da;text-decoration:none}
   <div class="spinner" id="spinner"></div>
   <div id="error-msg"></div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
 
 <script>
 let _dir = 'it-en'; // it→en oppure en→it
@@ -2121,7 +2124,7 @@ footer a{color:#26c6da;text-decoration:none}
     <div id="file-list"></div>
   </div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
 
 <script>
 let _allFiles = [];
