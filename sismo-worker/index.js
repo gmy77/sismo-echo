@@ -1,8 +1,11 @@
 // ============================================================
-// SISMO FVG — Cloudflare Worker v2.0
+// SISMO FVG — Cloudflare Worker
 // Monitor Sismico FVG + Correlazione Solare NOAA
 // Gimmy Pignolo © 2026 — gimmycloud.com
 // ============================================================
+
+// auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
+const ECHO_VERSION = "3.0";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -423,6 +426,144 @@ table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:8px 14px;font-size:.68em;color:#455a64;text-transform:uppercase;letter-spacing:.08em;font-family:'Share Tech Mono',monospace;border-bottom:1px solid rgba(255,255,255,.07)}
 footer{text-align:center;padding:28px 0 18px;color:#263238;font-size:.73em;font-family:'Share Tech Mono',monospace;border-top:1px solid rgba(255,255,255,.04);margin-top:32px}
 footer a{color:#26c6da;text-decoration:none}
+
+/* ════════════════════════════════════════════════════════════ */
+/* ECHO 2026 — enhancement layer (glass · motion · depth · glow)  */
+/* ════════════════════════════════════════════════════════════ */
+:root{--ease:cubic-bezier(.22,.61,.36,1);--ease-out:cubic-bezier(.16,1,.3,1)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+html{scroll-behavior:smooth}
+
+/* — animated aurora behind the grid — */
+body::after{content:'';position:fixed;inset:-20%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(38% 48% at 14% 8%,rgba(38,198,218,.12),transparent 62%),
+    radial-gradient(42% 52% at 88% 18%,rgba(255,109,0,.09),transparent 62%),
+    radial-gradient(46% 50% at 62% 96%,rgba(224,64,251,.08),transparent 62%);
+  animation:auroraDrift 22s var(--ease) infinite alternate}
+@keyframes auroraDrift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(1%,-2.5%,0) scale(1.06)}100%{transform:translate3d(-1%,1.5%,0) scale(1.03)}}
+.container{position:relative;z-index:1}
+
+/* — header glow line — */
+header{position:relative}
+header::after{content:'';position:absolute;left:0;bottom:-1px;height:1px;width:100%;
+  background:linear-gradient(90deg,transparent,rgba(38,198,218,.6),rgba(255,109,0,.35),transparent);
+  background-size:200% 100%;animation:scanLine 6s linear infinite}
+@keyframes scanLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.logo-icon{will-change:transform}
+.logo-text h1{background:linear-gradient(92deg,#eceff1,#9fe8f0 55%,#26c6da);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* — glassmorphism panels — */
+.panel{background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+  backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+  border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 30px -12px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);
+  transition:transform .5s var(--ease-out),box-shadow .5s var(--ease-out),border-color .5s var(--ease-out)}
+.panel:hover{transform:translateY(-3px);border-color:rgba(38,198,218,.28);
+  box-shadow:0 18px 44px -16px rgba(0,0,0,.7),0 0 0 1px rgba(38,198,218,.12),inset 0 1px 0 rgba(255,255,255,.07)}
+.panel-header{position:relative}
+.panel-header::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:0;height:60%;
+  background:linear-gradient(180deg,#26c6da,transparent);border-radius:2px;transition:width .4s var(--ease)}
+.panel:hover .panel-header::before{width:3px}
+
+/* — stat cards: lift · glow · sheen — */
+.stat-card{background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.018));
+  backdrop-filter:blur(10px) saturate(130%);-webkit-backdrop-filter:blur(10px) saturate(130%);
+  box-shadow:0 6px 22px -12px rgba(0,0,0,.55);cursor:default;
+  transition:transform .45s var(--ease-out),box-shadow .45s var(--ease-out),border-color .45s var(--ease-out)}
+.stat-card::after{content:'';position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .45s var(--ease);
+  background:radial-gradient(120% 90% at 50% -10%,rgba(38,198,218,.14),transparent 60%);pointer-events:none}
+.stat-card:hover{transform:translateY(-5px) scale(1.015);border-color:rgba(255,255,255,.16);
+  box-shadow:0 22px 48px -18px rgba(0,0,0,.75)}
+.stat-card:hover::after{opacity:1}
+.stat-card::before{transition:filter .4s var(--ease)}
+.stat-card:hover::before{filter:drop-shadow(0 0 6px currentColor)}
+.stat-value{transition:text-shadow .4s var(--ease)}
+.stat-card:hover .stat-value{text-shadow:0 0 22px rgba(38,198,218,.35)}
+
+/* — buttons: gradient · sheen sweep · lift — */
+.btn{position:relative;overflow:hidden;border-radius:8px;
+  background:linear-gradient(135deg,rgba(38,198,218,.16),rgba(38,198,218,.06));
+  box-shadow:0 2px 10px -4px rgba(38,198,218,.4);
+  transition:transform .3s var(--ease-out),box-shadow .3s var(--ease-out),background .3s var(--ease)}
+.btn::before{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-20deg);transition:left .6s var(--ease)}
+.btn:hover{transform:translateY(-2px);background:linear-gradient(135deg,rgba(38,198,218,.28),rgba(38,198,218,.12));
+  box-shadow:0 8px 22px -6px rgba(38,198,218,.55)}
+.btn:hover::before{left:130%}
+.btn:active{transform:translateY(0) scale(.97)}
+
+/* — ECHO app launch buttons (href="/...") — */
+.panel-body a[href^="/"]{position:relative;overflow:hidden;
+  transition:transform .3s var(--ease-out),box-shadow .3s var(--ease-out),background .3s var(--ease),border-color .3s var(--ease)}
+.panel-body a[href^="/"]::after{content:'';position:absolute;top:0;left:-120%;width:55%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);transform:skewX(-20deg);transition:left .6s var(--ease)}
+.panel-body a[href^="/"]:hover{transform:translateY(-3px) scale(1.04);
+  box-shadow:0 12px 26px -8px rgba(0,0,0,.55),0 0 18px -4px currentColor}
+.panel-body a[href^="/"]:hover::after{left:140%}
+
+/* — pill badges shimmer — */
+.echo-badge,.ai-badge{transition:box-shadow .4s var(--ease),transform .4s var(--ease-out)}
+.echo-badge:hover,.ai-badge:hover{transform:translateY(-1px);box-shadow:0 0 16px -2px rgba(38,198,218,.5)}
+
+/* — scroll reveal — */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease-out),transform .7s var(--ease-out)}
+.reveal.in{opacity:1;transform:none}
+
+/* — table rows lift — */
+tbody tr{transition:background .25s var(--ease)}
+tbody tr:hover{background:rgba(38,198,218,.05)}
+
+/* ══ ECHO SUITE — launcher grid ══ */
+.suite-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}
+.app-card{position:relative;display:flex;flex-direction:column;gap:6px;padding:22px 18px 16px;
+  border-radius:16px;text-decoration:none;color:#eceff1;overflow:hidden;
+  background:linear-gradient(170deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+  transition:transform .4s var(--ease-out),border-color .4s var(--ease),box-shadow .4s var(--ease-out)}
+.app-card:hover{transform:translateY(-6px) scale(1.03);border-color:var(--app);
+  box-shadow:0 18px 40px -14px rgba(0,0,0,.8),0 0 24px -6px var(--app)}
+.app-glow{position:absolute;inset:0;opacity:0;transition:opacity .45s var(--ease);pointer-events:none;
+  background:radial-gradient(130% 100% at 50% -20%,color-mix(in srgb,var(--app) 22%,transparent),transparent 60%)}
+.app-card:hover .app-glow{opacity:1}
+.app-icon{font-size:2.1em;line-height:1.2;margin-bottom:4px;transition:transform .4s var(--ease-out)}
+.app-card:hover .app-icon{transform:scale(1.18) translateY(-2px)}
+.app-name{font-weight:800;font-size:1.02em;letter-spacing:.01em}
+.app-desc{font-size:.7em;color:#546e7a;font-family:'Share Tech Mono',monospace;min-height:2.2em}
+.app-tag{align-self:flex-start;font-size:.6em;font-family:'Share Tech Mono',monospace;color:var(--app);
+  border:1px solid color-mix(in srgb,var(--app) 40%,transparent);
+  background:color-mix(in srgb,var(--app) 10%,transparent);border-radius:20px;padding:2px 10px}
+.app-go{margin-top:10px;font-size:.68em;font-family:'Share Tech Mono',monospace;color:var(--app);
+  letter-spacing:.18em;opacity:.55;display:flex;align-items:center;gap:6px;transition:opacity .3s var(--ease)}
+.app-go span{transition:transform .3s var(--ease-out)}
+.app-card:hover .app-go{opacity:1}
+.app-card:hover .app-go span{transform:translateX(5px)}
+
+/* ══ DOCK flottante in vetro ══ */
+#dock{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;
+  display:flex;align-items:center;gap:4px;padding:8px 12px;border-radius:20px;
+  background:rgba(10,18,26,.72);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 16px 48px -12px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08);
+  transition:transform .5s var(--ease-out),opacity .5s var(--ease)}
+#dock.hide{transform:translateX(-50%) translateY(90px);opacity:0}
+.dock-item{position:relative;display:flex;align-items:center;justify-content:center;
+  width:42px;height:42px;border-radius:13px;font-size:1.25em;text-decoration:none;cursor:pointer;
+  transition:transform .3s var(--ease-out),background .3s var(--ease)}
+.dock-item:hover{transform:translateY(-7px) scale(1.22);background:rgba(255,255,255,.08)}
+.dock-item::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);
+  background:rgba(8,14,20,.95);border:1px solid rgba(38,198,218,.3);color:#9fe8f0;
+  font-family:'Share Tech Mono',monospace;font-size:.5em;letter-spacing:.08em;
+  padding:4px 10px;border-radius:7px;white-space:nowrap;opacity:0;pointer-events:none;
+  transition:opacity .25s var(--ease),transform .25s var(--ease-out)}
+.dock-item:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
+.dock-sep{width:1px;height:26px;background:rgba(255,255,255,.1);margin:0 5px}
+@media(max-width:640px){#dock{gap:1px;padding:6px 8px}.dock-item{width:37px;height:37px;font-size:1.05em}}
+body{padding-bottom:84px}
+
+/* ══ progress bar di scroll in cima ══ */
+#scrollbar-top{position:fixed;top:0;left:0;height:2px;width:0%;z-index:60;
+  background:linear-gradient(90deg,#26c6da,#ff6d00,#e040fb);
+  box-shadow:0 0 12px rgba(38,198,218,.6)}
 </style>
 </head>
 <body>
@@ -434,7 +575,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div class="logo">
     <div class="logo-icon"><img src="data:image/png;base64,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" style="width:100%;height:100%;border-radius:50%;object-fit:cover"></div>
     <div class="logo-text">
-      <h1>SISMO FVG <span class="echo-badge">☀ PROGETTO ECHO v2</span></h1>
+      <h1>SISMO FVG <span class="echo-badge">☀ PROGETTO ECHO v${ECHO_VERSION}</span></h1>
       <p>monitor sismico + correlazione solare NOAA // friuli venezia giulia</p>
     </div>
   </div>
@@ -518,7 +659,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 <!-- ============================================================ -->
 <!-- SEZIONE CAMPI FLEGREI                                       -->
 <!-- ============================================================ -->
-<div class="panel" style="margin-top:28px;border-color:rgba(224,64,251,.25)">
+<div class="panel" id="cf" style="margin-top:28px;border-color:rgba(224,64,251,.25);scroll-margin-top:20px">
   <div class="panel-header" style="color:#e040fb;border-bottom-color:rgba(224,64,251,.2)">
     🌋 <span style="color:#e040fb">AREA CAMPI FLEGREI · VESUVIO · ISCHIA</span>
     <span style="color:#455a64">LAT ${CF.lat_min}–${CF.lat_max} · LON ${CF.lon_min}–${CF.lon_max} · M≥0.0 · ogni micro-sisma</span>
@@ -614,7 +755,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   </div>
 </div>
 
-<div class="panel" style="margin-top:20px">
+<div class="panel" id="eventi" style="margin-top:20px;scroll-margin-top:20px">
   <div class="panel-header">⚡ <span class="acc">Ultimi 50 eventi FVG</span> ≥ M0.5</div>
   <div style="overflow-x:auto">
     <table>
@@ -634,62 +775,71 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   </div>
 </div>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">🎮 <span class="acc">ECHO GAMES</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">🔴🟡</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Forza 4</div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">gioco classico // 2 giocatori // canvas game</div>
-      <a href="/forza4" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">&#9654; Gioca ora</a>
-    </div>
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- ECHO SUITE — launcher grid 2026                            -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="panel" id="suite" style="margin-top:28px">
+  <div class="panel-header">
+    <span>🚀 <span class="acc">ECHO SUITE</span> — app &amp; strumenti</span>
+    <span style="color:#455a64">6 moduli · Cloudflare AI · edge</span>
   </div>
-</div>
+  <div class="panel-body">
+    <div class="suite-grid">
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">🤖 <span class="acc">ECHO CHAT</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">🧠</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Chatbot IA <span style="background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-size:.65em;color:#26c6da;font-family:'Share Tech Mono',monospace;vertical-align:middle">LLaMA 3</span></div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">assistente personale IA // accesso privato // powered by Cloudflare AI</div>
-      <a href="/chat" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">🤖 Apri Chat</a>
-    </div>
-  </div>
-</div>
+      <a href="/chat" class="app-card" style="--app:#26c6da">
+        <div class="app-glow"></div>
+        <div class="app-icon">🧠</div>
+        <div class="app-name">Echo Chat</div>
+        <div class="app-desc">assistente IA personale</div>
+        <div class="app-tag">LLaMA 3</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">💻 <span class="acc">ECHO CODE</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">⌨️</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Assistente Codice <span style="background:rgba(102,187,106,.1);border:1px solid rgba(102,187,106,.3);border-radius:20px;padding:2px 10px;font-size:.65em;color:#66bb6a;font-family:'Share Tech Mono',monospace;vertical-align:middle">Code Llama</span></div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">debug // spiega // ottimizza // genera codice // accesso privato</div>
-      <a href="/code" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(102,187,106,.3);background:rgba(102,187,106,.1);color:#66bb6a;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">💻 Apri Code</a>
-    </div>
-  </div>
-</div>
+      <a href="/code" class="app-card" style="--app:#66bb6a">
+        <div class="app-glow"></div>
+        <div class="app-icon">⌨️</div>
+        <div class="app-name">Echo Code</div>
+        <div class="app-desc">debug · spiega · genera</div>
+        <div class="app-tag">Code Llama</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">🌍 <span class="acc">ECHO TRANSLATE</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">🇮🇹⇄🇬🇧</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Traduttore IA <span style="background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-size:.65em;color:#26c6da;font-family:'Share Tech Mono',monospace;vertical-align:middle">AI</span></div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">traduzione EN ↔ IT // powered by Cloudflare AI // istantaneo</div>
-      <a href="/traduttore" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">⚡ Apri Traduttore</a>
-    </div>
-  </div>
-</div>
+      <a href="/traduttore" class="app-card" style="--app:#ffd600">
+        <div class="app-glow"></div>
+        <div class="app-icon">🌍</div>
+        <div class="app-name">Echo Translate</div>
+        <div class="app-desc">EN ↔ IT istantaneo</div>
+        <div class="app-tag">Cloudflare AI</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">💾 <span class="acc">ECHO STORAGE</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">📁</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">PixelDrain Files</div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">file manager privato // accesso riservato // cloud storage</div>
-      <a href="/pixeldrain" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">&#128193; Apri Storage</a>
+      <a href="/pixeldrain" class="app-card" style="--app:#ab47bc">
+        <div class="app-glow"></div>
+        <div class="app-icon">📁</div>
+        <div class="app-name">Echo Storage</div>
+        <div class="app-desc">file manager privato</div>
+        <div class="app-tag">PixelDrain</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
+
+      <a href="/forza4" class="app-card" style="--app:#ff6d00">
+        <div class="app-glow"></div>
+        <div class="app-icon">🔴🟡</div>
+        <div class="app-name">Forza 4</div>
+        <div class="app-desc">classico · 2 giocatori</div>
+        <div class="app-tag">ECHO Games</div>
+        <div class="app-go">GIOCA <span>→</span></div>
+      </a>
+
+      <a href="/othello" class="app-card" style="--app:#69f0ae">
+        <div class="app-glow"></div>
+        <div class="app-icon">⚫⚪</div>
+        <div class="app-name">Othello</div>
+        <div class="app-desc">minimax + learning</div>
+        <div class="app-tag">AI adattiva</div>
+        <div class="app-go">GIOCA <span>→</span></div>
+      </a>
+
     </div>
   </div>
 </div>
@@ -697,16 +847,482 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 </div>
 
 <footer>
-  ECHO MONITOR v2 — <a href="https://gimmycloud.com">gimmycloud.com</a> //
+  ECHO MONITOR v${ECHO_VERSION} — <a href="https://gimmycloud.com">gimmycloud.com</a> //
   sismicità: <a href="https://www.ingv.it" target="_blank">INGV</a> —
   dati solari: <a href="https://www.swpc.noaa.gov" target="_blank">NOAA SWPC</a> //
   Gimmy Pignolo © 2026 // <span style="color:#26c6da">Progetto ECHO</span>
 </footer>
+
+<div id="scrollbar-top"></div>
+
+<!-- DOCK 2026 -->
+<nav id="dock" aria-label="Navigazione rapida">
+  <a class="dock-item" href="#top" data-tip="MONITOR" onclick="window.scrollTo({top:0,behavior:'smooth'});return false">🌍</a>
+  <a class="dock-item" href="#cf" data-tip="CAMPI FLEGREI">🌋</a>
+  <a class="dock-item" href="#eventi" data-tip="EVENTI FVG">⚡</a>
+  <a class="dock-item" href="#suite" data-tip="ECHO SUITE">🚀</a>
+  <div class="dock-sep"></div>
+  <a class="dock-item" href="/chat" data-tip="ECHO CHAT">🧠</a>
+  <a class="dock-item" href="/code" data-tip="ECHO CODE">⌨️</a>
+  <a class="dock-item" href="/traduttore" data-tip="TRANSLATE">🌐</a>
+  <a class="dock-item" href="/pixeldrain" data-tip="STORAGE">📁</a>
+  <div class="dock-sep"></div>
+  <a class="dock-item" href="/forza4" data-tip="FORZA 4">🔴</a>
+  <a class="dock-item" href="/othello" data-tip="OTHELLO">⚫</a>
+</nav>
+
+<script>
+(function(){
+  /* ── dock: nascondi scendendo, mostra salendo ── */
+  var dock=document.getElementById('dock'),lastY=0;
+  window.addEventListener('scroll',function(){
+    var y=window.scrollY;
+    if(y>lastY+8&&y>300){dock.classList.add('hide')}
+    else if(y<lastY-8||y<300){dock.classList.remove('hide')}
+    lastY=y;
+    /* progress bar */
+    var h=document.documentElement.scrollHeight-window.innerHeight;
+    document.getElementById('scrollbar-top').style.width=(h>0?(y/h*100):0)+'%';
+  },{passive:true});
+})();
+</script>
+
+<script>
+(function(){
+  var ease=function(t){return 1-Math.pow(1-t,3)};
+
+  /* ── scroll reveal: pannelli e card entrano in scena ── */
+  var targets=document.querySelectorAll('.panel,.stat-card');
+  targets.forEach(function(el){el.classList.add('reveal')});
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          var el=e.target,d=el.classList.contains('stat-card')?(Array.prototype.indexOf.call(el.parentNode.children,el)*70):60;
+          setTimeout(function(){el.classList.add('in')},d);
+          io.unobserve(el);
+        }
+      });
+    },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+    targets.forEach(function(el){io.observe(el)});
+  } else { targets.forEach(function(el){el.classList.add('in')}); }
+
+  /* ── count-up: i numeri delle stat salgono da 0 ── */
+  function countUp(el){
+    var raw=el.textContent.trim();
+    var m=raw.match(/^([^\\d-]*)(-?[\\d.]+)(.*)$/);
+    if(!m){return}
+    var pre=m[1],num=parseFloat(m[2]),post=m[3];
+    if(!isFinite(num)||num===0){return}
+    var dec=(m[2].indexOf('.')>=0)?1:0,dur=900,t0=null;
+    function step(ts){
+      if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),v=num*ease(p);
+      el.textContent=pre+(dec?v.toFixed(1):Math.round(v))+post;
+      if(p<1)requestAnimationFrame(step);else el.textContent=raw;
+    }
+    requestAnimationFrame(step);
+  }
+  var sv=document.querySelectorAll('.stat-value');
+  if('IntersectionObserver' in window){
+    var io2=new IntersectionObserver(function(es){
+      es.forEach(function(e){if(e.isIntersecting){countUp(e.target);io2.unobserve(e.target)}});
+    },{threshold:.6});
+    sv.forEach(function(el){io2.observe(el)});
+  }
+
+  /* ── tilt 3D leggero sulle stat card ── */
+  document.querySelectorAll('.stat-card').forEach(function(card){
+    card.style.transformStyle='preserve-3d';
+    card.addEventListener('pointermove',function(ev){
+      var r=card.getBoundingClientRect();
+      var rx=((ev.clientY-r.top)/r.height-.5)*-6;
+      var ry=((ev.clientX-r.left)/r.width-.5)*6;
+      card.style.transform='translateY(-5px) perspective(700px) rotateX('+rx+'deg) rotateY('+ry+'deg)';
+    });
+    card.addEventListener('pointerleave',function(){card.style.transform=''});
+  });
+})();
+</script>
 </body>
 </html>`;
 }
 
 // ============================================================
+// OTHELLO — ECHO Games
+// ============================================================
+function renderOthello() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Othello — ECHO Games</title>
+<meta name="author" content="Gimmy Pignolo">
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px;overflow-x:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;width:100%;max-width:520px;text-align:center}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 0 14px;border-bottom:1px solid rgba(102,187,106,.15);margin-bottom:14px}
+.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
+.back:hover{background:rgba(38,198,218,.2)}
+.title-box{text-align:center}
+.title-box h1{font-size:1.5em;font-weight:800;letter-spacing:.08em;color:#eceff1}
+.title-box sub{font-size:.66em;color:#546e7a;font-family:'Share Tech Mono',monospace}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:10px;font-family:'Share Tech Mono',monospace;font-size:.88em}
+#ti{color:#66bb6a;font-size:.82em}
+canvas{display:block;margin:0 auto;border-radius:8px;cursor:pointer;touch-action:none;max-width:100%}
+.btns{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.btn{background:rgba(102,187,106,.12);border:1px solid rgba(102,187,106,.3);color:#66bb6a;padding:8px 18px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.8em;cursor:pointer;transition:background .15s}
+.btn:hover{background:rgba(102,187,106,.28)}
+.btn.on{background:rgba(102,187,106,.28);border-color:#66bb6a}
+#lg{font-family:'Share Tech Mono',monospace;font-size:.68em;color:#37474f;margin-top:8px;min-height:18px}
+footer{margin-top:18px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#1c2a33}
+footer a{color:#26c6da;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/" class="back">← ECHO Monitor</a>
+    <div class="title-box">
+      <h1>&#9899; OTHELLO &#9898;</h1>
+      <sub>Reversi // AI adattiva // ECHO Games</sub>
+    </div>
+    <div style="width:80px"></div>
+  </div>
+  <div class="sbar">
+    <span>&#9899; Nero (Tu): <strong id="s1">2</strong></span>
+    <span id="ti">Il tuo turno</span>
+    <span>&#9898; Bianco (AI): <strong id="s2">2</strong></span>
+  </div>
+  <canvas id="cvs" width="400" height="400"></canvas>
+  <div class="btns">
+    <button class="btn" id="btn-new">&#8635; Nuova partita</button>
+    <button class="btn on" id="btn-cpu">vs CPU: ON &#129302;</button>
+  </div>
+  <div id="lg"></div>
+  <footer>ECHO Games // <a href="/">← monitor sismico</a> &nbsp;&copy; 2026 Gimmy Pignolo</footer>
+</div>
+<script>
+var SZ=8;
+var DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+var BW=[[120,-20,20,5,5,20,-20,120],[-20,-40,-5,-5,-5,-5,-40,-20],[20,-5,15,3,3,15,-5,20],[5,-5,3,3,3,3,-5,5],[5,-5,3,3,3,3,-5,5],[20,-5,15,3,3,15,-5,20],[-20,-40,-5,-5,-5,-5,-40,-20],[120,-20,20,5,5,20,-20,120]];
+var learnW=BW.map(function(row){return row.map(function(){return 0;});});
+var grid,player,gameOver,winner,cpuOn=true,cpuBusy=false,moveLog=[];
+var canvas=document.getElementById('cvs');
+var ctx=canvas.getContext('2d');
+var CS=50,BX=0,BY=0,valid=[],hovR=-1,hovC=-1;
+
+function resize(){
+  var w=Math.min(window.innerWidth-32,480);
+  CS=Math.floor(w/SZ);
+  canvas.width=SZ*CS;
+  canvas.height=SZ*CS;
+}
+
+function mkGrid(){
+  return Array.from({length:SZ},function(){return Array(SZ).fill(0);});
+}
+
+function getFlips(g,r,c,p){
+  if(g[r][c]!==0)return[];
+  var res=[];
+  for(var d=0;d<DIRS.length;d++){
+    var dr=DIRS[d][0],dc=DIRS[d][1],line=[],nr=r+dr,nc=c+dc;
+    while(nr>=0&&nr<SZ&&nc>=0&&nc<SZ&&g[nr][nc]===-p){
+      line.push([nr,nc]);nr+=dr;nc+=dc;
+    }
+    if(line.length&&nr>=0&&nr<SZ&&nc>=0&&nc<SZ&&g[nr][nc]===p){
+      for(var i=0;i<line.length;i++)res.push(line[i]);
+    }
+  }
+  return res;
+}
+
+function getValid(g,p){
+  var mv=[];
+  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++)if(getFlips(g,r,c,p).length)mv.push([r,c]);
+  return mv;
+}
+
+function applyMove(g,r,c,p){
+  var b=g.map(function(row){return row.slice();});
+  var fl=getFlips(b,r,c,p);
+  for(var i=0;i<fl.length;i++)b[fl[i][0]][fl[i][1]]=p;
+  b[r][c]=p;
+  return b;
+}
+
+function countP(g,p){
+  var n=0;
+  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++)if(g[r][c]===p)n++;
+  return n;
+}
+
+function isTerminal(g){
+  if(getValid(g,1).length>0)return false;
+  if(getValid(g,-1).length>0)return false;
+  return true;
+}
+
+function hasEmpty(g){
+  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++)if(g[r][c]===0)return true;
+  return false;
+}
+
+function evalBoard(g,p){
+  var sc=0;
+  for(var r=0;r<SZ;r++)for(var c=0;c<SZ;c++){
+    var v=g[r][c];
+    if(v!==0){
+      var w=(BW[r][c]||0)+(learnW[r][c]||0);
+      sc+=v*w;
+    }
+  }
+  var my=getValid(g,p).length,op=getValid(g,-p).length;
+  if(my+op>0)sc+=p*10*(my-op)/(my+op);
+  return sc*p;
+}
+
+function minimax(g,depth,alpha,beta,p,rootP){
+  if(depth===0||isTerminal(g))return[evalBoard(g,rootP),null];
+  var moves=getValid(g,p);
+  if(!moves.length){
+    var rv=minimax(g,depth-1,alpha,beta,-p,rootP);
+    return[rv[0],null];
+  }
+  var best=moves[0];
+  var val,i,nb,rv;
+  if(p===rootP){
+    val=-Infinity;
+    for(i=0;i<moves.length;i++){
+      nb=applyMove(g,moves[i][0],moves[i][1],p);
+      rv=minimax(nb,depth-1,alpha,beta,-p,rootP);
+      if(rv[0]>val){val=rv[0];best=moves[i];}
+      if(val>alpha)alpha=val;
+      if(beta<=alpha)break;
+    }
+  } else {
+    val=Infinity;
+    for(i=0;i<moves.length;i++){
+      nb=applyMove(g,moves[i][0],moves[i][1],p);
+      rv=minimax(nb,depth-1,alpha,beta,-p,rootP);
+      if(rv[0]<val){val=rv[0];best=moves[i];}
+      if(val<beta)beta=val;
+      if(beta<=alpha)break;
+    }
+  }
+  return[val,best];
+}
+
+function newGame(){
+  grid=mkGrid();
+  var m=SZ/2;
+  grid[m-1][m-1]=-1;grid[m-1][m]=1;
+  grid[m][m-1]=1;grid[m][m]=-1;
+  player=1;gameOver=false;winner=0;cpuBusy=false;moveLog=[];
+  valid=getValid(grid,1);
+  updUI();draw();
+}
+
+function doMove(r,c){
+  if(gameOver||cpuBusy||player!==1)return;
+  if(!getFlips(grid,r,c,1).length)return;
+  moveLog.push([r,c,1]);
+  grid=applyMove(grid,r,c,1);
+  player=-1;
+  valid=getValid(grid,-1);
+  if(!valid.length){
+    if(!getValid(grid,1).length){endGame();return;}
+    player=1;valid=getValid(grid,1);updUI();draw();return;
+  }
+  if(isTerminal(grid)){endGame();return;}
+  updUI();draw();
+  if(cpuOn)doCpu();
+}
+
+function doCpu(){
+  if(!cpuOn||gameOver||player!==-1)return;
+  cpuBusy=true;updUI();draw();
+  setTimeout(function(){
+    var empty=countP(grid,0);
+    var depth=empty<=10?8:(empty<=18?6:4);
+    var res=minimax(grid,depth,-Infinity,Infinity,-1,-1);
+    var mv=res[1];
+    if(mv){
+      moveLog.push([mv[0],mv[1],-1]);
+      grid=applyMove(grid,mv[0],mv[1],-1);
+    }
+    player=1;cpuBusy=false;
+    valid=getValid(grid,1);
+    if(!valid.length){
+      if(!getValid(grid,-1).length){endGame();return;}
+      player=-1;doCpu();return;
+    }
+    if(isTerminal(grid)){endGame();return;}
+    updUI();draw();
+  },400);
+}
+
+function endGame(){
+  gameOver=true;
+  var b=countP(grid,1),w=countP(grid,-1);
+  winner=b>w?1:(w>b?-1:0);
+  updUI();draw();
+  fetch('/api/othello/learn',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({winner:winner,moves:moveLog})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.games)document.getElementById('lg').textContent='Brain: '+d.games+' partite';
+  }).catch(function(){});
+}
+
+function updUI(){
+  document.getElementById('s1').textContent=countP(grid,1);
+  document.getElementById('s2').textContent=countP(grid,-1);
+  var ti=document.getElementById('ti');
+  if(gameOver){
+    if(winner===1)ti.textContent='Hai vinto! '+countP(grid,1)+'-'+countP(grid,-1);
+    else if(winner===-1)ti.textContent='Vince AI '+countP(grid,-1)+'-'+countP(grid,1);
+    else ti.textContent='Pareggio '+countP(grid,1)+'-'+countP(grid,-1);
+    ti.style.color='#ffd600';
+  } else if(cpuBusy){
+    ti.textContent='AI pensa...';
+    ti.style.color='#ef9a9a';
+  } else {
+    ti.textContent='Il tuo turno ('+valid.length+')';
+    ti.style.color='#66bb6a';
+  }
+}
+
+function isValid(r,c){
+  for(var i=0;i<valid.length;i++)if(valid[i][0]===r&&valid[i][1]===c)return true;
+  return false;
+}
+
+function draw(){
+  var w=canvas.width,h=canvas.height;
+  // Board
+  ctx.fillStyle='#1d6e3a';
+  ctx.fillRect(0,0,w,h);
+  // Cells
+  for(var r=0;r<SZ;r++){
+    for(var c=0;c<SZ;c++){
+      var x=c*CS,y=r*CS;
+      // Alternate cell shade
+      ctx.fillStyle=(r+c)%2===0?'#1d6e3a':'#1a6435';
+      ctx.fillRect(x,y,CS,CS);
+      // Grid border
+      ctx.strokeStyle='rgba(0,0,0,.25)';
+      ctx.lineWidth=1;
+      ctx.strokeRect(x+.5,y+.5,CS-1,CS-1);
+      // Valid move dot
+      if(!gameOver&&!cpuBusy&&isValid(r,c)){
+        ctx.fillStyle='rgba(165,214,167,.5)';
+        ctx.beginPath();
+        ctx.arc(x+CS/2,y+CS/2,CS*0.13,0,Math.PI*2);
+        ctx.fill();
+      }
+      // Hover highlight
+      if(!gameOver&&!cpuBusy&&hovR===r&&hovC===c&&isValid(r,c)){
+        ctx.fillStyle='rgba(165,214,167,.22)';
+        ctx.fillRect(x,y,CS,CS);
+      }
+      // Piece
+      var v=grid[r][c];
+      if(v!==0){
+        var cx=x+CS/2,cy=y+CS/2,rad=CS*0.4;
+        ctx.fillStyle=v===1?'#1a1a1a':'#e8e8e8';
+        ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.fill();
+        // highlight
+        ctx.fillStyle=v===1?'rgba(255,255,255,.12)':'rgba(255,255,255,.55)';
+        ctx.beginPath();ctx.arc(cx-rad*0.25,cy-rad*0.25,rad*0.35,0,Math.PI*2);ctx.fill();
+      }
+    }
+  }
+  // Corner dots
+  var pts=[[2,2],[2,6],[6,2],[6,6]];
+  for(var i=0;i<pts.length;i++){
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.beginPath();ctx.arc(pts[i][1]*CS,pts[i][0]*CS,3,0,Math.PI*2);ctx.fill();
+  }
+  // End overlay
+  if(gameOver){
+    ctx.fillStyle='rgba(8,14,20,.6)';
+    ctx.fillRect(0,0,w,h);
+    var msg=winner===1?'HAI VINTO!':winner===-1?"VINCE L'AI":'PAREGGIO!';
+    var col=winner===1?'#ffd600':winner===-1?'#ef5350':'#66bb6a';
+    var fs=Math.max(22,Math.floor(CS*0.65));
+    ctx.font='bold '+fs+'px "Exo 2",sans-serif';
+    ctx.textAlign='center';ctx.fillStyle=col;
+    ctx.fillText(msg,w/2,h/2);
+    ctx.font=Math.floor(fs*0.55)+'px "Share Tech Mono",monospace';
+    ctx.fillStyle='#90a4ae';
+    ctx.fillText(countP(grid,1)+' – '+countP(grid,-1),w/2,h/2+fs*0.9);
+  }
+}
+
+// Events
+canvas.addEventListener('mousemove',function(e){
+  var rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width;
+  var mx=(e.clientX-rect.left)*sx,my=(e.clientY-rect.top)*sx;
+  var nc=Math.floor(mx/CS),nr=Math.floor(my/CS);
+  if(nr!==hovR||nc!==hovC){
+    hovR=(nr>=0&&nr<SZ)?nr:-1;
+    hovC=(nc>=0&&nc<SZ)?nc:-1;
+    draw();
+  }
+});
+canvas.addEventListener('mouseleave',function(){hovR=-1;hovC=-1;draw();});
+canvas.addEventListener('mousedown',function(e){
+  e.preventDefault();
+  var rect=canvas.getBoundingClientRect();
+  var sx=canvas.width/rect.width,sy=canvas.height/rect.height;
+  var col=Math.floor((e.clientX-rect.left)*sx/CS);
+  var row=Math.floor((e.clientY-rect.top)*sy/CS);
+  if(row<0||row>=SZ||col<0||col>=SZ)return;
+  if(gameOver||cpuBusy||player!==1)return;
+  doMove(row,col);
+});
+canvas.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  var t=e.touches[0],rect=canvas.getBoundingClientRect();
+  var sx=canvas.width/rect.width,sy=canvas.height/rect.height;
+  var col=Math.floor((t.clientX-rect.left)*sx/CS);
+  var row=Math.floor((t.clientY-rect.top)*sy/CS);
+  if(row<0||row>=SZ||col<0||col>=SZ)return;
+  if(gameOver||cpuBusy||player!==1)return;
+  doMove(row,col);
+},{passive:false});
+  if(e.key==='r'||e.key==='R')newGame();
+});
+document.getElementById('btn-new').addEventListener('click',newGame);
+document.getElementById('btn-cpu').addEventListener('click',function(){
+  cpuOn=!cpuOn;
+  var btn=document.getElementById('btn-cpu');
+  if(cpuOn){btn.textContent='vs CPU: ON \u{1F916}';btn.className='btn on';}
+  else{btn.textContent='vs CPU: OFF';btn.className='btn';}
+  if(cpuOn&&!gameOver&&!cpuBusy&&player===-1)doCpu();
+});
+
+// Carica brain
+fetch('/api/othello/stats').then(function(r){return r.json();}).then(function(d){
+  if(d&&d.weights)learnW=d.weights;
+  if(d&&d.games>0)document.getElementById('lg').textContent='Brain: '+d.games+' partite';
+}).catch(function(){});
+
+// Avvia
+resize();
+newGame();
+window.addEventListener('resize',function(){resize();newGame();});
+</script>
+</body>
+</html>`;
+}
+
+
 // FORZA 4 — ECHO Games
 // ============================================================
 function renderForza4() {
@@ -974,7 +1590,7 @@ footer a{color:#26c6da;text-decoration:none}
   <textarea id="msg-input" placeholder="Scrivi un messaggio... (Invio per inviare)" rows="1"></textarea>
   <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
 let _history = [];
@@ -1132,7 +1748,7 @@ footer a{color:#66bb6a;text-decoration:none}
     <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
   </div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
 
 <script>
 let _history = [];
@@ -1333,7 +1949,7 @@ footer a{color:#26c6da;text-decoration:none}
   <div class="spinner" id="spinner"></div>
   <div id="error-msg"></div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
 
 <script>
 let _dir = 'it-en'; // it→en oppure en→it
@@ -1508,7 +2124,7 @@ footer a{color:#26c6da;text-decoration:none}
     <div id="file-list"></div>
   </div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v2 &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
 
 <script>
 let _allFiles = [];
@@ -1621,6 +2237,304 @@ document.getElementById('token-input').addEventListener('keydown', e => {
 if (_token) tryAuth(_token).then(ok => {
   if (!ok) localStorage.removeItem('pd_token');
 });
+</script>
+</body>
+</html>`;
+}
+
+// (renderOthello già definita sopra)
+function _deleteme() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Othello &#9679; ECHO Games UNUSED</title>
+<meta name="author" content="Gimmy Pignolo">
+<meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;overflow-x:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;width:100%;max-width:540px;text-align:center}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 18px;border-bottom:1px solid rgba(38,198,218,.15);margin-bottom:14px}
+.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
+.back:hover{background:rgba(38,198,218,.2)}
+.gtitle{font-family:'Share Tech Mono',monospace;font-size:.95em;color:#26c6da;letter-spacing:.1em}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:10px;gap:8px}
+.ps{display:flex;align-items:center;gap:7px;font-family:'Share Tech Mono',monospace;font-size:.82em}
+.disc{width:18px;height:18px;border-radius:50%;flex-shrink:0}
+.disc-b{background:radial-gradient(circle at 35% 35%,#666,#111)}
+.disc-w{background:radial-gradient(circle at 35% 35%,#fff,#ccc)}
+.sv{font-size:1.3em;font-weight:700}
+#status{font-family:'Share Tech Mono',monospace;font-size:.78em;color:#90a4ae;flex:1;text-align:center}
+#cvs{border-radius:12px;cursor:pointer;touch-action:none;max-width:100%;display:block;margin:0 auto}
+.brow{display:flex;gap:10px;justify-content:center;margin-top:10px}
+.gbtn{padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.82em;transition:background .1s,transform .1s}
+.gbtn:hover{background:rgba(38,198,218,.25)}
+.gbtn:active{background:rgba(38,198,218,.45);transform:scale(.96)}
+.diff{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:8px}
+.dlbl{font-family:'Share Tech Mono',monospace;font-size:.7em;color:#546e7a}
+.dbtn{padding:4px 12px;border-radius:5px;border:1px solid rgba(38,198,218,.18);background:transparent;color:#546e7a;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.7em;transition:all .15s}
+.dbtn.on{background:rgba(38,198,218,.15);border-color:rgba(38,198,218,.45);color:#26c6da}
+footer{margin-top:16px;font-size:.7em;color:#263238;font-family:'Share Tech Mono',monospace}
+footer a{color:#26c6da;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="/newtab">&#8592; Home</a>
+    <span class="gtitle">&#9679; OTHELLO</span>
+    <span style="width:80px"></span>
+  </div>
+  <div class="sbar">
+    <div class="ps"><div class="disc disc-b"></div><span>Tu</span><span class="sv" id="sb">2</span></div>
+    <div id="status">Il tuo turno (&#9679;)</div>
+    <div class="ps"><span class="sv" id="sw">2</span><span>AI</span><div class="disc disc-w"></div></div>
+  </div>
+  <canvas id="cvs" width="480" height="480"></canvas>
+  <div class="brow">
+    <button class="gbtn" onclick="newGame()">&#8635; Nuova partita</button>
+    <button class="gbtn" onclick="undoMove()">&#8592; Annulla</button>
+  </div>
+  <div class="diff">
+    <span class="dlbl">Difficolt&agrave;:</span>
+    <button class="dbtn" id="d0" onclick="setDiff(0)">Facile</button>
+    <button class="dbtn on" id="d1" onclick="setDiff(1)">Normale</button>
+    <button class="dbtn" id="d2" onclick="setDiff(2)">Esperto</button>
+  </div>
+  <footer>ECHO Games // <a href="/newtab">&#8592; home</a> &nbsp;|&nbsp; &copy; 2026 Gimmy Pignolo</footer>
+</div>
+<script>
+var SIZE=8,CELL=60;
+var BLACK=1,WHITE=-1,EMPTY=0;
+var DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+var WEIGHTS=[
+  [120,-20,20,5,5,20,-20,120],
+  [-20,-40,-5,-5,-5,-5,-40,-20],
+  [20,-5,15,3,3,15,-5,20],
+  [5,-5,3,3,3,3,-5,5],
+  [5,-5,3,3,3,3,-5,5],
+  [20,-5,15,3,3,15,-5,20],
+  [-20,-40,-5,-5,-5,-5,-40,-20],
+  [120,-20,20,5,5,20,-20,120]
+];
+var DEPTHS=[3,5,7];
+var board,turn,over,validMoves,history,thinking,diffLevel=1;
+var cvs=document.getElementById('cvs');
+var ctx=cvs.getContext('2d');
+var statusEl=document.getElementById('status');
+
+function resize(){var m=Math.min(window.innerWidth-40,480);cvs.style.width=m+'px';cvs.style.height=m+'px';}
+resize();window.addEventListener('resize',resize);
+
+function setDiff(d){
+  diffLevel=d;
+  for(var i=0;i<3;i++)document.getElementById('d'+i).classList.toggle('on',i===d);
+  newGame();
+}
+
+function mkBoard(){
+  var b=[];for(var r=0;r<8;r++){b[r]=[];for(var c=0;c<8;c++)b[r][c]=EMPTY;}
+  b[3][3]=WHITE;b[3][4]=BLACK;b[4][3]=BLACK;b[4][4]=WHITE;
+  return b;
+}
+
+function cloneBoard(bd){return bd.map(function(row){return row.slice();});}
+
+function getFlips(bd,r,c,p){
+  if(bd[r][c]!==EMPTY)return[];
+  var res=[];
+  for(var d=0;d<DIRS.length;d++){
+    var dr=DIRS[d][0],dc=DIRS[d][1],line=[];
+    var nr=r+dr,nc=c+dc;
+    while(nr>=0&&nr<8&&nc>=0&&nc<8&&bd[nr][nc]===-p){line.push([nr,nc]);nr+=dr;nc+=dc;}
+    if(line.length&&nr>=0&&nr<8&&nc>=0&&nc<8&&bd[nr][nc]===p)
+      for(var i=0;i<line.length;i++)res.push(line[i]);
+  }
+  return res;
+}
+
+function getValid(bd,p){
+  var m=[];
+  for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(getFlips(bd,r,c,p).length)m.push([r,c]);
+  return m;
+}
+
+function applyMove(bd,r,c,p){
+  var nb=cloneBoard(bd),flips=getFlips(nb,r,c,p);
+  for(var i=0;i<flips.length;i++)nb[flips[i][0]][flips[i][1]]=p;
+  nb[r][c]=p;return nb;
+}
+
+function countPieces(bd,p){var n=0;for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]===p)n++;return n;}
+function countEmpty(bd){var n=0;for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]===EMPTY)n++;return n;}
+
+function evalBoard(bd,rp){
+  var score=0;
+  for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]!==EMPTY)score+=bd[r][c]*WEIGHTS[r][c];
+  var my=getValid(bd,rp).length,opp=getValid(bd,-rp).length;
+  if(my+opp>0)score+=rp*10*(my-opp)/(my+opp);
+  return score*rp;
+}
+
+function minimax(bd,depth,alpha,beta,p,rp){
+  var moves=getValid(bd,p);
+  if(depth===0||(moves.length===0&&getValid(bd,-p).length===0))return[evalBoard(bd,rp),null];
+  if(moves.length===0){var r2=minimax(bd,depth-1,alpha,beta,-p,rp);return[r2[0],null];}
+  var bestM=moves[0];
+  if(p===rp){
+    var best=-1e9;
+    for(var i=0;i<moves.length;i++){
+      var v=minimax(applyMove(bd,moves[i][0],moves[i][1],p),depth-1,alpha,beta,-p,rp)[0];
+      if(v>best){best=v;bestM=moves[i];}
+      if(v>alpha)alpha=v;if(beta<=alpha)break;
+    }
+    return[best,bestM];
+  }else{
+    var best2=1e9;
+    for(var j=0;j<moves.length;j++){
+      var v2=minimax(applyMove(bd,moves[j][0],moves[j][1],p),depth-1,alpha,beta,-p,rp)[0];
+      if(v2<best2){best2=v2;bestM=moves[j];}
+      if(v2<beta)beta=v2;if(beta<=alpha)break;
+    }
+    return[best2,bestM];
+  }
+}
+
+function chooseAI(bd){
+  var empty=countEmpty(bd),depth=DEPTHS[diffLevel];
+  if(empty<=10)depth=Math.max(depth,8);
+  else if(empty<=16)depth=Math.max(depth,depth+1);
+  return minimax(bd,depth,-1e9,1e9,WHITE,WHITE)[1];
+}
+
+function updateScores(){
+  document.getElementById('sb').textContent=countPieces(board,BLACK);
+  document.getElementById('sw').textContent=countPieces(board,WHITE);
+}
+
+function newGame(){
+  board=mkBoard();turn=BLACK;over=false;history=[];thinking=false;
+  validMoves=getValid(board,BLACK);
+  statusEl.style.color='#90a4ae';statusEl.textContent='Il tuo turno (●)';
+  updateScores();draw();
+}
+
+function undoMove(){
+  if(thinking||history.length<2)return;
+  board=history[history.length-2];history.splice(-2);
+  turn=BLACK;over=false;thinking=false;
+  validMoves=getValid(board,BLACK);
+  statusEl.style.color='#90a4ae';statusEl.textContent='Annullato — il tuo turno (●)';
+  updateScores();draw();
+}
+
+function draw(){
+  var W=480,H=480;
+  ctx.fillStyle='#0d4c28';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#136634';ctx.lineWidth=1;
+  for(var i=1;i<8;i++){
+    ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(W,i*CELL);ctx.stroke();
+  }
+  // star points
+  ctx.fillStyle='#1a7040';
+  [[2,2],[2,5],[5,2],[5,5]].forEach(function(p){
+    ctx.beginPath();ctx.arc(p[1]*CELL+CELL/2,p[0]*CELL+CELL/2,4,0,Math.PI*2);ctx.fill();
+  });
+  // valid move hints
+  if(turn===BLACK&&!over){
+    for(var m=0;m<validMoves.length;m++){
+      var vr=validMoves[m][0],vc=validMoves[m][1];
+      ctx.fillStyle='rgba(105,240,174,0.2)';
+      ctx.beginPath();ctx.arc(vc*CELL+30,vr*CELL+30,16,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(105,240,174,0.45)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(vc*CELL+30,vr*CELL+30,16,0,Math.PI*2);ctx.stroke();
+    }
+  }
+  // pieces
+  for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+    if(board[r][c]===EMPTY)continue;
+    var x=c*CELL+30,y=r*CELL+30,isB=board[r][c]===BLACK;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,.65)';ctx.shadowBlur=8;ctx.shadowOffsetX=2;ctx.shadowOffsetY=3;
+    var g=ctx.createRadialGradient(x-7,y-7,2,x,y,23);
+    if(isB){g.addColorStop(0,'#5a5a5a');g.addColorStop(1,'#101010');}
+    else{g.addColorStop(0,'#ffffff');g.addColorStop(1,'#c8c8c8');}
+    ctx.fillStyle=g;
+    ctx.beginPath();ctx.arc(x,y,23,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+}
+
+cvs.addEventListener('click',function(e){
+  if(turn!==BLACK||over||thinking)return;
+  var rect=cvs.getBoundingClientRect();
+  var sx=480/rect.width,sy=480/rect.height;
+  var x=(e.clientX-rect.left)*sx,y=(e.clientY-rect.top)*sy;
+  var c=Math.floor(x/CELL),r=Math.floor(y/CELL);
+  if(r<0||r>=8||c<0||c>=8)return;
+  var ok=false;
+  for(var i=0;i<validMoves.length;i++)if(validMoves[i][0]===r&&validMoves[i][1]===c){ok=true;break;}
+  if(!ok)return;
+  history.push(cloneBoard(board));
+  board=applyMove(board,r,c,BLACK);
+  updateScores();draw();
+  var aiM=getValid(board,WHITE);
+  if(aiM.length===0){
+    var plM=getValid(board,BLACK);
+    if(plM.length===0){endGame();return;}
+    statusEl.style.color='#ffb347';
+    statusEl.textContent='L\'AI salta — ancora il tuo turno (●)';
+    validMoves=plM;draw();return;
+  }
+  turn=WHITE;aiMove();
+});
+
+cvs.addEventListener('touchend',function(e){
+  e.preventDefault();
+  var t=e.changedTouches[0];
+  cvs.dispatchEvent(new MouseEvent('click',{clientX:t.clientX,clientY:t.clientY}));
+},{passive:false});
+
+function aiMove(){
+  thinking=true;
+  statusEl.style.color='#69f0ae';statusEl.textContent='AI sta pensando…';
+  setTimeout(function(){
+    var move=chooseAI(board);
+    if(move){
+      history.push(cloneBoard(board));
+      board=applyMove(board,move[0],move[1],WHITE);
+      updateScores();
+    }
+    turn=BLACK;thinking=false;
+    validMoves=getValid(board,BLACK);
+    draw();
+    if(validMoves.length===0){
+      var aiM2=getValid(board,WHITE);
+      if(aiM2.length===0){endGame();return;}
+      turn=WHITE;
+      statusEl.style.color='#ffb347';
+      statusEl.textContent='Nessuna mossa — l\'AI gioca ancora';
+      setTimeout(aiMove,600);
+    }else{
+      statusEl.style.color='#90a4ae';statusEl.textContent='Il tuo turno (●)';
+    }
+  },30);
+}
+
+function endGame(){
+  over=true;
+  var b=countPieces(board,BLACK),w=countPieces(board,WHITE);
+  if(b>w){statusEl.style.color='#69f0ae';statusEl.textContent='Hai vinto! ● '+b+' – '+w+' ○';}
+  else if(w>b){statusEl.style.color='#ff5252';statusEl.textContent='Ha vinto l\'AI! ● '+b+' – '+w+' ○';}
+  else{statusEl.style.color='#ffd600';statusEl.textContent='Pareggio! ● '+b+' – '+w+' ○';}
+  draw();
+}
+
+newGame();
 </script>
 </body>
 </html>`;
@@ -1779,6 +2693,7 @@ body::after{
   <a class="lc" href="https://www.youtube.com" target="_blank"><img src="https://www.youtube.com/favicon.ico" onerror="this.style.display='none'">YouTube</a>
   <a class="lc" href="/chat" target="_blank">🧠 Echo Chat</a>
   <a class="lc" href="/forza4" target="_blank">🎮 Forza 4</a>
+  <a class="lc" href="/othello" target="_blank">&#9679; Othello</a>
 </div>
 
 <!-- CENTER -->
@@ -2085,6 +3000,42 @@ export default {
 
     if (url.pathname === "/newtab") {
       return new Response(renderNewtab(), {headers: {"Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store"}});
+    }
+
+    if (url.pathname === "/othello") {
+      return new Response(renderOthello(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
+    }
+
+    if (url.pathname === "/api/othello/stats") {
+      const raw = await env.F4_LEARN.get("othello_stats");
+      const stats = raw ? JSON.parse(raw) : {games:0, weights:null, win_b:0, win_w:0, draws:0};
+      return new Response(JSON.stringify(stats), {headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Cache-Control":"no-store"}});
+    }
+
+    if (url.pathname === "/api/othello/learn" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const raw = await env.F4_LEARN.get("othello_stats");
+        const stats = raw ? JSON.parse(raw) : {games:0, weights:Array.from({length:8},()=>Array(8).fill(0)), win_b:0, win_w:0, draws:0};
+        if (!stats.weights) stats.weights = Array.from({length:8},()=>Array(8).fill(0));
+        stats.games++;
+        if (body.winner === 1) stats.win_b++;
+        else if (body.winner === -1) stats.win_w++;
+        else stats.draws++;
+        const lr = 0.4;
+        if (body.winner !== 0 && body.moves && Array.isArray(body.moves)) {
+          body.moves.forEach(([r,c,p]) => {
+            if (r>=0&&r<8&&c>=0&&c<8) {
+              const delta = p === body.winner ? lr : -lr*0.7;
+              stats.weights[r][c] = Math.max(-200, Math.min(200, (stats.weights[r][c]||0) + delta));
+            }
+          });
+        }
+        await env.F4_LEARN.put("othello_stats", JSON.stringify(stats));
+        return new Response(JSON.stringify({ok:true, games:stats.games}), {headers:{"Content-Type":"application/json"}});
+      } catch(e) {
+        return new Response(JSON.stringify({error:e.message}), {status:500, headers:{"Content-Type":"application/json"}});
+      }
     }
 
     try {
