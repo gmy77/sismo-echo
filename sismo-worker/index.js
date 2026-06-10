@@ -423,6 +423,92 @@ table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:8px 14px;font-size:.68em;color:#455a64;text-transform:uppercase;letter-spacing:.08em;font-family:'Share Tech Mono',monospace;border-bottom:1px solid rgba(255,255,255,.07)}
 footer{text-align:center;padding:28px 0 18px;color:#263238;font-size:.73em;font-family:'Share Tech Mono',monospace;border-top:1px solid rgba(255,255,255,.04);margin-top:32px}
 footer a{color:#26c6da;text-decoration:none}
+
+/* ════════════════════════════════════════════════════════════ */
+/* ECHO 2026 — enhancement layer (glass · motion · depth · glow)  */
+/* ════════════════════════════════════════════════════════════ */
+:root{--ease:cubic-bezier(.22,.61,.36,1);--ease-out:cubic-bezier(.16,1,.3,1)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+html{scroll-behavior:smooth}
+
+/* — animated aurora behind the grid — */
+body::after{content:'';position:fixed;inset:-20%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(38% 48% at 14% 8%,rgba(38,198,218,.12),transparent 62%),
+    radial-gradient(42% 52% at 88% 18%,rgba(255,109,0,.09),transparent 62%),
+    radial-gradient(46% 50% at 62% 96%,rgba(224,64,251,.08),transparent 62%);
+  animation:auroraDrift 22s var(--ease) infinite alternate}
+@keyframes auroraDrift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(1%,-2.5%,0) scale(1.06)}100%{transform:translate3d(-1%,1.5%,0) scale(1.03)}}
+.container{position:relative;z-index:1}
+
+/* — header glow line — */
+header{position:relative}
+header::after{content:'';position:absolute;left:0;bottom:-1px;height:1px;width:100%;
+  background:linear-gradient(90deg,transparent,rgba(38,198,218,.6),rgba(255,109,0,.35),transparent);
+  background-size:200% 100%;animation:scanLine 6s linear infinite}
+@keyframes scanLine{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.logo-icon{will-change:transform}
+.logo-text h1{background:linear-gradient(92deg,#eceff1,#9fe8f0 55%,#26c6da);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* — glassmorphism panels — */
+.panel{background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+  backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+  border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 30px -12px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);
+  transition:transform .5s var(--ease-out),box-shadow .5s var(--ease-out),border-color .5s var(--ease-out)}
+.panel:hover{transform:translateY(-3px);border-color:rgba(38,198,218,.28);
+  box-shadow:0 18px 44px -16px rgba(0,0,0,.7),0 0 0 1px rgba(38,198,218,.12),inset 0 1px 0 rgba(255,255,255,.07)}
+.panel-header{position:relative}
+.panel-header::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:0;height:60%;
+  background:linear-gradient(180deg,#26c6da,transparent);border-radius:2px;transition:width .4s var(--ease)}
+.panel:hover .panel-header::before{width:3px}
+
+/* — stat cards: lift · glow · sheen — */
+.stat-card{background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.018));
+  backdrop-filter:blur(10px) saturate(130%);-webkit-backdrop-filter:blur(10px) saturate(130%);
+  box-shadow:0 6px 22px -12px rgba(0,0,0,.55);cursor:default;
+  transition:transform .45s var(--ease-out),box-shadow .45s var(--ease-out),border-color .45s var(--ease-out)}
+.stat-card::after{content:'';position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .45s var(--ease);
+  background:radial-gradient(120% 90% at 50% -10%,rgba(38,198,218,.14),transparent 60%);pointer-events:none}
+.stat-card:hover{transform:translateY(-5px) scale(1.015);border-color:rgba(255,255,255,.16);
+  box-shadow:0 22px 48px -18px rgba(0,0,0,.75)}
+.stat-card:hover::after{opacity:1}
+.stat-card::before{transition:filter .4s var(--ease)}
+.stat-card:hover::before{filter:drop-shadow(0 0 6px currentColor)}
+.stat-value{transition:text-shadow .4s var(--ease)}
+.stat-card:hover .stat-value{text-shadow:0 0 22px rgba(38,198,218,.35)}
+
+/* — buttons: gradient · sheen sweep · lift — */
+.btn{position:relative;overflow:hidden;border-radius:8px;
+  background:linear-gradient(135deg,rgba(38,198,218,.16),rgba(38,198,218,.06));
+  box-shadow:0 2px 10px -4px rgba(38,198,218,.4);
+  transition:transform .3s var(--ease-out),box-shadow .3s var(--ease-out),background .3s var(--ease)}
+.btn::before{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-20deg);transition:left .6s var(--ease)}
+.btn:hover{transform:translateY(-2px);background:linear-gradient(135deg,rgba(38,198,218,.28),rgba(38,198,218,.12));
+  box-shadow:0 8px 22px -6px rgba(38,198,218,.55)}
+.btn:hover::before{left:130%}
+.btn:active{transform:translateY(0) scale(.97)}
+
+/* — ECHO app launch buttons (href="/...") — */
+.panel-body a[href^="/"]{position:relative;overflow:hidden;
+  transition:transform .3s var(--ease-out),box-shadow .3s var(--ease-out),background .3s var(--ease),border-color .3s var(--ease)}
+.panel-body a[href^="/"]::after{content:'';position:absolute;top:0;left:-120%;width:55%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);transform:skewX(-20deg);transition:left .6s var(--ease)}
+.panel-body a[href^="/"]:hover{transform:translateY(-3px) scale(1.04);
+  box-shadow:0 12px 26px -8px rgba(0,0,0,.55),0 0 18px -4px currentColor}
+.panel-body a[href^="/"]:hover::after{left:140%}
+
+/* — pill badges shimmer — */
+.echo-badge,.ai-badge{transition:box-shadow .4s var(--ease),transform .4s var(--ease-out)}
+.echo-badge:hover,.ai-badge:hover{transform:translateY(-1px);box-shadow:0 0 16px -2px rgba(38,198,218,.5)}
+
+/* — scroll reveal — */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease-out),transform .7s var(--ease-out)}
+.reveal.in{opacity:1;transform:none}
+
+/* — table rows lift — */
+tbody tr{transition:background .25s var(--ease)}
+tbody tr:hover{background:rgba(38,198,218,.05)}
 </style>
 </head>
 <body>
@@ -709,6 +795,63 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   dati solari: <a href="https://www.swpc.noaa.gov" target="_blank">NOAA SWPC</a> //
   Gimmy Pignolo © 2026 // <span style="color:#26c6da">Progetto ECHO</span>
 </footer>
+
+<script>
+(function(){
+  var ease=function(t){return 1-Math.pow(1-t,3)};
+
+  /* ── scroll reveal: pannelli e card entrano in scena ── */
+  var targets=document.querySelectorAll('.panel,.stat-card');
+  targets.forEach(function(el){el.classList.add('reveal')});
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          var el=e.target,d=el.classList.contains('stat-card')?(Array.prototype.indexOf.call(el.parentNode.children,el)*70):60;
+          setTimeout(function(){el.classList.add('in')},d);
+          io.unobserve(el);
+        }
+      });
+    },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+    targets.forEach(function(el){io.observe(el)});
+  } else { targets.forEach(function(el){el.classList.add('in')}); }
+
+  /* ── count-up: i numeri delle stat salgono da 0 ── */
+  function countUp(el){
+    var raw=el.textContent.trim();
+    var m=raw.match(/^([^\\d-]*)(-?[\\d.]+)(.*)$/);
+    if(!m){return}
+    var pre=m[1],num=parseFloat(m[2]),post=m[3];
+    if(!isFinite(num)||num===0){return}
+    var dec=(m[2].indexOf('.')>=0)?1:0,dur=900,t0=null;
+    function step(ts){
+      if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),v=num*ease(p);
+      el.textContent=pre+(dec?v.toFixed(1):Math.round(v))+post;
+      if(p<1)requestAnimationFrame(step);else el.textContent=raw;
+    }
+    requestAnimationFrame(step);
+  }
+  var sv=document.querySelectorAll('.stat-value');
+  if('IntersectionObserver' in window){
+    var io2=new IntersectionObserver(function(es){
+      es.forEach(function(e){if(e.isIntersecting){countUp(e.target);io2.unobserve(e.target)}});
+    },{threshold:.6});
+    sv.forEach(function(el){io2.observe(el)});
+  }
+
+  /* ── tilt 3D leggero sulle stat card ── */
+  document.querySelectorAll('.stat-card').forEach(function(card){
+    card.style.transformStyle='preserve-3d';
+    card.addEventListener('pointermove',function(ev){
+      var r=card.getBoundingClientRect();
+      var rx=((ev.clientY-r.top)/r.height-.5)*-6;
+      var ry=((ev.clientX-r.left)/r.width-.5)*6;
+      card.style.transform='translateY(-5px) perspective(700px) rotateX('+rx+'deg) rotateY('+ry+'deg)';
+    });
+    card.addEventListener('pointerleave',function(){card.style.transform=''});
+  });
+})();
+</script>
 </body>
 </html>`;
 }
