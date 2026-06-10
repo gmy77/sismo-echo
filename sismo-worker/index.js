@@ -509,6 +509,58 @@ header::after{content:'';position:absolute;left:0;bottom:-1px;height:1px;width:1
 /* — table rows lift — */
 tbody tr{transition:background .25s var(--ease)}
 tbody tr:hover{background:rgba(38,198,218,.05)}
+
+/* ══ ECHO SUITE — launcher grid ══ */
+.suite-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}
+.app-card{position:relative;display:flex;flex-direction:column;gap:6px;padding:22px 18px 16px;
+  border-radius:16px;text-decoration:none;color:#eceff1;overflow:hidden;
+  background:linear-gradient(170deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+  transition:transform .4s var(--ease-out),border-color .4s var(--ease),box-shadow .4s var(--ease-out)}
+.app-card:hover{transform:translateY(-6px) scale(1.03);border-color:var(--app);
+  box-shadow:0 18px 40px -14px rgba(0,0,0,.8),0 0 24px -6px var(--app)}
+.app-glow{position:absolute;inset:0;opacity:0;transition:opacity .45s var(--ease);pointer-events:none;
+  background:radial-gradient(130% 100% at 50% -20%,color-mix(in srgb,var(--app) 22%,transparent),transparent 60%)}
+.app-card:hover .app-glow{opacity:1}
+.app-icon{font-size:2.1em;line-height:1.2;margin-bottom:4px;transition:transform .4s var(--ease-out)}
+.app-card:hover .app-icon{transform:scale(1.18) translateY(-2px)}
+.app-name{font-weight:800;font-size:1.02em;letter-spacing:.01em}
+.app-desc{font-size:.7em;color:#546e7a;font-family:'Share Tech Mono',monospace;min-height:2.2em}
+.app-tag{align-self:flex-start;font-size:.6em;font-family:'Share Tech Mono',monospace;color:var(--app);
+  border:1px solid color-mix(in srgb,var(--app) 40%,transparent);
+  background:color-mix(in srgb,var(--app) 10%,transparent);border-radius:20px;padding:2px 10px}
+.app-go{margin-top:10px;font-size:.68em;font-family:'Share Tech Mono',monospace;color:var(--app);
+  letter-spacing:.18em;opacity:.55;display:flex;align-items:center;gap:6px;transition:opacity .3s var(--ease)}
+.app-go span{transition:transform .3s var(--ease-out)}
+.app-card:hover .app-go{opacity:1}
+.app-card:hover .app-go span{transform:translateX(5px)}
+
+/* ══ DOCK flottante in vetro ══ */
+#dock{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;
+  display:flex;align-items:center;gap:4px;padding:8px 12px;border-radius:20px;
+  background:rgba(10,18,26,.72);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 16px 48px -12px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08);
+  transition:transform .5s var(--ease-out),opacity .5s var(--ease)}
+#dock.hide{transform:translateX(-50%) translateY(90px);opacity:0}
+.dock-item{position:relative;display:flex;align-items:center;justify-content:center;
+  width:42px;height:42px;border-radius:13px;font-size:1.25em;text-decoration:none;cursor:pointer;
+  transition:transform .3s var(--ease-out),background .3s var(--ease)}
+.dock-item:hover{transform:translateY(-7px) scale(1.22);background:rgba(255,255,255,.08)}
+.dock-item::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);
+  background:rgba(8,14,20,.95);border:1px solid rgba(38,198,218,.3);color:#9fe8f0;
+  font-family:'Share Tech Mono',monospace;font-size:.5em;letter-spacing:.08em;
+  padding:4px 10px;border-radius:7px;white-space:nowrap;opacity:0;pointer-events:none;
+  transition:opacity .25s var(--ease),transform .25s var(--ease-out)}
+.dock-item:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
+.dock-sep{width:1px;height:26px;background:rgba(255,255,255,.1);margin:0 5px}
+@media(max-width:640px){#dock{gap:1px;padding:6px 8px}.dock-item{width:37px;height:37px;font-size:1.05em}}
+body{padding-bottom:84px}
+
+/* ══ progress bar di scroll in cima ══ */
+#scrollbar-top{position:fixed;top:0;left:0;height:2px;width:0%;z-index:60;
+  background:linear-gradient(90deg,#26c6da,#ff6d00,#e040fb);
+  box-shadow:0 0 12px rgba(38,198,218,.6)}
 </style>
 </head>
 <body>
@@ -604,7 +656,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 <!-- ============================================================ -->
 <!-- SEZIONE CAMPI FLEGREI                                       -->
 <!-- ============================================================ -->
-<div class="panel" style="margin-top:28px;border-color:rgba(224,64,251,.25)">
+<div class="panel" id="cf" style="margin-top:28px;border-color:rgba(224,64,251,.25);scroll-margin-top:20px">
   <div class="panel-header" style="color:#e040fb;border-bottom-color:rgba(224,64,251,.2)">
     🌋 <span style="color:#e040fb">AREA CAMPI FLEGREI · VESUVIO · ISCHIA</span>
     <span style="color:#455a64">LAT ${CF.lat_min}–${CF.lat_max} · LON ${CF.lon_min}–${CF.lon_max} · M≥0.0 · ogni micro-sisma</span>
@@ -700,7 +752,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   </div>
 </div>
 
-<div class="panel" style="margin-top:20px">
+<div class="panel" id="eventi" style="margin-top:20px;scroll-margin-top:20px">
   <div class="panel-header">⚡ <span class="acc">Ultimi 50 eventi FVG</span> ≥ M0.5</div>
   <div style="overflow-x:auto">
     <table>
@@ -720,69 +772,71 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   </div>
 </div>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">🎮 <span class="acc">ECHO GAMES</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">🔴🟡</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Forza 4</div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">gioco classico // 2 giocatori // canvas game</div>
-      <a href="/forza4" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">&#9654; Gioca ora</a>
-    </div>
-    <div style="width:1px;height:60px;background:rgba(38,198,218,.1)"></div>
-    <div style="font-size:2.5em;line-height:1">&#9899;&#9898;</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Othello <span style="background:rgba(102,187,106,.1);border:1px solid rgba(102,187,106,.25);border-radius:20px;padding:1px 8px;font-size:.6em;color:#66bb6a;font-family:'Share Tech Mono',monospace;vertical-align:middle">AI adattiva</span></div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">reversi // minimax + learning // canvas game</div>
-      <a href="/othello" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(102,187,106,.3);background:rgba(102,187,106,.1);color:#66bb6a;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">&#9654; Gioca ora</a>
-    </div>
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- ECHO SUITE — launcher grid 2026                            -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div class="panel" id="suite" style="margin-top:28px">
+  <div class="panel-header">
+    <span>🚀 <span class="acc">ECHO SUITE</span> — app &amp; strumenti</span>
+    <span style="color:#455a64">6 moduli · Cloudflare AI · edge</span>
   </div>
-</div>
+  <div class="panel-body">
+    <div class="suite-grid">
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">🤖 <span class="acc">ECHO CHAT</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">🧠</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Chatbot IA <span style="background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-size:.65em;color:#26c6da;font-family:'Share Tech Mono',monospace;vertical-align:middle">LLaMA 3</span></div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">assistente personale IA // accesso privato // powered by Cloudflare AI</div>
-      <a href="/chat" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">🤖 Apri Chat</a>
-    </div>
-  </div>
-</div>
+      <a href="/chat" class="app-card" style="--app:#26c6da">
+        <div class="app-glow"></div>
+        <div class="app-icon">🧠</div>
+        <div class="app-name">Echo Chat</div>
+        <div class="app-desc">assistente IA personale</div>
+        <div class="app-tag">LLaMA 3</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">💻 <span class="acc">ECHO CODE</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">⌨️</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Assistente Codice <span style="background:rgba(102,187,106,.1);border:1px solid rgba(102,187,106,.3);border-radius:20px;padding:2px 10px;font-size:.65em;color:#66bb6a;font-family:'Share Tech Mono',monospace;vertical-align:middle">Code Llama</span></div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">debug // spiega // ottimizza // genera codice // accesso privato</div>
-      <a href="/code" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(102,187,106,.3);background:rgba(102,187,106,.1);color:#66bb6a;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">💻 Apri Code</a>
-    </div>
-  </div>
-</div>
+      <a href="/code" class="app-card" style="--app:#66bb6a">
+        <div class="app-glow"></div>
+        <div class="app-icon">⌨️</div>
+        <div class="app-name">Echo Code</div>
+        <div class="app-desc">debug · spiega · genera</div>
+        <div class="app-tag">Code Llama</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">🌍 <span class="acc">ECHO TRANSLATE</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">🇮🇹⇄🇬🇧</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">Traduttore IA <span style="background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-size:.65em;color:#26c6da;font-family:'Share Tech Mono',monospace;vertical-align:middle">AI</span></div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">traduzione EN ↔ IT // powered by Cloudflare AI // istantaneo</div>
-      <a href="/traduttore" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">⚡ Apri Traduttore</a>
-    </div>
-  </div>
-</div>
+      <a href="/traduttore" class="app-card" style="--app:#ffd600">
+        <div class="app-glow"></div>
+        <div class="app-icon">🌍</div>
+        <div class="app-name">Echo Translate</div>
+        <div class="app-desc">EN ↔ IT istantaneo</div>
+        <div class="app-tag">Cloudflare AI</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
 
-<div class="panel" style="margin-top:20px">
-  <div class="panel-header">💾 <span class="acc">ECHO STORAGE</span></div>
-  <div class="panel-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-    <div style="font-size:2.5em;line-height:1">📁</div>
-    <div>
-      <div style="font-weight:700;font-size:1.05em;margin-bottom:4px">PixelDrain Files</div>
-      <div style="font-size:.75em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:12px">file manager privato // accesso riservato // cloud storage</div>
-      <a href="/pixeldrain" style="display:inline-block;padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.82em">&#128193; Apri Storage</a>
+      <a href="/pixeldrain" class="app-card" style="--app:#ab47bc">
+        <div class="app-glow"></div>
+        <div class="app-icon">📁</div>
+        <div class="app-name">Echo Storage</div>
+        <div class="app-desc">file manager privato</div>
+        <div class="app-tag">PixelDrain</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
+
+      <a href="/forza4" class="app-card" style="--app:#ff6d00">
+        <div class="app-glow"></div>
+        <div class="app-icon">🔴🟡</div>
+        <div class="app-name">Forza 4</div>
+        <div class="app-desc">classico · 2 giocatori</div>
+        <div class="app-tag">ECHO Games</div>
+        <div class="app-go">GIOCA <span>→</span></div>
+      </a>
+
+      <a href="/othello" class="app-card" style="--app:#69f0ae">
+        <div class="app-glow"></div>
+        <div class="app-icon">⚫⚪</div>
+        <div class="app-name">Othello</div>
+        <div class="app-desc">minimax + learning</div>
+        <div class="app-tag">AI adattiva</div>
+        <div class="app-go">GIOCA <span>→</span></div>
+      </a>
+
     </div>
   </div>
 </div>
@@ -795,6 +849,40 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   dati solari: <a href="https://www.swpc.noaa.gov" target="_blank">NOAA SWPC</a> //
   Gimmy Pignolo © 2026 // <span style="color:#26c6da">Progetto ECHO</span>
 </footer>
+
+<div id="scrollbar-top"></div>
+
+<!-- DOCK 2026 -->
+<nav id="dock" aria-label="Navigazione rapida">
+  <a class="dock-item" href="#top" data-tip="MONITOR" onclick="window.scrollTo({top:0,behavior:'smooth'});return false">🌍</a>
+  <a class="dock-item" href="#cf" data-tip="CAMPI FLEGREI">🌋</a>
+  <a class="dock-item" href="#eventi" data-tip="EVENTI FVG">⚡</a>
+  <a class="dock-item" href="#suite" data-tip="ECHO SUITE">🚀</a>
+  <div class="dock-sep"></div>
+  <a class="dock-item" href="/chat" data-tip="ECHO CHAT">🧠</a>
+  <a class="dock-item" href="/code" data-tip="ECHO CODE">⌨️</a>
+  <a class="dock-item" href="/traduttore" data-tip="TRANSLATE">🌐</a>
+  <a class="dock-item" href="/pixeldrain" data-tip="STORAGE">📁</a>
+  <div class="dock-sep"></div>
+  <a class="dock-item" href="/forza4" data-tip="FORZA 4">🔴</a>
+  <a class="dock-item" href="/othello" data-tip="OTHELLO">⚫</a>
+</nav>
+
+<script>
+(function(){
+  /* ── dock: nascondi scendendo, mostra salendo ── */
+  var dock=document.getElementById('dock'),lastY=0;
+  window.addEventListener('scroll',function(){
+    var y=window.scrollY;
+    if(y>lastY+8&&y>300){dock.classList.add('hide')}
+    else if(y<lastY-8||y<300){dock.classList.remove('hide')}
+    lastY=y;
+    /* progress bar */
+    var h=document.documentElement.scrollHeight-window.innerHeight;
+    document.getElementById('scrollbar-top').style.width=(h>0?(y/h*100):0)+'%';
+  },{passive:true});
+})();
+</script>
 
 <script>
 (function(){
