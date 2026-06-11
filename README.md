@@ -71,8 +71,10 @@ La versione vive in un'unica costante (`ECHO_VERSION`) e **sale da sola**: un pr
 
 **Gimmy Pignolo** © 2026 · [gimmycloud.com](https://gimmycloud.com)
 
+🤖 sviluppato insieme a **Fable 5** di [Anthropic](https://www.anthropic.com) · Claude Code
+
 dati sismici [INGV](https://www.ingv.it) · dati solari [NOAA SWPC](https://www.swpc.noaa.gov)
 
-*Progetto ECHO — costruito con ❤️ insieme a Claude*
+*Progetto ECHO — costruito con ❤️, umano + IA*
 
 </div>
