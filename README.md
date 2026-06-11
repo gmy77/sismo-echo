@@ -1,135 +1,78 @@
-# 🔴🟡 Forza 4 — Advanced Edition
+<div align="center">
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/Pygame-2.5%2B-green?logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow" />
-</p>
+# 🌋 SISMO ECHO
 
-<p align="center">
-  Versione avanzata del classico <strong>Forza 4</strong> realizzata in Python con Pygame.<br/>
-  Grafica moderna, animazioni fluide, particelle ed effetti visivi 3D.
-</p>
+**Earth Correlation Hypothesis Observatory**
+
+Monitor sismico in tempo reale + correlazione solare NOAA — servito dall'edge, Cloudflare Workers.
+
+🔗 **[sismo-fvg.gimmy077.workers.dev](https://sismo-fvg.gimmy077.workers.dev)**
+
+![Version](https://img.shields.io/badge/version-3.0-26c6da)
+![Platform](https://img.shields.io/badge/platform-Cloudflare%20Workers-F38020?logo=cloudflare&logoColor=white)
+![DB](https://img.shields.io/badge/database-D1%20%C3%972%20%2B%20KV-blue)
+![UI](https://img.shields.io/badge/UI-2026%20glass%20%C2%B7%20motion-e040fb)
+
+</div>
 
 ---
 
-## Anteprima
+## 🎯 Cos'è
+
+ECHO investiga la **correlazione osservazionale** tra attività geomagnetica solare (indice Kp, vento solare) e sismicità terrestre, su due aree ad alta attività:
+
+- 🌍 **Friuli Venezia Giulia** — area sismica attiva del Nord-Est Italia
+- 🌋 **Campi Flegrei · Vesuvio · Ischia** — il sistema vulcanico napoletano, ogni micro-sisma da M0.0
+
+La tesi sotto osservazione: *i picchi geomagnetici (Kp ≥ 4) precedono o coincidono con aumenti di sismicità locale entro 0–72h.* Il dataset cresce ogni giorno, in automatico.
+
+## 📊 La dashboard
+
+- **Timeline doppia sincronizzata** — Kp solare sopra, eventi sismici sotto, 30 giorni
+- **Coincidenze rilevate** — hit rate Kp≥4 + sismi nello stesso giorno, per entrambe le aree
+- **Eventi live INGV** — aggiornamento 4×/giorno via cron + on-demand
+- **UI 2026** — glassmorphism, aurora animata, dock flottante in vetro, launcher ECHO Suite
+
+## 🚀 ECHO Suite
+
+App integrate, tutte servite dallo stesso Worker:
+
+| App | Cosa fa | Motore |
+|---|---|---|
+| 🧠 **Echo Chat** | assistente IA personale | LLaMA 3 · Cloudflare AI |
+| ⌨️ **Echo Code** | debug · spiega · genera codice | Code Llama |
+| 🌍 **Echo Translate** | EN ↔ IT istantaneo | Cloudflare AI |
+| 📁 **Echo Storage** | file manager privato | PixelDrain API |
+| 🔴 **Forza 4** | classico, 2 giocatori | Canvas |
+| ⚫ **Othello** | reversi con AI che impara | minimax + KV learning |
+
+Bonus: **[/newtab](https://sismo-fvg.gimmy077.workers.dev/newtab)** — pagina nuova scheda personalizzata con widget SISMO live (vedi anche [newtab-worker](https://github.com/gmy77/newtab-worker), il template open-source nato da qui).
+
+## ⚙️ Architettura
 
 ```
-╔═══════════════════════════════════════╗
-║            FORZA  4                   ║
-║  [G1: Rosso  0]        [G2: Giallo 0] ║
-║                                       ║
-║  🔴 🔴 ⬛ ⬛ ⬛ ⬛ ⬛              ║
-║  🔴 🟡 🟡 ⬛ ⬛ ⬛ ⬛              ║
-║  🔴 🟡 🔴 🟡 ⬛ ⬛ ⬛              ║
-║  🟡 🔴 🟡 🔴 🟡 ⬛ ⬛              ║
-╚═══════════════════════════════════════╝
+INGV FDSNWS API ──→ Cloudflare Worker ──→ D1: terremoti-fvg
+NOAA Solar API  ──→    (cron 4×/gg)    ──→ D1: terremoti-cf
+                                       ──→ KV: status + AI learning
+                                       ──→ Dashboard HTML (edge-rendered)
 ```
 
----
+Zero framework, zero build step: un Worker, due database D1, un KV. Tutto il rendering è server-side in template literals.
 
-## ✨ Funzionalità
+📖 Documentazione tecnica completa: [sismo-worker/README.md](sismo-worker/README.md)
 
-| Feature | Descrizione |
-|---------|-------------|
-| 🎨 **Grafica avanzata** | Sfondo con gradiente, pezzi con effetto 3D (highlight + ombreggiatura + riflesso) |
-| 🌊 **Animazione caduta** | I pezzi cadono con accelerazione gravitazionale realistica |
-| ✨ **Sistema particelle** | Esplosione di particelle all'impatto e alla vittoria |
-| 🏆 **Celle vincenti** | Le 4 celle vittoria lampeggiano con animazione pulsante |
-| 👆 **Hover preview** | Anteprima del pezzo con freccia animata sulla colonna selezionata |
-| 📊 **Punteggi persistenti** | I punteggi vengono mantenuti tra le partite senza riavviare |
-| 🎯 **Rilevamento completo** | Vittoria in orizzontale, verticale e diagonale (entrambe le direzioni) |
-| 🔄 **Reset rapido** | Nuova partita con un tasto, senza perdere il punteggio |
+## 🔢 Versioning
+
+La versione vive in un'unica costante (`ECHO_VERSION`) e **sale da sola**: un pre-commit hook incrementa la minor (+0.1) ad ogni modifica del worker. I major bump (v4, v5...) sono decisioni umane — il hook li rispetta e si fa da parte.
 
 ---
 
-## 📦 Requisiti
+<div align="center">
 
-- **Python** 3.8 o superiore
-- **Pygame** 2.5 o superiore
+**Gimmy Pignolo** © 2026 · [gimmycloud.com](https://gimmycloud.com)
 
----
+dati sismici [INGV](https://www.ingv.it) · dati solari [NOAA SWPC](https://www.swpc.noaa.gov)
 
-## 🚀 Installazione e avvio
+*Progetto ECHO — costruito con ❤️ insieme a Claude*
 
-### 1. Clona il repository
-
-```bash
-git clone https://github.com/gmy77/forza4_adv.git
-cd forza4_adv
-```
-
-### 2. Installa la dipendenza
-
-```bash
-pip install pygame
-```
-
-### 3. Avvia il gioco
-
-```bash
-python forza4.py
-```
-
----
-
-## 🎮 Controlli
-
-| Azione | Input |
-|--------|-------|
-| **Posizionare un pezzo** | Click sinistro del mouse sulla colonna desiderata |
-| **Nuova partita** | Tasto `R` |
-| **Uscire** | Tasto `Q` oppure chiudi la finestra |
-
----
-
-## 🏗️ Struttura del codice
-
-```
-forza4.py
-├── class Particle          # Singola particella (posizione, fisica, rendering)
-└── class ForzeQuattro      # Motore di gioco principale
-    ├── reset()             # Reimposta lo stato della partita
-    ├── update(dt)          # Aggiorna fisica, animazioni e particelle
-    ├── draw()              # Rendering principale (sfondo → pezzi → tavola → UI)
-    ├── drop_piece(col)     # Avvia animazione di caduta pezzo
-    ├── check_winner(p)     # Controlla vittoria (orizzontale/verticale/diagonale)
-    └── run()               # Game loop principale
-```
-
----
-
-## 🎨 Dettagli tecnici
-
-- **Risoluzione:** 820 × 790 pixel (adattabile modificando le costanti)
-- **FPS target:** 60 fps con delta-time per animazioni frame-indipendenti
-- **Griglia:** 7 colonne × 6 righe (standard internazionale del Forza 4)
-- **Rendering pezzi:** Multi-layer (bordo scuro → colore base → highlight radiale → punto luce)
-- **Particelle:** Fisica con gravità, fade-out per alpha e riduzione dimensione
-
----
-
-## 🛠️ Personalizzazione
-
-Le costanti all'inizio del file permettono di adattare facilmente il gioco:
-
-```python
-COLS      = 7       # Numero di colonne
-ROWS      = 6       # Numero di righe
-CELL_SIZE = 100     # Dimensione cella in pixel
-FPS       = 60      # Frame per secondo
-```
-
----
-
-## 📄 Licenza
-
-Distribuito sotto licenza **MIT**. Libero di usare, modificare e distribuire.
-
----
-
-<p align="center">
-  Fatto con ❤️ e Pygame da <strong>Gimmy</strong>
-</p>
+</div>

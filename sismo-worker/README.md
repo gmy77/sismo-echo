@@ -1,4 +1,4 @@
-# 🌋 ECHO Monitor v4 — Sismo FVG + Correlazione Solare
+# 🌋 ECHO Monitor — Sismo FVG + Correlazione Solare
 
 **Progetto ECHO** · *Earth Correlation Hypothesis Observatory*
 Monitor sismico in tempo reale con correlazione solare — Cloudflare Worker + D1
@@ -6,7 +6,7 @@ Gimmy Pignolu © 2026 — [gimmycloud.com](https://gimmycloud.com)
 
 🔗 **Live:** [https://sismo-fvg.gimmy077.workers.dev](https://sismo-fvg.gimmy077.workers.dev/?updated=0)
 
-![Version](https://img.shields.io/badge/version-4.0-e040fb)
+![Version](https://img.shields.io/badge/version-3.0-26c6da)
 ![Platform](https://img.shields.io/badge/platform-Cloudflare%20Workers-orange)
 ![DB](https://img.shields.io/badge/database-Cloudflare%20D1-blue)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
