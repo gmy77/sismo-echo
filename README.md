@@ -46,7 +46,7 @@ App integrate, tutte servite dallo stesso Worker:
 | 🔴 **Forza 4** | classico, 2 giocatori | Canvas |
 | ⚫ **Othello** | reversi con AI che impara | minimax + KV learning |
 
-Bonus: **[/newtab](https://sismo-fvg.gimmy077.workers.dev/newtab)** — pagina nuova scheda personalizzata con widget SISMO live (vedi anche [newtab-worker](https://github.com/gmy77/newtab-worker), il template open-source nato da qui).
+Bonus: **[/newtab](https://sismo-fvg.gimmy077.workers.dev/newtab)** — pagina nuova scheda personalizzata con widget sismico doppio (FVG + Campi Flegrei). Installala come nuova scheda di Edge/Chrome con l'estensione **[SISMO ECHO Tab](https://github.com/gmy77/sismo-echo-tab)**, oppure parti dal template open-source [newtab-worker](https://github.com/gmy77/newtab-worker).
 
 ## ⚙️ Architettura
 
