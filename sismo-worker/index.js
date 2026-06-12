@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.1";
+const ECHO_VERSION = "3.2";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -2727,7 +2727,7 @@ body::after{
   <div class="sw">
     <span class="si-icon">⌕</span>
     <input class="si" type="text" placeholder="Cerca nel web..." autocomplete="off"
-      onkeydown="if(event.key==='Enter'&&this.value.trim())window.open('https://www.google.com/search?q='+encodeURIComponent(this.value),'_self')">
+      onkeydown="if(event.key==='Enter'&&this.value.trim())window.open('https://www.google.com/search?q='+encodeURIComponent(this.value),'_top')">
   </div>
 
   <!-- ECHO SUITE shortcuts -->
