@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.0";
+const ECHO_VERSION = "3.1";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -2555,40 +2555,50 @@ function renderNewtab() {
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#080e14;--cyan:#26c6da;--green:#69f0ae;--orange:#ff6d00;
-  --red:#ff1744;--yellow:#ffd600;--text:#eceff1;--muted:#546e7a;
-  --panel:rgba(255,255,255,.03);--border:rgba(255,255,255,.07);
+  --red:#ff1744;--yellow:#ffd600;--magenta:#e040fb;--text:#eceff1;--muted:#546e7a;
+  --panel:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);
+  --ease:cubic-bezier(.22,.61,.36,1);--ease-out:cubic-bezier(.16,1,.3,1);
 }
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 html,body{height:100%;overflow:hidden}
 body{
   background:var(--bg);color:var(--text);
   font-family:'Exo 2',sans-serif;
   display:flex;flex-direction:column;
 }
+/* griglia */
 body::before{
   content:'';position:fixed;inset:0;
-  background-image:linear-gradient(rgba(38,198,218,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.022) 1px,transparent 1px);
+  background-image:linear-gradient(rgba(38,198,218,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.025) 1px,transparent 1px);
   background-size:52px 52px;pointer-events:none;z-index:0;
+  mask-image:radial-gradient(ellipse 90% 70% at 50% 45%,#000 35%,transparent 100%);
 }
+/* aurora animata */
 body::after{
-  content:'';position:fixed;inset:0;
-  background:radial-gradient(ellipse 75% 55% at 50% 42%,rgba(38,198,218,.045) 0%,transparent 68%);
-  pointer-events:none;z-index:0;
+  content:'';position:fixed;inset:-20%;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(36% 46% at 18% 14%,rgba(38,198,218,.11),transparent 62%),
+    radial-gradient(40% 50% at 84% 22%,rgba(255,109,0,.07),transparent 62%),
+    radial-gradient(44% 48% at 60% 90%,rgba(224,64,251,.07),transparent 62%);
+  animation:auroraDrift 24s var(--ease) infinite alternate;
 }
+@keyframes auroraDrift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(1%,-2.5%,0) scale(1.06)}100%{transform:translate3d(-1%,1.5%,0) scale(1.03)}}
 
 /* ─ TOP LINKS ─ */
 .topbar{
   display:flex;align-items:center;justify-content:center;
-  gap:7px;padding:16px 24px;position:relative;z-index:10;flex-wrap:wrap;
+  gap:7px;padding:18px 24px;position:relative;z-index:10;flex-wrap:wrap;
 }
 .lc{
   display:flex;align-items:center;gap:5px;
-  padding:5px 13px;border-radius:20px;
+  padding:6px 14px;border-radius:20px;
   background:var(--panel);border:1px solid var(--border);
-  color:#78909c;text-decoration:none;
+  color:#90a4ae;text-decoration:none;
   font-family:'Share Tech Mono',monospace;font-size:.7em;letter-spacing:.03em;
-  transition:all .18s;
+  backdrop-filter:blur(10px) saturate(130%);-webkit-backdrop-filter:blur(10px) saturate(130%);
+  transition:transform .3s var(--ease-out),background .25s var(--ease),border-color .25s var(--ease),color .25s var(--ease);
 }
-.lc:hover{background:rgba(38,198,218,.1);border-color:rgba(38,198,218,.3);color:var(--cyan);}
+.lc:hover{background:rgba(38,198,218,.12);border-color:rgba(38,198,218,.35);color:var(--cyan);transform:translateY(-2px);}
 .lc img{width:13px;height:13px;border-radius:2px;flex-shrink:0;}
 
 /* ─ CENTER ─ */
@@ -2600,12 +2610,15 @@ body::after{
 .clock{
   font-size:clamp(5rem,13vw,9.5rem);font-weight:200;
   letter-spacing:-.03em;line-height:1;
-  color:var(--text);font-family:'Exo 2',sans-serif;
+  font-family:'Exo 2',sans-serif;
   display:flex;align-items:baseline;gap:4px;
+  background:linear-gradient(92deg,#eceff1,#9fe8f0 55%,#26c6da);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 4px 30px rgba(38,198,218,.18));
 }
 .clock-sec{
   font-family:'Share Tech Mono',monospace;
-  font-size:.3em;color:var(--cyan);opacity:.65;
+  font-size:.3em;-webkit-text-fill-color:var(--cyan);opacity:.7;
   letter-spacing:0;margin-bottom:.12em;
 }
 .date-str{
@@ -2617,68 +2630,80 @@ body::after{
 .greeting b{color:var(--text);font-weight:600;}
 
 /* search */
-.sw{margin-top:22px;position:relative;width:clamp(260px,38vw,500px);}
+.sw{margin-top:22px;position:relative;width:clamp(260px,40vw,520px);}
 .si{
   width:100%;background:var(--panel);border:1px solid var(--border);
-  border-radius:30px;padding:11px 18px 11px 42px;
-  color:var(--text);font-family:'Exo 2',sans-serif;font-size:.92em;
-  outline:none;transition:all .2s;
+  border-radius:30px;padding:13px 18px 13px 44px;
+  color:var(--text);font-family:'Exo 2',sans-serif;font-size:.95em;
+  outline:none;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:border-color .25s var(--ease),background .25s var(--ease),box-shadow .25s var(--ease);
 }
-.si:focus{border-color:rgba(38,198,218,.4);background:rgba(38,198,218,.05);box-shadow:0 0 22px rgba(38,198,218,.1);}
+.si:focus{border-color:rgba(38,198,218,.45);background:rgba(38,198,218,.06);box-shadow:0 0 0 4px rgba(38,198,218,.08),0 8px 30px -10px rgba(38,198,218,.3);}
 .si::placeholder{color:var(--muted);}
-.si-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9em;pointer-events:none;}
+.si-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.95em;pointer-events:none;}
+
+/* app shortcuts (Echo Suite) */
+.apps{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:560px;}
+.app{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;
+  width:78px;padding:12px 6px;border-radius:15px;text-decoration:none;color:#cfd8dc;overflow:hidden;
+  background:var(--panel);border:1px solid var(--border);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:transform .35s var(--ease-out),border-color .3s var(--ease),box-shadow .3s var(--ease-out);
+}
+.app:hover{transform:translateY(-5px) scale(1.05);border-color:var(--ac);box-shadow:0 14px 30px -12px rgba(0,0,0,.7),0 0 18px -6px var(--ac);}
+.app .ai{font-size:1.5em;line-height:1;transition:transform .35s var(--ease-out);}
+.app:hover .ai{transform:scale(1.18);}
+.app .al{font-family:'Share Tech Mono',monospace;font-size:.56em;letter-spacing:.04em;color:#90a4ae;}
+.app:hover .al{color:var(--ac);}
 
 /* ─ BOTTOM ─ */
 .bottom{
-  display:flex;align-items:flex-end;
-  justify-content:space-between;
-  padding:16px 28px 22px;
-  position:relative;z-index:10;gap:14px;flex-wrap:wrap;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:16px 28px 22px;position:relative;z-index:10;gap:14px;flex-wrap:wrap;
 }
 
-/* SISMO widget */
+/* SISMO widgets */
+.sw-row{display:flex;gap:12px;flex-wrap:wrap;flex-shrink:0;}
 .sw-box{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:14px;padding:13px 16px;
-  min-width:250px;max-width:310px;
-  text-decoration:none;color:inherit;
-  transition:all .2s;display:block;flex-shrink:0;
+  background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));
+  border:1px solid var(--border);border-radius:15px;padding:13px 16px;
+  min-width:236px;max-width:300px;text-decoration:none;color:inherit;display:block;flex-shrink:0;
+  backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+  box-shadow:0 8px 26px -14px rgba(0,0,0,.6);
+  transition:transform .4s var(--ease-out),border-color .3s var(--ease),box-shadow .4s var(--ease-out);
 }
-.sw-box:hover{background:rgba(38,198,218,.055);border-color:rgba(38,198,218,.22);}
+.sw-box:hover{transform:translateY(-4px);border-color:var(--ac,rgba(38,198,218,.3));box-shadow:0 16px 38px -16px rgba(0,0,0,.75),0 0 20px -8px var(--ac,rgba(38,198,218,.4));}
+.sw-box.cf{--ac:var(--magenta);}
+.sw-box.fvg{--ac:var(--cyan);}
 .sw-head{
   display:flex;align-items:center;gap:7px;margin-bottom:9px;
-  font-family:'Share Tech Mono',monospace;font-size:.65em;
+  font-family:'Share Tech Mono',monospace;font-size:.63em;
   color:var(--muted);text-transform:uppercase;letter-spacing:.1em;
 }
+.sw-head .hl{color:var(--ac);}
 .sdot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:bl 2s ease-in-out infinite;flex-shrink:0;}
 .sdot.warn{background:var(--orange);}
 .sdot.alert{background:var(--red);animation:bl .8s ease-in-out infinite;}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
 .sw-last{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
 .mag-b{font-family:'Share Tech Mono',monospace;font-size:1.25em;font-weight:700;min-width:44px;}
-.sw-loc{font-size:.78em;color:#b0bec5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:175px;}
+.sw-loc{font-size:.76em;color:#b0bec5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:168px;}
 .sw-loc .sw-t{font-family:'Share Tech Mono',monospace;font-size:.82em;color:var(--muted);display:block;}
 .sw-stats{
-  display:flex;gap:12px;
-  font-family:'Share Tech Mono',monospace;font-size:.67em;color:var(--muted);
+  display:flex;gap:12px;font-family:'Share Tech Mono',monospace;font-size:.66em;color:var(--muted);
   border-top:1px solid var(--border);padding-top:7px;
 }
 .sw-stats strong{font-size:1.08em;}
 
 /* quote */
-.quote-area{
-  flex:1;text-align:center;font-size:.72em;color:#37474f;
-  font-style:italic;line-height:1.65;padding:0 12px;
-  align-self:flex-end;padding-bottom:2px;
-}
+.quote-area{flex:1;text-align:center;font-size:.74em;color:#455a64;font-style:italic;line-height:1.65;padding:0 12px;align-self:flex-end;padding-bottom:4px;min-width:160px;}
 
 /* mini-info bottom right */
-.br{
-  text-align:right;font-family:'Share Tech Mono',monospace;
-  font-size:.66em;color:#2e4050;line-height:1.9;flex-shrink:0;
-}
-.br a{color:var(--cyan);opacity:.5;text-decoration:none;font-size:.9em;}
+.br{text-align:right;font-family:'Share Tech Mono',monospace;font-size:.66em;color:#2e4050;line-height:1.9;flex-shrink:0;}
+.br a{color:var(--cyan);opacity:.55;text-decoration:none;font-size:.9em;}
 .br a:hover{opacity:1;}
+.br .ver{color:var(--magenta);opacity:.7;}
 </style>
 </head>
 <body>
@@ -2691,9 +2716,7 @@ body::after{
   <a class="lc" href="https://claude.ai" target="_blank">🤖 Claude</a>
   <a class="lc" href="https://gimmycloud.com" target="_blank">🌐 GimmyCloud</a>
   <a class="lc" href="https://www.youtube.com" target="_blank"><img src="https://www.youtube.com/favicon.ico" onerror="this.style.display='none'">YouTube</a>
-  <a class="lc" href="/chat" target="_blank">🧠 Echo Chat</a>
-  <a class="lc" href="/forza4" target="_blank">🎮 Forza 4</a>
-  <a class="lc" href="/othello" target="_blank">&#9679; Othello</a>
+  <a class="lc" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">🌋 SISMO</a>
 </div>
 
 <!-- CENTER -->
@@ -2706,24 +2729,50 @@ body::after{
     <input class="si" type="text" placeholder="Cerca nel web..." autocomplete="off"
       onkeydown="if(event.key==='Enter'&&this.value.trim())window.open('https://www.google.com/search?q='+encodeURIComponent(this.value),'_self')">
   </div>
+
+  <!-- ECHO SUITE shortcuts -->
+  <div class="apps">
+    <a class="app" href="/chat" target="_blank" style="--ac:#26c6da"><span class="ai">🧠</span><span class="al">CHAT</span></a>
+    <a class="app" href="/code" target="_blank" style="--ac:#66bb6a"><span class="ai">⌨️</span><span class="al">CODE</span></a>
+    <a class="app" href="/traduttore" target="_blank" style="--ac:#ffd600"><span class="ai">🌍</span><span class="al">TRANSLATE</span></a>
+    <a class="app" href="/pixeldrain" target="_blank" style="--ac:#ab47bc"><span class="ai">📁</span><span class="al">STORAGE</span></a>
+    <a class="app" href="/forza4" target="_blank" style="--ac:#ff6d00"><span class="ai">🔴</span><span class="al">FORZA 4</span></a>
+    <a class="app" href="/othello" target="_blank" style="--ac:#69f0ae"><span class="ai">⚫</span><span class="al">OTHELLO</span></a>
+  </div>
 </div>
 
 <!-- BOTTOM -->
 <div class="bottom">
 
-  <!-- SISMO -->
-  <a class="sw-box" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">
-    <div class="sw-head"><div class="sdot" id="sdot"></div>ECHO MONITOR · SISMO FVG</div>
-    <div class="sw-last">
-      <div class="mag-b" id="smag" style="color:var(--green)">M—</div>
-      <div class="sw-loc"><span id="sloc">caricamento…</span><span class="sw-t" id="stime"></span></div>
-    </div>
-    <div class="sw-stats">
-      <span>TOT <strong id="stot" style="color:var(--cyan)">—</strong></span>
-      <span>MAX <strong id="smax">—</strong></span>
-      <span>KP <strong id="skp">—</strong></span>
-    </div>
-  </a>
+  <div class="sw-row">
+    <!-- SISMO FVG -->
+    <a class="sw-box fvg" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">
+      <div class="sw-head"><div class="sdot" id="sdot"></div><span class="hl">SISMO FVG</span> · friuli</div>
+      <div class="sw-last">
+        <div class="mag-b" id="smag" style="color:var(--green)">M—</div>
+        <div class="sw-loc"><span id="sloc">caricamento…</span><span class="sw-t" id="stime"></span></div>
+      </div>
+      <div class="sw-stats">
+        <span>TOT <strong id="stot" style="color:var(--cyan)">—</strong></span>
+        <span>MAX <strong id="smax">—</strong></span>
+        <span>KP <strong id="skp">—</strong></span>
+      </div>
+    </a>
+
+    <!-- CAMPI FLEGREI -->
+    <a class="sw-box cf" href="https://sismo-fvg.gimmy077.workers.dev/#cf" target="_blank">
+      <div class="sw-head"><div class="sdot" id="cdot"></div>🌋 <span class="hl">CAMPI FLEGREI</span></div>
+      <div class="sw-last">
+        <div class="mag-b" id="cmag" style="color:var(--magenta)">M—</div>
+        <div class="sw-loc"><span id="cloc">caricamento…</span><span class="sw-t" id="ctime"></span></div>
+      </div>
+      <div class="sw-stats">
+        <span>TOT <strong id="ctot" style="color:var(--magenta)">—</strong></span>
+        <span>MAX <strong id="cmax">—</strong></span>
+        <span>30G <strong id="cn30">—</strong></span>
+      </div>
+    </a>
+  </div>
 
   <!-- QUOTE -->
   <div class="quote-area" id="quote">"Chi guarda fuori sogna, chi guarda dentro si sveglia."</div>
@@ -2731,16 +2780,23 @@ body::after{
   <!-- INFO -->
   <div class="br">
     <div id="brupd"></div>
+    <div>ECHO <span class="ver">v${ECHO_VERSION}</span></div>
     <a href="/newtab">↺ ricarica</a>
   </div>
 
 </div>
 
 <script>
-// ── CLOCK ──────────────────────────────────
 const GG=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
 const MM=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
 const Z=n=>String(n).padStart(2,'0');
+const QUOTES=[
+  '"Chi guarda fuori sogna, chi guarda dentro si sveglia."',
+  '"La Terra ha la sua musica per chi sa ascoltare."',
+  '"Tra cielo e suolo, ogni vibrazione racconta una storia."',
+  '"Il Sole soffia, la Terra risponde."',
+  '"Misura ciò che è misurabile, e rendi misurabile ciò che non lo è." — Galileo',
+];
 
 function tick(){
   const n=new Date();
@@ -2752,8 +2808,8 @@ function tick(){
   document.getElementById('greet').innerHTML=gr+', <b>Gimmy</b>.';
 }
 setInterval(tick,1000); tick();
+document.getElementById('quote').textContent=QUOTES[Math.floor(Math.random()*QUOTES.length)];
 
-// ── SISMO ───────────────────────────────────
 const API='https://sismo-fvg.gimmy077.workers.dev';
 const MC=m=>m>=3?'#ff1744':m>=2?'#ff6d00':m>=1?'#ffd600':'#69f0ae';
 const KC=k=>k>=7?'#ff1744':k>=5?'#ff6d00':k>=4?'#ffd600':k>=2?'#26c6da':'#69f0ae';
@@ -2765,6 +2821,11 @@ function ago(d){
   if(s<86400)return Math.floor(s/3600)+'h fa';
   return Math.floor(s/86400)+'g fa';
 }
+function setDot(id,m,d){
+  const dot=document.getElementById(id);if(!dot)return;
+  const mins=d?(Date.now()-d)/60000:999;
+  dot.className='sdot'+(m>=3?' alert':(m>=2||mins<60)?' warn':'');
+}
 
 async function loadSismo(){
   try{
@@ -2775,15 +2836,12 @@ async function loadSismo(){
     ]);
     const last=(ev.events||[])[0];
     if(last){
-      const m=parseFloat(last.magnitudine)||0;
-      const d=new Date(last.data_ora);
+      const m=parseFloat(last.magnitudine)||0,d=new Date(last.data_ora);
       document.getElementById('smag').textContent='M'+m.toFixed(1);
       document.getElementById('smag').style.color=MC(m);
       document.getElementById('sloc').textContent=last.localita;
       document.getElementById('stime').textContent=ago(d);
-      const dot=document.getElementById('sdot');
-      const minsAgo=(Date.now()-d)/60000;
-      dot.className='sdot'+(m>=3?' alert':m>=2||minsAgo<60?' warn':'');
+      setDot('sdot',m,d);
     }
     if(st.totale)document.getElementById('stot').textContent=st.totale;
     if(st.max_mag){const mm=parseFloat(st.max_mag);document.getElementById('smax').textContent='M'+mm.toFixed(1);document.getElementById('smax').style.color=MC(mm);}
@@ -2794,8 +2852,30 @@ async function loadSismo(){
     document.getElementById('sdot').className='sdot';
   }
 }
-loadSismo();
-setInterval(loadSismo,5*60*1000);
+
+async function loadCF(){
+  try{
+    const cf=await fetch(API+'/api/cf').then(r=>r.json());
+    if(cf.error){document.getElementById('cloc').textContent='—';document.getElementById('cdot').className='sdot';return;}
+    if(cf.last){
+      const m=parseFloat(cf.last.magnitudine)||0,d=new Date(cf.last.data_ora);
+      document.getElementById('cmag').textContent='M'+m.toFixed(1);
+      document.getElementById('cmag').style.color=MC(m);
+      document.getElementById('cloc').textContent=cf.last.localita||'Campi Flegrei';
+      document.getElementById('ctime').textContent=ago(d);
+      setDot('cdot',m,d);
+    }
+    if(cf.totale)document.getElementById('ctot').textContent=cf.totale;
+    if(cf.max_mag){const mm=parseFloat(cf.max_mag);document.getElementById('cmax').textContent='M'+mm.toFixed(1);document.getElementById('cmax').style.color=MC(mm);}
+    document.getElementById('cn30').textContent=cf.n30!=null?cf.n30:'—';
+  }catch(e){
+    document.getElementById('cloc').textContent='non disponibile';
+    document.getElementById('cdot').className='sdot';
+  }
+}
+
+loadSismo(); loadCF();
+setInterval(function(){loadSismo();loadCF();},5*60*1000);
 </script>
 </body>
 </html>`;
@@ -2889,6 +2969,21 @@ export default {
     if (url.pathname === "/api/stats") {
       const { results } = await db.prepare("SELECT COUNT(*) as totale, MAX(magnitudine) as max_mag, AVG(magnitudine) as avg_mag, MIN(data_ora) as primo FROM terremoti").all();
       return new Response(JSON.stringify(results[0]),{headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*"}});
+    }
+
+    if (url.pathname === "/api/cf") {
+      if (!env.DB_CF) return new Response(JSON.stringify({error:"DB_CF non disponibile"}),{status:503,headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*"}});
+      const [last, st, n30] = await Promise.all([
+        env.DB_CF.prepare("SELECT * FROM terremoti ORDER BY data_ora DESC LIMIT 1").all(),
+        env.DB_CF.prepare("SELECT COUNT(*) as totale, MAX(magnitudine) as max_mag FROM terremoti").all(),
+        env.DB_CF.prepare("SELECT COUNT(*) as n FROM terremoti WHERE data_ora >= datetime('now','-30 days')").all(),
+      ]);
+      return new Response(JSON.stringify({
+        last:   last.results[0]   || null,
+        totale: st.results[0]?.totale  || 0,
+        max_mag:st.results[0]?.max_mag || null,
+        n30:    n30.results[0]?.n || 0,
+      }),{headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Cache-Control":"max-age=60"}});
     }
 
     if (url.pathname === "/api/f4strategy") {
