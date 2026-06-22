@@ -2704,9 +2704,67 @@ body::after{
 .br a{color:var(--cyan);opacity:.55;text-decoration:none;font-size:.9em;}
 .br a:hover{opacity:1;}
 .br .ver{color:var(--magenta);opacity:.7;}
+
+/* ── v0.3000 INSIDER LAYER ── */
+.insider-tag{
+  position:fixed;left:16px;bottom:14px;z-index:20;
+  font-family:'Share Tech Mono',monospace;font-size:.62em;letter-spacing:.04em;
+  color:#3a4d5c;display:flex;align-items:center;gap:7px;user-select:none;
+}
+.insider-tag .idot{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);animation:idotpulse 2.4s ease-in-out infinite;}
+@keyframes idotpulse{0%,100%{opacity:.45}50%{opacity:1}}
+.insider-tag b{color:#566773;}
+
+.lucewatch-tag{
+  position:fixed;top:16px;right:18px;z-index:20;
+  font-family:'Share Tech Mono',monospace;font-size:.62em;letter-spacing:.04em;
+  color:#3a4d5c;text-align:right;line-height:1.6;user-select:none;
+}
+.lucewatch-tag .lw-time{color:var(--orange);font-weight:600;}
+
+#bootOverlay{
+  position:fixed;inset:0;z-index:999;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .6s ease,visibility .6s ease;
+}
+#bootOverlay.hide{opacity:0;visibility:hidden;pointer-events:none;}
+.boot-box{font-family:'Share Tech Mono',monospace;color:var(--cyan);font-size:.8em;line-height:1.7;width:min(540px,86vw);}
+.boot-line{opacity:0;color:var(--muted);white-space:pre;}
+.boot-line .ok{color:var(--green);}
+.boot-line .tag{color:var(--cyan);}
+.boot-line .warn{color:var(--yellow);}
+.boot-bar-track{height:2px;background:rgba(255,255,255,.06);margin-top:16px;border-radius:2px;overflow:hidden;}
+.boot-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--green));}
+
+/* pulsazione magnitudo-reattiva: sostituisce il pallino statico con velocità variabile */
+.sdot{animation-duration:var(--pulse-speed,2.4s)!important;}
+
+/* sparkline sismografo */
+.sw-spark{margin-top:8px;height:20px;width:100%;}
+.sw-spark svg{display:block;width:100%;height:100%;overflow:visible;}
+.sw-spark path{fill:none;stroke-width:1.2;opacity:.6;}
+.sw-spark circle{r:2;}
+
+/* onda d'urto */
+.shock-ring{
+  position:absolute;left:18px;top:18px;width:10px;height:10px;border-radius:50%;
+  transform:translate(-50%,-50%);opacity:0;pointer-events:none;border:1px solid currentColor;
+}
+.shock-ring.fire{animation:shockExpand 1s cubic-bezier(.2,.7,.3,1) forwards;}
+@keyframes shockExpand{0%{width:10px;height:10px;opacity:.85}100%{width:220px;height:220px;opacity:0}}
+.sw-box{position:relative;overflow:hidden;}
 </style>
 </head>
 <body>
+
+<!-- v0.3000 BOOT SEQUENCE -->
+<div id="bootOverlay">
+  <div class="boot-box" id="bootLines"></div>
+</div>
+
+<!-- v0.3000 WATERMARK -->
+<div class="insider-tag"><span class="idot"></span>PREVIEW_INSIDER_2026.22 <b>v0.3000</b> · ring: FUTURE</div>
+<div class="lucewatch-tag">LUCE-WATCH · prossimo check<br><span class="lw-time" id="lwTime">—</span></div>
 
 <!-- TOP LINKS -->
 <div class="topbar">
@@ -2747,11 +2805,13 @@ body::after{
   <div class="sw-row">
     <!-- SISMO FVG -->
     <a class="sw-box fvg" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">
+      <div class="shock-ring" id="shockFVG" style="color:var(--green)"></div>
       <div class="sw-head"><div class="sdot" id="sdot"></div><span class="hl">SISMO FVG</span> · friuli</div>
       <div class="sw-last">
         <div class="mag-b" id="smag" style="color:var(--green)">M—</div>
         <div class="sw-loc"><span id="sloc">caricamento…</span><span class="sw-t" id="stime"></span></div>
       </div>
+      <div class="sw-spark" id="sparkFVG"></div>
       <div class="sw-stats">
         <span>TOT <strong id="stot" style="color:var(--cyan)">—</strong></span>
         <span>MAX <strong id="smax">—</strong></span>
@@ -2761,11 +2821,13 @@ body::after{
 
     <!-- CAMPI FLEGREI -->
     <a class="sw-box cf" href="https://sismo-fvg.gimmy077.workers.dev/#cf" target="_blank">
+      <div class="shock-ring" id="shockCF" style="color:var(--magenta)"></div>
       <div class="sw-head"><div class="sdot" id="cdot"></div>🌋 <span class="hl">CAMPI FLEGREI</span></div>
       <div class="sw-last">
         <div class="mag-b" id="cmag" style="color:var(--magenta)">M—</div>
         <div class="sw-loc"><span id="cloc">caricamento…</span><span class="sw-t" id="ctime"></span></div>
       </div>
+      <div class="sw-spark" id="sparkCF"></div>
       <div class="sw-stats">
         <span>TOT <strong id="ctot" style="color:var(--magenta)">—</strong></span>
         <span>MAX <strong id="cmax">—</strong></span>
@@ -2814,6 +2876,83 @@ const API='https://sismo-fvg.gimmy077.workers.dev';
 const MC=m=>m>=3?'#ff1744':m>=2?'#ff6d00':m>=1?'#ffd600':'#69f0ae';
 const KC=k=>k>=7?'#ff1744':k>=5?'#ff6d00':k>=4?'#ffd600':k>=2?'#26c6da':'#69f0ae';
 
+/* ── v0.3000 INSIDER LAYER — funzioni vive ── */
+const sparkHistory={fvg:[],cf:[]};
+const lastMag={fvg:null,cf:null};
+
+function pulseSpeedFor(m){
+  const c=Math.max(0,Math.min(m,6));
+  return Math.max(0.6,2.6-(c/6)*2).toFixed(2)+'s';
+}
+function renderSpark(hostId,hist,color){
+  const host=document.getElementById(hostId);if(!host||hist.length<2)return;
+  const w=100,h=20,pad=2,max=Math.max(...hist,1);
+  const step=(w-pad*2)/(hist.length-1);
+  let d='',lx=0,ly=0;
+  hist.forEach((v,i)=>{
+    const x=pad+i*step,y=h-pad-(v/max)*(h-pad*2);
+    d+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)+' ';
+    lx=x;ly=y;
+  });
+  host.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><path d="'+d+'" stroke="'+color+'"></path><circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" fill="'+color+'"></circle></svg>';
+}
+function fireShock(id,color){
+  const ring=document.getElementById(id);if(!ring)return;
+  ring.style.color=color;
+  ring.classList.remove('fire');
+  void ring.offsetWidth;
+  ring.classList.add('fire');
+}
+function applyKpAtmosphere(k){
+  const unrest=Math.max(0,Math.min((k-2)/6,1));
+  document.body.style.setProperty('--kp-unrest',unrest.toFixed(2));
+  const quoteEl=document.getElementById('quote');
+  if(quoteEl)quoteEl.style.color=unrest>0.6?'rgba(255,109,0,.55)':'';
+}
+
+/* LUCE-WATCH countdown — target 24 giugno 2026, 09:00 */
+function updateLuceWatch(){
+  const target=new Date('2026-06-24T09:00:00');
+  const el=document.getElementById('lwTime');if(!el)return;
+  let diff=target-new Date();
+  if(diff<=0){el.textContent='verifica disponibile ora';return;}
+  const h=Math.floor(diff/3600000);diff-=h*3600000;
+  const m=Math.floor(diff/60000);
+  el.textContent='in '+h+'h '+String(m).padStart(2,'0')+'m';
+}
+updateLuceWatch();setInterval(updateLuceWatch,30000);
+
+/* BOOT SEQUENCE */
+(function bootSequence(){
+  const lines=[
+    'GIMMYCLOUD // ECHO BOOTSTRAP',
+    'loading kernel modules ............... <span class="ok">OK</span>',
+    'mounting D1::terremoti-fvg ........... <span class="ok">OK</span>',
+    'mounting D1::terremoti-cf ............ <span class="ok">OK</span>',
+    'sync INGV feed (FVG + CF) ............ <span class="ok">OK</span>',
+    'sync NOAA Kp index ................... <span class="ok">OK</span>',
+    'seismic correlation v3.2 ............. <span class="warn">WARM-UP</span>',
+    'rendering interface ring: <span class="tag">FUTURE</span> ......'
+  ];
+  const box=document.getElementById('bootLines');if(!box)return;
+  let html='';
+  lines.forEach(l=>{html+='<div class="boot-line">'+l+'</div>';});
+  html+='<div class="boot-bar-track"><div class="boot-bar-fill" id="bootBar"></div></div>';
+  box.innerHTML=html;
+  const els=box.querySelectorAll('.boot-line');
+  els.forEach((el,i)=>{setTimeout(()=>{el.style.transition='opacity .15s';el.style.opacity=1;},80*i);});
+  setTimeout(()=>{
+    const bar=document.getElementById('bootBar');
+    if(bar){bar.style.transition='width 1s ease';bar.style.width='100%';}
+  },80*lines.length+60);
+  setTimeout(()=>{
+    const ov=document.getElementById('bootOverlay');
+    if(ov)ov.classList.add('hide');
+  },80*lines.length+1300);
+  document.getElementById('bootOverlay').addEventListener('click',function(){this.classList.add('hide');});
+})();
+
+
 function ago(d){
   const s=Math.floor((Date.now()-d)/1000);
   if(s<60)return s+'s fa';
@@ -2825,6 +2964,7 @@ function setDot(id,m,d){
   const dot=document.getElementById(id);if(!dot)return;
   const mins=d?(Date.now()-d)/60000:999;
   dot.className='sdot'+(m>=3?' alert':(m>=2||mins<60)?' warn':'');
+  dot.style.setProperty('--pulse-speed',pulseSpeedFor(m||0));
 }
 
 async function loadSismo(){
@@ -2842,10 +2982,20 @@ async function loadSismo(){
       document.getElementById('sloc').textContent=last.localita;
       document.getElementById('stime').textContent=ago(d);
       setDot('sdot',m,d);
+      if(lastMag.fvg!==null && m!==lastMag.fvg) fireShock('shockFVG',MC(m));
+      lastMag.fvg=m;
+    }
+    if(ev.events && ev.events.length>1){
+      sparkHistory.fvg=ev.events.slice(0,12).reverse().map(e=>parseFloat(e.magnitudine)||0);
+      renderSpark('sparkFVG',sparkHistory.fvg,'var(--green)');
     }
     if(st.totale)document.getElementById('stot').textContent=st.totale;
     if(st.max_mag){const mm=parseFloat(st.max_mag);document.getElementById('smax').textContent='M'+mm.toFixed(1);document.getElementById('smax').style.color=MC(mm);}
-    if(sol&&sol[0]){const k=parseFloat(sol[0].kp_max)||0;const ke=document.getElementById('skp');ke.textContent=k.toFixed(1);ke.style.color=KC(k);}
+    if(sol&&sol[0]){
+      const k=parseFloat(sol[0].kp_max)||0;
+      const ke=document.getElementById('skp');ke.textContent=k.toFixed(1);ke.style.color=KC(k);
+      applyKpAtmosphere(k);
+    }
     document.getElementById('brupd').textContent='aggiornato '+ago(Date.now()-100);
   }catch(e){
     document.getElementById('sloc').textContent='non disponibile';
@@ -2864,6 +3014,11 @@ async function loadCF(){
       document.getElementById('cloc').textContent=cf.last.localita||'Campi Flegrei';
       document.getElementById('ctime').textContent=ago(d);
       setDot('cdot',m,d);
+      if(lastMag.cf!==null && m!==lastMag.cf) fireShock('shockCF',MC(m));
+      lastMag.cf=m;
+      sparkHistory.cf.push(m);
+      if(sparkHistory.cf.length>12) sparkHistory.cf.shift();
+      renderSpark('sparkCF',sparkHistory.cf,'var(--magenta)');
     }
     if(cf.totale)document.getElementById('ctot').textContent=cf.totale;
     if(cf.max_mag){const mm=parseFloat(cf.max_mag);document.getElementById('cmax').textContent='M'+mm.toFixed(1);document.getElementById('cmax').style.color=MC(mm);}
@@ -2880,6 +3035,7 @@ setInterval(function(){loadSismo();loadCF();},5*60*1000);
 </body>
 </html>`;
 }
+
 
 // ============================================================
 // HANDLER PRINCIPALE
