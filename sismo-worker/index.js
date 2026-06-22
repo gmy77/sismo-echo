@@ -2739,6 +2739,16 @@ body::after{
 /* pulsazione magnitudo-reattiva: sostituisce il pallino statico con velocità variabile */
 .sdot{animation-duration:var(--pulse-speed,2.4s)!important;}
 
+/* sweep verticale — respiro di fondo, si intensifica col Kp */
+#kpSweep{
+  position:fixed;left:0;right:0;height:160px;top:-200px;
+  background:linear-gradient(180deg,transparent,rgba(38,198,218,.05),transparent);
+  pointer-events:none;z-index:1;
+  animation:kpSweepMove 10s linear infinite;
+  opacity:.5;
+}
+@keyframes kpSweepMove{0%{transform:translateY(0)}100%{transform:translateY(calc(100vh + 360px))}}
+
 /* sparkline sismografo */
 .sw-spark{margin-top:8px;height:20px;width:100%;}
 .sw-spark svg{display:block;width:100%;height:100%;overflow:visible;}
@@ -2756,6 +2766,9 @@ body::after{
 </style>
 </head>
 <body>
+
+<!-- v0.3000 KP SWEEP -->
+<div id="kpSweep"></div>
 
 <!-- v0.3000 BOOT SEQUENCE -->
 <div id="bootOverlay">
@@ -2908,6 +2921,16 @@ function applyKpAtmosphere(k){
   document.body.style.setProperty('--kp-unrest',unrest.toFixed(2));
   const quoteEl=document.getElementById('quote');
   if(quoteEl)quoteEl.style.color=unrest>0.6?'rgba(255,109,0,.55)':'';
+  const sweep=document.getElementById('kpSweep');
+  if(sweep){
+    const duration=(10-unrest*7).toFixed(1)+'s'; // calmo 10s -> agitato 3s
+    const opacity=(0.5+unrest*0.45).toFixed(2);   // calmo .5 -> agitato .95
+    sweep.style.animationDuration=duration;
+    sweep.style.opacity=opacity;
+    sweep.style.background=unrest>0.5
+      ? 'linear-gradient(180deg,transparent,rgba(255,109,0,.09),transparent)'
+      : 'linear-gradient(180deg,transparent,rgba(38,198,218,.05),transparent)';
+  }
 }
 
 /* LUCE-WATCH countdown — target 24 giugno 2026, 09:00 */
@@ -3029,6 +3052,7 @@ async function loadCF(){
   }
 }
 
+applyKpAtmosphere(1); // valore neutro iniziale, in attesa del primo fetch reale
 loadSismo(); loadCF();
 setInterval(function(){loadSismo();loadCF();},5*60*1000);
 </script>
