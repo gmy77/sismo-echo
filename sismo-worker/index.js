@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.3";
+const ECHO_VERSION = "3.4";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -550,12 +550,6 @@ tbody tr:hover{background:rgba(38,198,218,.05)}
   width:42px;height:42px;border-radius:13px;font-size:1.25em;text-decoration:none;cursor:pointer;
   transition:transform .3s var(--ease-out),background .3s var(--ease)}
 .dock-item:hover{transform:translateY(-7px) scale(1.22);background:rgba(255,255,255,.08)}
-.dock-item::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);
-  background:rgba(8,14,20,.95);border:1px solid rgba(38,198,218,.3);color:#9fe8f0;
-  font-family:'Share Tech Mono',monospace;font-size:.5em;letter-spacing:.08em;
-  padding:4px 10px;border-radius:7px;white-space:nowrap;opacity:0;pointer-events:none;
-  transition:opacity .25s var(--ease),transform .25s var(--ease-out)}
-.dock-item:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
 .dock-sep{width:1px;height:26px;background:rgba(255,255,255,.1);margin:0 5px}
 @media(max-width:640px){#dock{gap:1px;padding:6px 8px}.dock-item{width:37px;height:37px;font-size:1.05em}}
 body{padding-bottom:84px}
@@ -564,6 +558,22 @@ body{padding-bottom:84px}
 #scrollbar-top{position:fixed;top:0;left:0;height:2px;width:0%;z-index:60;
   background:linear-gradient(90deg,#26c6da,#ff6d00,#e040fb);
   box-shadow:0 0 12px rgba(38,198,218,.6)}
+
+/* ══ tooltip glass globale (elementi con data-tt) ══ */
+#echo-tt{position:fixed;z-index:80;max-width:265px;padding:10px 14px;border-radius:10px;
+  background:rgba(8,16,24,.96);border:1px solid rgba(38,198,218,.35);
+  backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);
+  box-shadow:0 14px 38px -12px rgba(0,0,0,.85),0 0 22px -10px rgba(38,198,218,.5);
+  font-size:.72em;line-height:1.65;color:#b8d8de;pointer-events:none;
+  opacity:0;transform:translateY(6px);transition:opacity .22s var(--ease),transform .22s var(--ease-out)}
+#echo-tt.on{opacity:1;transform:translateY(0)}
+#echo-tt .tt-title{display:block;font-family:'Share Tech Mono',monospace;font-size:.82em;
+  letter-spacing:.1em;color:#26c6da;margin-bottom:5px;text-transform:uppercase}
+#echo-tt .tt-new{display:inline-block;background:rgba(105,240,174,.12);border:1px solid rgba(105,240,174,.35);
+  color:#69f0ae;border-radius:12px;padding:0 8px;font-family:'Share Tech Mono',monospace;font-size:.72em;
+  letter-spacing:.06em;margin-left:6px;vertical-align:middle}
+#echo-tt::after{content:'';position:absolute;top:100%;left:var(--arrow-x,50%);transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:rgba(38,198,218,.35)}
 </style>
 </head>
 <body>
@@ -582,7 +592,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div class="update-info">
     <div><span class="live-dot"></span>LIVE — INGV + NOAA SWPC</div>
     <div>${now}</div>
-    <a href="#" onclick="var t=prompt('Token aggiornamento:');if(t)location.href='/update?token='+encodeURIComponent(t);return false;" class="btn">↻ Aggiorna ora</a>
+    <a href="#" onclick="var t=prompt('Token aggiornamento:');if(t)location.href='/update?token='+encodeURIComponent(t);return false;" class="btn"
+       data-tt-title="Aggiornamento manuale"
+       data-tt="Forza il download immediato dei dati INGV e NOAA (richiede il token di amministrazione). In condizioni normali non serve: i dati si aggiornano da soli 4 volte al giorno via cron.">↻ Aggiorna ora</a>
   </div>
 </header>
 
@@ -786,7 +798,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div class="panel-body">
     <div class="suite-grid">
 
-      <a href="/chat" class="app-card" style="--app:#26c6da">
+      <a href="/chat" class="app-card" style="--app:#26c6da"
+         data-tt-title="Echo Chat" data-tt-badge="MODELLO NUOVO"
+         data-tt="Assistente conversazionale su LLaMA 3.3 70B di Meta — subentrato a LLaMA 3 8B, deprecato da Cloudflare a maggio 2026. Quasi 9× più grande del precedente: risposte più accurate, contesto più ampio, italiano nativo.">
         <div class="app-glow"></div>
         <div class="app-icon">🧠</div>
         <div class="app-name">Echo Chat</div>
@@ -795,7 +809,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
-      <a href="/code" class="app-card" style="--app:#66bb6a">
+      <a href="/code" class="app-card" style="--app:#66bb6a"
+         data-tt-title="Echo Code" data-tt-badge="MODELLO NUOVO"
+         data-tt="Assistente di programmazione su GLM 4.7 Flash (Zhipu AI) — il sostituto raccomandato da Cloudflare per il coding dopo il ritiro di Code Llama. Contesto da 131.000 token: debug, spiegazioni, ottimizzazione e generazione di codice.">
         <div class="app-glow"></div>
         <div class="app-icon">⌨️</div>
         <div class="app-name">Echo Code</div>
@@ -804,7 +820,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
-      <a href="/traduttore" class="app-card" style="--app:#ffd600">
+      <a href="/traduttore" class="app-card" style="--app:#ffd600"
+         data-tt-title="Echo Translate"
+         data-tt="Traduttore neurale istantaneo EN ↔ IT su modello m2m100 di Meta. Traduzione diretta tra le due lingue, senza inglese come ponte — ideale per testi tecnici e frasi lunghe.">
         <div class="app-glow"></div>
         <div class="app-icon">🌍</div>
         <div class="app-name">Echo Translate</div>
@@ -813,7 +831,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
-      <a href="/pixeldrain" class="app-card" style="--app:#ab47bc">
+      <a href="/pixeldrain" class="app-card" style="--app:#ab47bc"
+         data-tt-title="Echo Storage"
+         data-tt="File manager privato collegato a PixelDrain via API: elenco, anteprima e link di condivisione dei tuoi file cloud. Accesso riservato con token lato server.">
         <div class="app-glow"></div>
         <div class="app-icon">📁</div>
         <div class="app-name">Echo Storage</div>
@@ -822,7 +842,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
-      <a href="/forza4" class="app-card" style="--app:#ff6d00">
+      <a href="/forza4" class="app-card" style="--app:#ff6d00"
+         data-tt-title="Forza 4"
+         data-tt="Il classico gioco a gettoni, 2 giocatori sullo stesso schermo. Canvas nativo con animazioni fluide e sistema di apprendimento dell'IA basato su Cloudflare KV.">
         <div class="app-glow"></div>
         <div class="app-icon">🔴🟡</div>
         <div class="app-name">Forza 4</div>
@@ -831,7 +853,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-go">GIOCA <span>→</span></div>
       </a>
 
-      <a href="/othello" class="app-card" style="--app:#69f0ae">
+      <a href="/othello" class="app-card" style="--app:#69f0ae"
+         data-tt-title="Othello"
+         data-tt="Reversi contro un'IA adattiva: motore minimax i cui pesi evolvono partita dopo partita grazie al learning persistente su KV. Più giochi, più diventa forte.">
         <div class="app-glow"></div>
         <div class="app-icon">⚫⚪</div>
         <div class="app-name">Othello</div>
@@ -857,22 +881,68 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 
 <!-- DOCK 2026 -->
 <nav id="dock" aria-label="Navigazione rapida">
-  <a class="dock-item" href="#top" data-tip="MONITOR" onclick="window.scrollTo({top:0,behavior:'smooth'});return false">🌍</a>
-  <a class="dock-item" href="#cf" data-tip="CAMPI FLEGREI">🌋</a>
-  <a class="dock-item" href="#eventi" data-tip="EVENTI FVG">⚡</a>
-  <a class="dock-item" href="#suite" data-tip="ECHO SUITE">🚀</a>
+  <a class="dock-item" href="#top" onclick="window.scrollTo({top:0,behavior:'smooth'});return false"
+     data-tt-title="Monitor" data-tt="Torna in cima: statistiche FVG e timeline di correlazione sismo-solare.">🌍</a>
+  <a class="dock-item" href="#cf"
+     data-tt-title="Campi Flegrei" data-tt="Sezione area napoletana: Campi Flegrei, Vesuvio e Ischia — ogni micro-sisma da M0.0.">🌋</a>
+  <a class="dock-item" href="#eventi"
+     data-tt-title="Eventi FVG" data-tt="Tabella degli ultimi 50 terremoti registrati in Friuli e prealpi orientali (M ≥ 0.5).">⚡</a>
+  <a class="dock-item" href="#suite"
+     data-tt-title="Echo Suite" data-tt="Il launcher delle 6 app integrate: IA, giochi e strumenti, tutti sullo stesso worker.">🚀</a>
   <div class="dock-sep"></div>
-  <a class="dock-item" href="/chat" data-tip="ECHO CHAT">🧠</a>
-  <a class="dock-item" href="/code" data-tip="ECHO CODE">⌨️</a>
-  <a class="dock-item" href="/traduttore" data-tip="TRANSLATE">🌐</a>
-  <a class="dock-item" href="/pixeldrain" data-tip="STORAGE">📁</a>
+  <a class="dock-item" href="/chat"
+     data-tt-title="Echo Chat" data-tt="Assistente IA conversazionale — LLaMA 3.3 70B, il nuovo modello post-deprecazione.">🧠</a>
+  <a class="dock-item" href="/code"
+     data-tt-title="Echo Code" data-tt="Assistente di programmazione — GLM 4.7 Flash, 131k token di contesto.">⌨️</a>
+  <a class="dock-item" href="/traduttore"
+     data-tt-title="Echo Translate" data-tt="Traduzione neurale istantanea EN ↔ IT.">🌐</a>
+  <a class="dock-item" href="/pixeldrain"
+     data-tt-title="Echo Storage" data-tt="File manager privato su PixelDrain, accesso riservato.">📁</a>
   <div class="dock-sep"></div>
-  <a class="dock-item" href="/forza4" data-tip="FORZA 4">🔴</a>
-  <a class="dock-item" href="/othello" data-tip="OTHELLO">⚫</a>
+  <a class="dock-item" href="/forza4"
+     data-tt-title="Forza 4" data-tt="Il classico gioco a gettoni, 2 giocatori sullo stesso schermo.">🔴</a>
+  <a class="dock-item" href="/othello"
+     data-tt-title="Othello" data-tt="Reversi contro un'IA che impara partita dopo partita.">⚫</a>
 </nav>
 
 <script>
 (function(){
+  /* ── tooltip glass globale (data-tt) ── */
+  var tt=document.createElement('div');
+  tt.id='echo-tt';
+  document.body.appendChild(tt);
+
+  function showTT(el){
+    var title=el.getAttribute('data-tt-title')||'';
+    var body=el.getAttribute('data-tt')||'';
+    var badge=el.getAttribute('data-tt-badge')||'';
+    if(!body&&!title)return;
+    tt.innerHTML=(title?'<span class="tt-title">'+title+(badge?'<span class="tt-new">✦ '+badge+'</span>':'')+'</span>':'')+body;
+    tt.classList.add('on');
+    var r=el.getBoundingClientRect();
+    /* misura dopo il render */
+    var tw=tt.offsetWidth,th=tt.offsetHeight;
+    var x=r.left+r.width/2-tw/2;
+    x=Math.max(10,Math.min(x,window.innerWidth-tw-10));
+    var y=r.top-th-12;
+    if(y<8){y=r.bottom+12}   /* se non c'è spazio sopra, vai sotto */
+    tt.style.left=x+'px';
+    tt.style.top=y+'px';
+    /* freccetta centrata sull'elemento */
+    var ax=r.left+r.width/2-x;
+    tt.style.setProperty('--arrow-x',Math.max(14,Math.min(ax,tw-14))+'px');
+  }
+  function hideTT(){tt.classList.remove('on')}
+
+  document.addEventListener('mouseover',function(e){
+    var el=e.target.closest('[data-tt]');
+    if(el){showTT(el)}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(e.target.closest('[data-tt]'))hideTT();
+  });
+  window.addEventListener('scroll',hideTT,{passive:true});
+
   /* ── dock: nascondi scendendo, mostra salendo ── */
   var dock=document.getElementById('dock'),lastY=0;
   window.addEventListener('scroll',function(){
