@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.4";
+const ECHO_VERSION = "3.5";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -1611,7 +1611,7 @@ function renderChat() {
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
 .topbar{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(38,198,218,.15);flex-shrink:0}
 .back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
@@ -1621,7 +1621,11 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-
 .title sub{font-size:.68em;color:#546e7a;font-family:'Share Tech Mono',monospace}
 .ai-badge{display:inline-block;background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.25);border-radius:20px;padding:2px 10px;font-family:'Share Tech Mono',monospace;font-size:.65em;color:#26c6da;vertical-align:middle}
 /* chat */
-#chat-wrap{position:relative;z-index:1;flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+#chat-wrap{position:relative;z-index:1;flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:rgba(38,198,218,.35) transparent}
+#chat-wrap::-webkit-scrollbar{width:9px}
+#chat-wrap::-webkit-scrollbar-track{background:transparent}
+#chat-wrap::-webkit-scrollbar-thumb{background:rgba(38,198,218,.3);border-radius:5px;border:2px solid #080e14}
+#chat-wrap::-webkit-scrollbar-thumb:hover{background:rgba(38,198,218,.55)}
 .msg{max-width:75%;padding:12px 16px;border-radius:12px;font-size:.9em;line-height:1.55;word-break:break-word}
 .msg.user{align-self:flex-end;background:rgba(38,198,218,.15);border:1px solid rgba(38,198,218,.3);color:#eceff1;border-bottom-right-radius:3px}
 .msg.ai{align-self:flex-start;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cfd8dc;border-bottom-left-radius:3px}
@@ -1751,7 +1755,7 @@ function renderCode() {
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
 .topbar{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(38,198,218,.15);flex-shrink:0}
 .back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
@@ -1763,7 +1767,11 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-
 /* layout */
 #main{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;overflow:hidden}
 /* chat */
-#chat-wrap{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+#chat-wrap{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:rgba(102,187,106,.35) transparent}
+#chat-wrap::-webkit-scrollbar{width:9px}
+#chat-wrap::-webkit-scrollbar-track{background:transparent}
+#chat-wrap::-webkit-scrollbar-thumb{background:rgba(102,187,106,.3);border-radius:5px;border:2px solid #080e14}
+#chat-wrap::-webkit-scrollbar-thumb:hover{background:rgba(102,187,106,.55)}
 .msg{max-width:80%;padding:12px 16px;border-radius:12px;font-size:.88em;line-height:1.6;word-break:break-word}
 .msg.user{align-self:flex-end;background:rgba(102,187,106,.12);border:1px solid rgba(102,187,106,.3);color:#eceff1;border-bottom-right-radius:3px}
 .msg.ai{align-self:flex-start;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cfd8dc;border-bottom-left-radius:3px;max-width:90%}
