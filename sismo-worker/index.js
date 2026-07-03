@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.2";
+const ECHO_VERSION = "3.3";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -791,7 +791,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-icon">🧠</div>
         <div class="app-name">Echo Chat</div>
         <div class="app-desc">assistente IA personale</div>
-        <div class="app-tag">LLaMA 3</div>
+        <div class="app-tag">LLaMA 3.3 70B</div>
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
@@ -800,7 +800,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-icon">⌨️</div>
         <div class="app-name">Echo Code</div>
         <div class="app-desc">debug · spiega · genera</div>
-        <div class="app-tag">Code Llama</div>
+        <div class="app-tag">GLM 4.7 Flash</div>
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
@@ -1576,7 +1576,7 @@ footer a{color:#26c6da;text-decoration:none}
 <div class="topbar">
   <a href="/" class="back">&#8592; ECHO Monitor</a>
   <div class="title">
-    <h1>ECHO Chat <span class="ai-badge">LLaMA 3</span></h1>
+    <h1>ECHO Chat <span class="ai-badge">LLaMA 3.3 70B</span></h1>
     <sub>Chatbot IA // powered by Cloudflare AI</sub>
   </div>
   <div style="width:110px;display:flex;justify-content:flex-end">
@@ -1726,7 +1726,7 @@ footer a{color:#66bb6a;text-decoration:none}
 <div class="topbar">
   <a href="/" class="back">&#8592; ECHO Monitor</a>
   <div class="title">
-    <h1>ECHO Code <span class="ai-badge">Code Llama</span></h1>
+    <h1>ECHO Code <span class="ai-badge">GLM 4.7 Flash</span></h1>
     <sub>Assistente codice IA // powered by Cloudflare AI</sub>
   </div>
   <div style="width:110px;display:flex;justify-content:flex-end">
@@ -3203,13 +3203,14 @@ export default {
       try {
         const { messages } = await request.json();
         if (!messages || !messages.length) return new Response(JSON.stringify({error:"Messaggio mancante"}), {status:400, headers:{"Content-Type":"application/json"}});
-        const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+        const result = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
           messages: [
             { role:"system", content:"Sei ECHO AI, un assistente personale intelligente e amichevole. Rispondi in italiano a meno che non ti venga chiesto altro. Sii conciso ma completo." },
             ...messages
           ]
         });
-        return new Response(JSON.stringify({reply: result.response}), {headers:{"Content-Type":"application/json"}});
+        // formato classico {response} oppure OpenAI-style {choices[0].message.content}
+        return new Response(JSON.stringify({reply: result.response ?? result.choices?.[0]?.message?.content ?? ""}), {headers:{"Content-Type":"application/json"}});
       } catch(e) {
         return new Response(JSON.stringify({error: e.message}), {status:500, headers:{"Content-Type":"application/json"}});
       }
@@ -3223,13 +3224,14 @@ export default {
       try {
         const { messages } = await request.json();
         if (!messages || !messages.length) return new Response(JSON.stringify({error:"Messaggio mancante"}), {status:400, headers:{"Content-Type":"application/json"}});
-        const result = await env.AI.run("@cf/meta/llama-3-8b-instruct-awq", {
+        const result = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
           messages: [
             { role:"system", content:"Sei ECHO Code, un esperto assistente di programmazione. Aiuta con debug, spiegazioni di codice, ottimizzazioni e generazione di codice. Usa blocchi ```codice``` per il codice. Rispondi in italiano a meno che non ti venga chiesto altro." },
             ...messages
           ]
         });
-        return new Response(JSON.stringify({reply: result.response}), {headers:{"Content-Type":"application/json"}});
+        // GLM risponde in formato OpenAI: choices[0].message.content
+        return new Response(JSON.stringify({reply: result.response ?? result.choices?.[0]?.message?.content ?? ""}), {headers:{"Content-Type":"application/json"}});
       } catch(e) {
         return new Response(JSON.stringify({error: e.message}), {status:500, headers:{"Content-Type":"application/json"}});
       }
