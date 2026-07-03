@@ -1,2 +1,197 @@
+# .gitignore per Progetti Python + Windows
+# Generato per C:\Users\gimmy
+
+# ===== Python =====
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ===== IDEs =====
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ===== OS Files =====
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.directory
+
+# ===== Output Files =====
+# CSV/JSON outputs (se necessario, rimuovi queste righe)
+# *.csv
+# *.json
+
+# Log files
+*.log
+*.log.*
+
+# ===== Dati Specifici Progetto =====
+# Output simulazioni (se vuoi tracciare i dati, commenta queste righe)
+# collisione_stellare.csv
+# danza_gravitazionale.csv
+
+# RTL-433 data files (se vuoi tracciare, commenta)
+rtl_433_log.csv
+rtl_433_data.json
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# ===== Secrets & Credentials =====
+.env
+.env.local
+.env.*.local
+secrets.json
+credentials.json
+*.key
+*.pem
+
+# ===== Claude Code =====
+# Claude config (già tracciati globalmente)
+# .claude/
+# .claude.json
+
+# ===== Directories Temporanee =====
+temp/
+tmp/
+cache/
+
+# ===== Compilati C/C++ =====
+*.obj
+*.o
+*.a
+*.lib
+*.dll
+*.exe
+*.out
+
+# ===== Altro =====
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Large data files (se necessario)
+*.dat
+*.bin
+
+# ===== Nuova Struttura Directory =====
+# Node modules (se presenti)
+node_modules/
+
+# Output directory
+Projects/Archived/output/
+
+# Windows system files (nella home directory)
+NTUSER.DAT*
+ntuser.dat*
+ntuser.ini
+
+# ===== Sismo Worker =====
 sismo-worker/node_modules/
 sismo-worker/.wrangler/
