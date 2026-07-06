@@ -2,7 +2,7 @@
 
 **Progetto ECHO** · *Earth Correlation Hypothesis Observatory*
 Monitor sismico in tempo reale con correlazione solare — Cloudflare Worker + D1
-Gimmy Pignolu © 2026 — [gimmycloud.com](https://gimmycloud.com)
+Gimmy Pignolu © 2026 — [gimmycloud.net](https://gimmycloud.net)
 
 🔗 **Live:** [https://sismo-fvg.gimmy077.workers.dev](https://sismo-fvg.gimmy077.workers.dev/?updated=0)
 

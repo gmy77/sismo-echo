@@ -1,11 +1,11 @@
 // ============================================================
 // SISMO FVG — Cloudflare Worker
 // Monitor Sismico FVG + Correlazione Solare NOAA
-// Gimmy Pignolo © 2026 — gimmycloud.com
+// Gimmy Pignolo © 2026 — gimmycloud.net
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.5";
+const ECHO_VERSION = "3.6";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -25,7 +25,7 @@ async function fetchINGVArea(area, giorni = 2, minMag = 0.5) {
   const url   = `${INGV_URL}?format=geojson&starttime=${fmt(start)}&endtime=${fmt(end)}&minmagnitude=${minMag}`
               + `&minlatitude=${area.lat_min}&maxlatitude=${area.lat_max}`
               + `&minlongitude=${area.lon_min}&maxlongitude=${area.lon_max}&orderby=time`;
-  const res   = await fetch(url, { headers:{"User-Agent":"SismoFVG/2.0 gimmycloud.com"} });
+  const res   = await fetch(url, { headers:{"User-Agent":"SismoFVG/2.0 gimmycloud.net"} });
   if (!res.ok) throw new Error(`INGV ${res.status}`);
   if (res.status === 204) return [];
   const data  = await res.json();
@@ -871,7 +871,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 </div>
 
 <footer>
-  ECHO MONITOR v${ECHO_VERSION} — <a href="https://gimmycloud.com">gimmycloud.com</a> //
+  ECHO MONITOR v${ECHO_VERSION} — <a href="https://gimmycloud.net">gimmycloud.net</a> //
   sismicità: <a href="https://www.ingv.it" target="_blank">INGV</a> —
   dati solari: <a href="https://www.swpc.noaa.gov" target="_blank">NOAA SWPC</a> //
   Gimmy Pignolo © 2026 // <span style="color:#26c6da">Progetto ECHO</span>
@@ -1664,7 +1664,7 @@ footer a{color:#26c6da;text-decoration:none}
   <textarea id="msg-input" placeholder="Scrivi un messaggio... (Invio per inviare)" rows="1"></textarea>
   <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.net">gimmycloud.net</a></footer>
 
 <script>
 let _history = [];
@@ -1826,7 +1826,7 @@ footer a{color:#66bb6a;text-decoration:none}
     <button id="send-btn" onclick="sendMsg()">⚡ Invia</button>
   </div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.net">gimmycloud.net</a></footer>
 
 <script>
 let _history = [];
@@ -2027,7 +2027,7 @@ footer a{color:#26c6da;text-decoration:none}
   <div class="spinner" id="spinner"></div>
   <div id="error-msg"></div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.net" target="_blank">gimmycloud.net</a></footer>
 
 <script>
 let _dir = 'it-en'; // it→en oppure en→it
@@ -2202,7 +2202,7 @@ footer a{color:#26c6da;text-decoration:none}
     <div id="file-list"></div>
   </div>
 </div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.com" target="_blank">gimmycloud.com</a></footer>
+<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.net" target="_blank">gimmycloud.net</a></footer>
 
 <script>
 let _allFiles = [];
@@ -2863,7 +2863,7 @@ body::after{
   <a class="lc" href="https://github.com/gmy77" target="_blank"><img src="https://github.com/favicon.ico" onerror="this.style.display='none'">GitHub</a>
   <a class="lc" href="https://dash.cloudflare.com" target="_blank"><img src="https://dash.cloudflare.com/favicon.ico" onerror="this.style.display='none'">Cloudflare</a>
   <a class="lc" href="https://claude.ai" target="_blank">🤖 Claude</a>
-  <a class="lc" href="https://gimmycloud.com" target="_blank">🌐 GimmyCloud</a>
+  <a class="lc" href="https://gimmycloud.net" target="_blank">🌐 GimmyCloud</a>
   <a class="lc" href="https://www.youtube.com" target="_blank"><img src="https://www.youtube.com/favicon.ico" onerror="this.style.display='none'">YouTube</a>
   <a class="lc" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">🌋 SISMO</a>
 </div>
@@ -3343,7 +3343,7 @@ export default {
         return new Response(JSON.stringify({error:"PIXELDRAIN_KEY non configurata nell'ambiente Cloudflare"}), {status:500, headers:{"Content-Type":"application/json"}});
       const auth = btoa(`:${env.PIXELDRAIN_KEY}`);
       const pdRes = await fetch("https://pixeldrain.com/api/user/files", {
-        headers: {"Authorization": `Basic ${auth}`, "User-Agent": "SismoFVG/2.0 gimmycloud.com"}
+        headers: {"Authorization": `Basic ${auth}`, "User-Agent": "SismoFVG/2.0 gimmycloud.net"}
       });
       const pdData = await pdRes.json();
       return new Response(JSON.stringify(pdData), {status: pdRes.status, headers:{"Content-Type":"application/json"}});
