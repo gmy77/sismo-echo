@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.6";
+const ECHO_VERSION = "3.7";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -861,6 +861,17 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-name">Othello</div>
         <div class="app-desc">minimax + learning</div>
         <div class="app-tag">AI adattiva</div>
+        <div class="app-go">GIOCA <span>→</span></div>
+      </a>
+
+      <a href="https://astro.gimmycloud.net" target="_blank" class="app-card" style="--app:#7e57c2"
+         data-tt-title="AstroSandbox" data-tt-badge="NUOVO"
+         data-tt="Simulatore di particelle falling-sand con fisica spaziale: 17 materiali, temperatura per cella, cambi di stato e tre gravità (Terra, Luna, zero-g). Un singolo file HTML, zero dipendenze — open source su GitHub.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🪐</div>
+        <div class="app-name">AstroSandbox</div>
+        <div class="app-desc">falling-sand · fisica spaziale</div>
+        <div class="app-tag">Physics Lab</div>
         <div class="app-go">GIOCA <span>→</span></div>
       </a>
 
