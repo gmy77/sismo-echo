@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.7";
+const ECHO_VERSION = "3.8";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
@@ -873,6 +873,17 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-desc">falling-sand · fisica spaziale</div>
         <div class="app-tag">Physics Lab</div>
         <div class="app-go">GIOCA <span>→</span></div>
+      </a>
+
+      <a href="https://techno.gimmycloud.net" target="_blank" class="app-card" style="--app:#ff6a00"
+         data-tt-title="TechnoLab 95" data-tt-badge="NUOVO"
+         data-tt="Groovebox stile techno Italia '95-2000: sequencer 16 step con 8 tracce sintetizzate, generatore di rumori industriali, banchi pattern quantizzati, campioni MP3 riagganciati a battuta e registrazione live. Un singolo file HTML, zero dipendenze — open source su GitHub.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🎛️</div>
+        <div class="app-name">TechnoLab 95</div>
+        <div class="app-desc">groovebox · rave anni '90</div>
+        <div class="app-tag">Music Lab</div>
+        <div class="app-go">SUONA <span>→</span></div>
       </a>
 
     </div>
