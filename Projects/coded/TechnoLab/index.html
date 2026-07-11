@@ -78,7 +78,7 @@
 <body>
 
 <h1>TECHNOLAB <span>95</span></h1>
-<div class="sub">Groovebox stile Italia '95–2000 — Insomnia / Musikò — tutto live, clicca e senti subito</div>
+<div class="sub">Groovebox stile Italia '95–2000 — cassa dritta, acido e rumori di fabbrica — tutto live, clicca e senti subito</div>
 
 <div class="transport">
   <button id="btnPlay" class="big">&#9654; PLAY</button>
@@ -145,7 +145,7 @@
 <div class="bottom">
   <div class="presets">
     <b style="font-size:11px;color:var(--dim)">PRESET:</b>
-    <button data-preset="insomnia">INSOMNIA 95</button>
+    <button data-preset="insomnia">RAVE 95</button>
     <button data-preset="fabbrica">FABBRICA</button>
     <button data-preset="acido">ACIDO</button>
     <button data-preset="vuoto">VUOTO</button>
@@ -971,7 +971,7 @@ function setTipo(id, key) { // cambia il tipo di suono e allinea il menu a tendi
 
 const PRESETS = {
   vuoto() { clearAll(); },
-  insomnia() { // dritto stile Insomnia '95: cassa 4/4, basso rolling, acido, hat in levare
+  insomnia() { // rave '95 dritto: cassa 4/4, basso rolling, acido, hat in levare
     clearAll();
     setPattern("kick", [0,4,8,12]);
     setPattern("bass", [2,3,6,7,10,11,14,15], {2:0,3:0,6:0,7:2,10:0,11:0,14:3,15:2});
