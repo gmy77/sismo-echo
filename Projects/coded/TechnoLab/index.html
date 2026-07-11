@@ -55,6 +55,12 @@
   .hint{font-size:10px; color:var(--dim); line-height:1.6;}
   .presets{display:flex; gap:6px; flex-wrap:wrap;}
 
+  .banks{display:flex; align-items:center; gap:4px; font-size:10px; color:var(--dim);}
+  button.bank{width:34px; padding:8px 0; font-weight:bold;}
+  button.bank.on{background:var(--acc2); color:#000; border-color:var(--acc2);}
+  button.bank.pending{outline:2px dashed var(--acc2); outline-offset:-2px;}
+  button.copy.on{background:var(--green); color:#000; border-color:var(--green);}
+
   button.rec{border-color:var(--red); color:var(--red); font-weight:bold;}
   button.rec.on{background:var(--red); color:#000; animation:blink 1s infinite;}
   @keyframes blink{50%{opacity:.55;}}
@@ -77,6 +83,13 @@
 <div class="transport">
   <button id="btnPlay" class="big">&#9654; PLAY</button>
   <div class="ctl"><b id="bpmVal">140 BPM</b><input type="range" id="bpm" min="120" max="160" value="140" step="1"><span>VELOCITÀ</span></div>
+  <button id="btnTap">TAP</button>
+  <div class="banks">
+    <b>PATTERN</b>
+    <button class="bank on" data-bank="0">A</button><button class="bank" data-bank="1">B</button>
+    <button class="bank" data-bank="2">C</button><button class="bank" data-bank="3">D</button>
+    <button id="btnCopy" class="copy" title="Copia il pattern attuale in un altro banco">COPIA</button>
+  </div>
   <div class="ctl"><b id="swingVal">0%</b><input type="range" id="swing" min="0" max="60" value="0"><span>SWING</span></div>
   <div class="ctl"><b id="cutVal">APERTO</b><input type="range" id="masterCut" class="master" min="80" max="18000" value="18000"><span>FILTRO MASTER (sweep live!)</span></div>
   <div class="ctl"><b id="dlyVal">25%</b><input type="range" id="delayFb" min="0" max="80" value="25"><span>DELAY FEEDBACK</span></div>
@@ -96,6 +109,37 @@
   <div class="ctl"><b id="sVolVal">70%</b><input type="range" id="sVol" min="0" max="100" value="70"><span>VOLUME</span></div>
 </div>
 
+<div class="samp lab">
+  <div class="title">GENERATORE</div>
+  <select id="gEngine">
+    <option value="noise">RUMORE</option>
+    <option value="sine">TONO PURO</option>
+    <option value="square">QUADRA</option>
+    <option value="sawtooth">SEGA</option>
+    <option value="fm">FM METALLO</option>
+  </select>
+  <div class="ctl"><b id="vFreq">220 Hz</b><input type="range" id="gFreq" min="30" max="3000" value="220"><span>TONO</span></div>
+  <div class="ctl"><b id="vSweep">0</b><input type="range" id="gSweep" min="-48" max="48" value="0"><span>GLISSATO</span></div>
+  <div class="ctl"><b id="vFmR">3.5</b><input type="range" id="gFmR" min="0.5" max="12" value="3.5" step="0.01"><span>FM RAPPORTO</span></div>
+  <div class="ctl"><b id="vFmA">5</b><input type="range" id="gFmA" min="0" max="12" value="5" step="0.1"><span>FM QUANTITÀ</span></div>
+  <select id="gFilt">
+    <option value="lowpass">PASSA-BASSO</option>
+    <option value="bandpass" selected>PASSA-BANDA</option>
+    <option value="highpass">PASSA-ALTO</option>
+  </select>
+  <div class="ctl"><b id="vCut">1200 Hz</b><input type="range" id="gCut" min="60" max="12000" value="1200"><span>FILTRO</span></div>
+  <div class="ctl"><b id="vRes">4</b><input type="range" id="gRes" min="0" max="24" value="4" step="0.5"><span>RISONANZA</span></div>
+  <div class="ctl"><b id="vFenv">0</b><input type="range" id="gFenv" min="0" max="8" value="0" step="0.1"><span>INVIL. FILTRO</span></div>
+  <div class="ctl"><b id="vAtk">5 ms</b><input type="range" id="gAtk" min="0.001" max="0.5" value="0.005" step="0.001"><span>ATTACCO</span></div>
+  <div class="ctl"><b id="vDec">0.40 s</b><input type="range" id="gDec" min="0.02" max="3" value="0.4" step="0.01"><span>CODA</span></div>
+  <div class="ctl"><b id="vDrive">1.5</b><input type="range" id="gDrive" min="1" max="8" value="1.5" step="0.1"><span>DISTORSIONE</span></div>
+  <div class="ctl"><b id="vHits">1</b><input type="range" id="gHits" min="1" max="8" value="1" step="1"><span>COLPI</span></div>
+  <div class="ctl"><b id="vRep">60 ms</b><input type="range" id="gRep" min="0.02" max="0.3" value="0.06" step="0.005"><span>RAFFICA</span></div>
+  <button id="gPlay">&#9654; PROVA</button>
+  <button id="gSave">SALVA IN RUMORE</button>
+  <span class="fname" id="gMsg">muovi le manopole e senti subito — poi salvalo come tipo della traccia RUMORE</span>
+</div>
+
 <div class="seq" id="seq"></div>
 
 <div class="bottom">
@@ -112,6 +156,7 @@
     CLICK sul nome traccia = anteprima suono immediata &nbsp;•&nbsp; CLICK su uno step = on/off &nbsp;•&nbsp;
     TASTO DESTRO su step di BASSO/ACIDO = cambia nota &nbsp;•&nbsp; SPAZIO = play/stop<br>
     TASTI 1–8 = muta/riattiva traccia quantizzato alla battuta (tratteggio rosso = in attesa) &nbsp;•&nbsp;
+    Q/W/E/R = pattern A/B/C/D quantizzato &nbsp;•&nbsp; COPIA = duplica il pattern in un altro banco &nbsp;•&nbsp;
     REC registra tutto quello che senti e scarica il file<br>
     Consiglio live: parti con cassa + basso, chiudi il FILTRO MASTER, aggiungi METALLO e RUMORE, poi apri il filtro piano piano.
   </div>
@@ -319,6 +364,63 @@ function playFx(t, out, p, stepDur) {
       g.gain.setValueAtTime(0.55, tt); g.gain.exponentialRampToValueAtTime(0.001, tt + 0.035);
       n.connect(f); f.connect(g); g.connect(out); n.stop(tt + 0.05);
     }
+  } else if (tipo === "trapano") { // trapano: saw basso con tremolo veloce
+    const o = AC.createOscillator(), g = AC.createGain(), f = AC.createBiquadFilter();
+    const trem = AC.createOscillator(), tg = AC.createGain();
+    o.type = "sawtooth"; o.frequency.value = 65;
+    f.type = "bandpass"; f.frequency.value = 900; f.Q.value = 2;
+    trem.type = "square"; trem.frequency.value = 28;
+    tg.gain.value = 0.5; trem.connect(tg); tg.connect(g.gain);
+    g.gain.setValueAtTime(0.45, t); g.gain.exponentialRampToValueAtTime(0.001, t + p.decay * 2);
+    o.connect(f); f.connect(g); g.connect(out);
+    o.start(t); trem.start(t); o.stop(t + p.decay * 2 + 0.05); trem.stop(t + p.decay * 2 + 0.05);
+  } else if (tipo === "scintille") { // saldatrice: crepitio di scintille
+    for (let i = 0; i < 14; i++) {
+      const tt = t + Math.random() * p.decay * 2;
+      const n = noiseSrc(tt), f = AC.createBiquadFilter(), g = AC.createGain();
+      f.type = "highpass"; f.frequency.value = 4000 + Math.random() * 5000;
+      g.gain.setValueAtTime(0.25 + Math.random() * 0.3, tt);
+      g.gain.exponentialRampToValueAtTime(0.001, tt + 0.015);
+      n.connect(f); f.connect(g); g.connect(out); n.stop(tt + 0.03);
+    }
+  } else if (tipo === "motore") { // motore/ventola: rombo basso pulsante
+    const dur = Math.max(p.decay, stepDur * 8);
+    const g = AC.createGain(), f = AC.createBiquadFilter();
+    const lfo = AC.createOscillator(), lg = AC.createGain();
+    f.type = "lowpass"; f.frequency.value = 350; f.Q.value = 1;
+    lfo.frequency.value = 9; lg.gain.value = 0.35; lfo.connect(lg); lg.connect(g.gain);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.4, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    const o = AC.createOscillator(); o.type = "sawtooth"; o.frequency.value = 48;
+    const n = noiseSrc(t);
+    o.connect(f); n.connect(f); f.connect(g); g.connect(out);
+    o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05); n.stop(t + dur + 0.05);
+  } else if (tipo === "statica") { // statica radio
+    const dur = Math.max(p.decay, stepDur * 4);
+    const n = noiseSrc(t), f = AC.createBiquadFilter(), g = AC.createGain();
+    f.type = "highpass"; f.frequency.value = 2500;
+    g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    n.connect(f); f.connect(g); g.connect(out); n.stop(t + dur + 0.05);
+  } else if (tipo === "gong") { // gong industriale: FM inarmonica lunga
+    const car = AC.createOscillator(), mod = AC.createOscillator(), mg = AC.createGain();
+    const g = AC.createGain(), f = AC.createBiquadFilter();
+    const dur = Math.max(p.decay * 4, 1);
+    car.frequency.value = 110; mod.frequency.value = 110 * 2.76; mg.gain.value = 700;
+    mod.connect(mg); mg.connect(car.frequency);
+    f.type = "lowpass"; f.frequency.value = 2500;
+    g.gain.setValueAtTime(0.6, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    car.connect(f); f.connect(g); g.connect(out);
+    car.start(t); mod.start(t); car.stop(t + dur + 0.05); mod.stop(t + dur + 0.05);
+  } else if (tipo === "zap") { // zap laser
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = "square";
+    o.frequency.setValueAtTime(2800, t);
+    o.frequency.exponentialRampToValueAtTime(80, t + Math.max(0.08, p.decay * 0.4));
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + Math.max(0.1, p.decay * 0.5));
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + p.decay * 0.5 + 0.1);
+  } else if (tipo === "custom" && p.custom) { // suono creato col GENERATORE
+    playCustom(t, out, p.custom);
   } else if (tipo === "hoover") { // stab hoover classico
     const g = AC.createGain(), f = AC.createBiquadFilter();
     f.type = "lowpass"; f.frequency.setValueAtTime(3000, t);
@@ -329,6 +431,49 @@ function playFx(t, out, p, stepDur) {
       o.connect(f); o.start(t); o.stop(t + p.decay + 0.05);
     });
     f.connect(g); g.connect(out);
+  }
+}
+
+// ============================================================
+// GENERATORE — motore flessibile: crei il rumore che ti serve
+// ============================================================
+function playCustom(t, out, c) {
+  const hits = Math.max(1, Math.round(c.hits || 1));
+  for (let h = 0; h < hits; h++) {
+    const tt = t + h * (c.rep || 0.06);
+    const atk = Math.max(0.001, c.atk), dec = Math.max(0.02, c.dec);
+    const f = AC.createBiquadFilter(), g = AC.createGain(), drive = makeDrive(c.drive || 1);
+
+    // filtro: con INVIL.FILTRO > 0 parte aperto e si chiude (stile 303)
+    f.type = c.filt; f.Q.value = c.res;
+    if (c.fenv > 0) {
+      f.frequency.setValueAtTime(Math.min(16000, c.cut * (1 + c.fenv)), tt);
+      f.frequency.exponentialRampToValueAtTime(Math.max(50, c.cut * 0.15), tt + atk + dec);
+    } else f.frequency.value = c.cut;
+
+    g.gain.setValueAtTime(0.0001, tt);
+    g.gain.linearRampToValueAtTime(0.65, tt + atk);
+    g.gain.exponentialRampToValueAtTime(0.001, tt + atk + dec);
+    f.connect(drive); drive.connect(g); g.connect(out);
+
+    const stopT = tt + atk + dec + 0.05;
+    if (c.engine === "noise") {
+      const n = noiseSrc(tt); n.connect(f); n.stop(stopT);
+    } else {
+      const o = AC.createOscillator();
+      o.type = c.engine === "fm" ? "sine" : c.engine; // sine|square|sawtooth|triangle
+      const fEnd = c.freq * Math.pow(2, (c.sweep || 0) / 12);
+      o.frequency.setValueAtTime(c.freq, tt);
+      if (c.sweep) o.frequency.exponentialRampToValueAtTime(Math.max(20, fEnd), tt + atk + dec);
+      if (c.engine === "fm") { // rapporto inarmonico = campane, incudini, metallo
+        const m = AC.createOscillator(), mg = AC.createGain();
+        m.frequency.value = c.freq * (c.fmRatio || 3.5);
+        mg.gain.value = c.freq * (c.fmAmt || 5);
+        m.connect(mg); mg.connect(o.frequency);
+        m.start(tt); m.stop(stopT);
+      }
+      o.connect(f); o.start(tt); o.stop(stopT);
+    }
   }
 }
 
@@ -382,15 +527,19 @@ const tracks = [
   { id:"fx",    name:"RUMORE",  pitched:false, vol:0.55, send:0.35,
     p:{tipo:"vapore", decay:0.5},
     tipi:{"VAPORE":{tipo:"vapore"},"SIRENA":{tipo:"sirena"},"DRONE":{tipo:"drone"},
-          "SWEEP":{tipo:"sweep"},"MARTELLO":{tipo:"martello"},"HOOVER":{tipo:"hoover"}},
+          "SWEEP":{tipo:"sweep"},"MARTELLO":{tipo:"martello"},"HOOVER":{tipo:"hoover"},
+          "TRAPANO":{tipo:"trapano"},"SCINTILLE":{tipo:"scintille"},"MOTORE":{tipo:"motore"},
+          "STATICA":{tipo:"statica"},"GONG":{tipo:"gong"},"ZAP":{tipo:"zap"}},
     ctrls:[["decay","CODA",0.1,2]],
     play:(t,out,p,st,dur)=>playFx(t,out,p,dur) },
 ];
 
-// Pattern: per ogni traccia 16 step {on:bool, note:indice in NOTES}
-const STEPS = 16;
+// Pattern: 4 banchi (A-D) da 16 step {on:bool, note:indice in NOTES} per traccia
+const STEPS = 16, BANKS = 4;
 tracks.forEach(tr => {
-  tr.pattern = Array.from({length: STEPS}, () => ({on: false, note: 0}));
+  tr.banks = Array.from({length: BANKS}, () =>
+    Array.from({length: STEPS}, () => ({on: false, note: 0})));
+  tr.pattern = tr.banks[0];
   tr.muted = false;
   tr.gain = AC.createGain(); tr.gain.gain.value = tr.vol;
   tr.sendGain = AC.createGain(); tr.sendGain.gain.value = tr.send;
@@ -407,7 +556,8 @@ const stepDur = () => 60 / bpm / 4;
 
 function scheduleStep(step, t) {
   const dur = stepDur();
-  if (step === 0) { // inizio battuta: applica i mute in attesa e ri-aggancia il campione
+  if (step === 0) { // inizio battuta: banco e mute in attesa, ri-aggancio del campione
+    if (pendingBank >= 0) { switchBank(pendingBank); pendingBank = -1; }
     applyPendingMutes();
     scheduleSampleBar(t, dur);
     barCount++;
@@ -545,6 +695,9 @@ btnPlay.onclick = togglePlay;
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   if (e.code === "Space") { e.preventDefault(); togglePlay(); return; }
+  // Q W E R: banchi pattern A-D (quantizzati come il click)
+  const bk = { KeyQ: 0, KeyW: 1, KeyE: 2, KeyR: 3 }[e.code];
+  if (bk !== undefined) { selectBank(bk); return; }
   // Tasti 1-8: muta/riattiva quantizzato alla battuta successiva
   const m = e.code.match(/^Digit([1-8])$/);
   if (m) {
@@ -555,6 +708,54 @@ document.addEventListener("keydown", e => {
     paintMute(tr);
   }
 });
+
+// ============================================================
+// BANCHI PATTERN A-D — cambio quantizzato alla battuta
+// ============================================================
+let curBank = 0, pendingBank = -1, copyMode = false;
+const bankBtns = [...document.querySelectorAll(".bank")];
+const btnCopy = $("btnCopy");
+
+function paintBanks() {
+  bankBtns.forEach((b, i) => {
+    b.classList.toggle("on", i === curBank);
+    b.classList.toggle("pending", i === pendingBank);
+  });
+}
+function switchBank(b) {
+  curBank = b;
+  tracks.forEach(tr => tr.pattern = tr.banks[b]);
+  paintAll(); paintBanks();
+}
+function selectBank(b) {
+  if (copyMode) { // destinazione della copia
+    tracks.forEach(tr => tr.banks[b].forEach((st, i) =>
+      Object.assign(st, tr.banks[curBank][i])));
+    copyMode = false; btnCopy.classList.remove("on"); btnCopy.textContent = "COPIA";
+    if (b === curBank) return;
+  }
+  if (playing && b !== curBank) { pendingBank = (pendingBank === b) ? -1 : b; paintBanks(); }
+  else { pendingBank = -1; switchBank(b); }
+}
+bankBtns.forEach((btn, i) => btn.onclick = () => selectBank(i));
+btnCopy.onclick = () => {
+  copyMode = !copyMode;
+  btnCopy.classList.toggle("on", copyMode);
+  btnCopy.textContent = copyMode ? "→ DOVE?" : "COPIA";
+};
+
+// ---- Tap tempo: batti il tempo sul bottone
+let taps = [];
+$("btnTap").onclick = () => {
+  const now = performance.now();
+  taps = taps.filter(t => now - t < 2500); taps.push(now);
+  if (taps.length >= 2) {
+    const iv = (taps[taps.length - 1] - taps[0]) / (taps.length - 1);
+    bpm = Math.max(120, Math.min(160, Math.round(60000 / iv)));
+    $("bpm").value = bpm; $("bpmVal").textContent = bpm + " BPM";
+    delayNode.delayTime.value = stepDur() * 3;
+  }
+};
 
 // ---- Mute quantizzati: si accodano e scattano all'inizio della battuta
 function paintMute(tr) {
@@ -696,6 +897,62 @@ $("delayFb").oninput = e => { delayFb.gain.value = e.target.value / 100; $("dlyV
 $("masterVol").oninput = e => { masterGain.gain.value = e.target.value / 100; $("volVal").textContent = e.target.value + "%"; };
 
 // ============================================================
+// GENERATORE — interfaccia: anteprima live e salvataggio in RUMORE
+// ============================================================
+const labGain = AC.createGain(); labGain.gain.value = 1; labGain.connect(busDry);
+const gen = { engine:"noise", freq:220, sweep:0, fmRatio:3.5, fmAmt:5, filt:"bandpass",
+              cut:1200, res:4, fenv:0, atk:0.005, dec:0.4, drive:1.5, hits:1, rep:0.06 };
+
+let lastPrev = 0;
+function genPreview(force) {
+  const now = performance.now();
+  if (!force && now - lastPrev < 200) return; // non accavallare mentre trascini
+  lastPrev = now;
+  AC.resume();
+  playCustom(AC.currentTime + 0.01, labGain, gen);
+}
+// [id slider, chiave, id etichetta, formattazione]
+[["gFreq","freq","vFreq",v=>Math.round(v)+" Hz"],
+ ["gSweep","sweep","vSweep",v=>(v>0?"+":"")+v+" semitoni"],
+ ["gFmR","fmRatio","vFmR",v=>v],
+ ["gFmA","fmAmt","vFmA",v=>v],
+ ["gCut","cut","vCut",v=>Math.round(v)+" Hz"],
+ ["gRes","res","vRes",v=>v],
+ ["gFenv","fenv","vFenv",v=>v],
+ ["gAtk","atk","vAtk",v=>Math.round(v*1000)+" ms"],
+ ["gDec","dec","vDec",v=>(+v).toFixed(2)+" s"],
+ ["gDrive","drive","vDrive",v=>v],
+ ["gHits","hits","vHits",v=>v],
+ ["gRep","rep","vRep",v=>Math.round(v*1000)+" ms"],
+].forEach(([id, key, lbl, fmt]) => {
+  $(id).oninput = e => { gen[key] = +e.target.value; $(lbl).textContent = fmt(e.target.value); genPreview(); };
+});
+$("gEngine").onchange = e => { gen.engine = e.target.value; genPreview(true); };
+$("gFilt").onchange = e => { gen.filt = e.target.value; genPreview(true); };
+$("gPlay").onclick = () => genPreview(true);
+
+// I suoni salvati diventano nuovi tipi della traccia RUMORE (persistono nel browser)
+const fxTrack = tracks.find(t => t.id === "fx");
+function registerCustom(name, params) {
+  fxTrack.tipi[name] = { tipo: "custom", custom: {...params} };
+  const o = document.createElement("option"); o.textContent = name;
+  fxTrack.selEl.appendChild(o);
+}
+let customs = [];
+try { customs = JSON.parse(localStorage.getItem("technolab95_customs") || "[]"); } catch (e) {}
+customs.forEach(c => registerCustom(c.name, c.p));
+
+$("gSave").onclick = () => {
+  const name = "MIO " + (customs.length + 1);
+  customs.push({ name, p: {...gen} });
+  localStorage.setItem("technolab95_customs", JSON.stringify(customs));
+  registerCustom(name, gen);
+  fxTrack.selEl.value = name;
+  Object.assign(fxTrack.p, fxTrack.tipi[name]);
+  $("gMsg").textContent = "salvato come \"" + name + "\" — la traccia RUMORE ora lo suona";
+};
+
+// ============================================================
 // PRESET — pattern di partenza
 // ============================================================
 function setPattern(id, stepsOn, notes) {
@@ -750,7 +1007,7 @@ document.querySelectorAll("[data-preset]").forEach(b => {
 
 // ---- Salva / carica su localStorage
 $("btnSave").onclick = () => {
-  const data = { bpm, swing, tracks: tracks.map(tr => ({ id: tr.id, muted: tr.muted, p: {...tr.p}, pattern: tr.pattern })) };
+  const data = { bpm, swing, curBank, tracks: tracks.map(tr => ({ id: tr.id, muted: tr.muted, p: {...tr.p}, banks: tr.banks })) };
   localStorage.setItem("technolab95", JSON.stringify(data));
   $("btnSave").textContent = "SALVATO ✓"; setTimeout(() => $("btnSave").textContent = "SALVA", 1200);
 };
@@ -764,10 +1021,19 @@ $("btnLoad").onclick = () => {
     const tr = tracks.find(t => t.id === saved.id);
     if (!tr) return;
     Object.assign(tr.p, saved.p);
-    tr.muted = saved.muted;
-    saved.pattern.forEach((st, i) => Object.assign(tr.pattern[i], st));
+    tr.muted = saved.muted; tr.pendingMute = false; paintMute(tr);
+    if (saved.banks) {
+      saved.banks.forEach((bank, b) => bank.forEach((st, i) => Object.assign(tr.banks[b][i], st)));
+    } else if (saved.pattern) { // salvataggi vecchi: un solo pattern, va nel banco A
+      saved.pattern.forEach((st, i) => Object.assign(tr.banks[0][i], st));
+    }
+    if (tr.selEl && tr.tipi) { // riallinea il menu del tipo se i parametri corrispondono
+      const k = Object.keys(tr.tipi).find(k => Object.entries(tr.tipi[k]).every(([a, v]) => tr.p[a] === v));
+      if (k) tr.selEl.value = k;
+    }
   });
-  paintAll();
+  pendingBank = -1;
+  switchBank(data.curBank || 0);
 };
 
 // Preset iniziale così si parte subito con qualcosa che suona
