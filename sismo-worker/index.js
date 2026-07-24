@@ -3225,10 +3225,18 @@ async function loadCF(){
 
 /* ── SPACE WEATHER — dati live NOAA SWPC ── */
 const SWPC='https://services.swpc.noaa.gov';
-function lastValid(rows,idx){
-  if(idx<0)return null;
-  for(let i=rows.length-1;i>=1;i--){
-    const v=parseFloat(rows[i][idx]);
+// rows può essere array-di-array (con header in riga 0) o array di oggetti {campo:valore}
+function lastValid(rows,idx,name){
+  if(!Array.isArray(rows))return null;
+  for(let i=rows.length-1;i>=0;i--){
+    const r=rows[i];
+    let v;
+    if(Array.isArray(r)){
+      if(i===0||idx<0)continue; // riga header o colonna assente
+      v=parseFloat(r[idx]);
+    }else if(r&&name!==undefined){
+      v=parseFloat(r[name]!==undefined?r[name]:r[String(name).toLowerCase()]);
+    }
     if(!isNaN(v))return v;
   }
   return null;
@@ -3248,7 +3256,7 @@ function flareClass(f){
 async function loadSpaceWx(){
   try{
     const kpRows=await FJ(SWPC+'/products/noaa-planetary-k-index.json');
-    const k=lastValid(kpRows,colIdx(kpRows,'Kp',1));
+    const k=lastValid(kpRows,colIdx(kpRows,'Kp',1),'Kp');
     if(k!==null){
       const el=document.getElementById('wxKp');
       el.textContent=k.toFixed(1);el.style.color=KC(k);
