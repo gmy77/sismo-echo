@@ -2856,6 +2856,35 @@ body::after{
 .sw-spark path{fill:none;stroke-width:1.2;opacity:.6;}
 .sw-spark circle{r:2;}
 
+/* ── SPACE WEATHER — colonna sinistra ── */
+.spacewx{
+  position:fixed;left:18px;top:50%;transform:translateY(-50%);
+  z-index:10;display:flex;flex-direction:column;gap:10px;width:200px;
+}
+.wx-box{
+  background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));
+  border:1px solid var(--border);border-radius:13px;padding:11px 14px;
+  backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+  box-shadow:0 8px 26px -14px rgba(0,0,0,.6);
+  transition:transform .4s var(--ease-out),border-color .3s var(--ease);
+}
+.wx-box:hover{transform:translateX(3px);border-color:var(--ac,rgba(38,198,218,.3));}
+.wx-box.kp{--ac:var(--cyan);}
+.wx-box.wind{--ac:var(--orange);}
+.wx-box.xray{--ac:var(--yellow);}
+.wx-head{
+  display:flex;align-items:center;gap:6px;margin-bottom:6px;
+  font-family:'Share Tech Mono',monospace;font-size:.6em;
+  color:var(--ac);text-transform:uppercase;letter-spacing:.1em;
+}
+.wx-head .wdot{width:5px;height:5px;border-radius:50%;background:var(--ac);box-shadow:0 0 6px var(--ac);flex-shrink:0;}
+.wx-val{font-family:'Share Tech Mono',monospace;font-size:1.55em;font-weight:700;line-height:1.1;}
+.wx-sub{font-family:'Share Tech Mono',monospace;font-size:.58em;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:2px;}
+.wx-rows{margin-top:7px;border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:3px;}
+.wx-row{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.62em;color:var(--muted);}
+.wx-row b{color:#b0bec5;font-weight:600;}
+@media(max-width:1180px){.spacewx{display:none;}}
+
 /* onda d'urto */
 .shock-ring{
   position:absolute;left:18px;top:18px;width:10px;height:10px;border-radius:50%;
@@ -2879,6 +2908,39 @@ body::after{
 <!-- v0.3000 WATERMARK -->
 <div class="insider-tag"><span class="idot"></span>PREVIEW_INSIDER_2026.22 <b>v0.3000</b> · ring: FUTURE</div>
 <div class="lucewatch-tag">LUCE-WATCH · prossimo check<br><span class="lw-time" id="lwTime">—</span></div>
+
+<!-- SPACE WEATHER — colonna sinistra -->
+<div class="spacewx">
+  <div class="wx-box kp">
+    <div class="wx-head"><span class="wdot"></span>Planetary KP</div>
+    <div class="wx-val" id="wxKp" style="color:var(--cyan)">—</div>
+    <div class="wx-sub">geomagnetic index</div>
+    <div class="wx-rows">
+      <div class="wx-row"><span>Stato</span><b id="wxKpStato">—</b></div>
+      <div class="wx-row"><span>Fonte</span><b>NOAA SWPC</b></div>
+    </div>
+  </div>
+  <div class="wx-box wind">
+    <div class="wx-head"><span class="wdot"></span>Solar Wind</div>
+    <div class="wx-val" id="wxWind" style="color:var(--orange)">—</div>
+    <div class="wx-sub">km/s — vento solare</div>
+    <div class="wx-rows">
+      <div class="wx-row"><span>Densità</span><b id="wxDens">— n/cc</b></div>
+      <div class="wx-row"><span>Bt / Bz</span><b id="wxBtBz">— / — nT</b></div>
+      <div class="wx-row"><span>Fonte</span><b>ACE/DSCOVR</b></div>
+    </div>
+  </div>
+  <div class="wx-box xray">
+    <div class="wx-head"><span class="wdot"></span>X-Ray Flux</div>
+    <div class="wx-val" id="wxXray" style="color:var(--yellow)">—</div>
+    <div class="wx-sub">solar flare class</div>
+    <div class="wx-rows">
+      <div class="wx-row"><span>Flux</span><b id="wxFlux">— W/m²</b></div>
+      <div class="wx-row"><span>Stato</span><b id="wxXStato">—</b></div>
+      <div class="wx-row"><span>Fonte</span><b>GOES-16/18</b></div>
+    </div>
+  </div>
+</div>
 
 <!-- TOP LINKS -->
 <div class="topbar">
@@ -3153,9 +3215,67 @@ async function loadCF(){
   }
 }
 
+/* ── SPACE WEATHER — dati live NOAA SWPC ── */
+const SWPC='https://services.swpc.noaa.gov';
+function lastValid(rows,idx){
+  for(let i=rows.length-1;i>=1;i--){
+    const v=parseFloat(rows[i][idx]);
+    if(!isNaN(v))return v;
+  }
+  return null;
+}
+function flareClass(f){
+  if(f>=1e-4)return['X'+(f/1e-4).toFixed(1),'#ff1744','X-Flare'];
+  if(f>=1e-5)return['M'+(f/1e-5).toFixed(1),'#ff6d00','M-Flare'];
+  if(f>=1e-6)return['C'+(f/1e-6).toFixed(1),'#ffd600','C-Flare'];
+  if(f>=1e-7)return['B'+(f/1e-7).toFixed(1),'#69f0ae','B-Flare'];
+  return['A'+(f/1e-8).toFixed(1),'#69f0ae','Quiete'];
+}
+async function loadSpaceWx(){
+  try{
+    const kpRows=await fetch(SWPC+'/products/noaa-planetary-k-index.json').then(r=>r.json());
+    const k=lastValid(kpRows,1);
+    if(k!==null){
+      const el=document.getElementById('wxKp');
+      el.textContent=k.toFixed(1);el.style.color=KC(k);
+      document.getElementById('wxKpStato').textContent=
+        k<2?'Silenzio cosmico':k<4?'Quiete':k<5?'Attivo':k<6?'Tempesta G1':k<7?'Tempesta G2':'Tempesta forte';
+    }
+  }catch(e){}
+  try{
+    const [plasma,mag]=await Promise.all([
+      fetch(SWPC+'/products/solar-wind/plasma-2-hour.json').then(r=>r.json()),
+      fetch(SWPC+'/products/solar-wind/mag-2-hour.json').then(r=>r.json()),
+    ]);
+    const speed=lastValid(plasma,2),dens=lastValid(plasma,1);
+    const bt=lastValid(mag,6),bz=lastValid(mag,3);
+    if(speed!==null){
+      const el=document.getElementById('wxWind');
+      el.textContent=Math.round(speed);
+      el.style.color=speed<400?'#69f0ae':speed<550?'#ffd600':speed<700?'#ff6d00':'#ff1744';
+    }
+    if(dens!==null)document.getElementById('wxDens').textContent=dens.toFixed(1)+' n/cc';
+    if(bt!==null||bz!==null)document.getElementById('wxBtBz').textContent=
+      (bt!==null?bt.toFixed(1):'—')+' / '+(bz!==null?bz.toFixed(1):'—')+' nT';
+  }catch(e){}
+  try{
+    const xr=await fetch(SWPC+'/json/goes/primary/xrays-6-hour.json').then(r=>r.json());
+    const long=xr.filter(d=>d.energy==='0.1-0.8nm');
+    const last=long[long.length-1];
+    if(last&&last.flux!=null){
+      const f=parseFloat(last.flux);
+      const [cls,col,stato]=flareClass(f);
+      const el=document.getElementById('wxXray');
+      el.textContent=cls;el.style.color=col;
+      document.getElementById('wxFlux').textContent=f.toExponential(2)+' W/m²';
+      document.getElementById('wxXStato').textContent=stato;
+    }
+  }catch(e){}
+}
+
 applyKpAtmosphere(1); // valore neutro iniziale, in attesa del primo fetch reale
-loadSismo(); loadCF();
-setInterval(function(){loadSismo();loadCF();},5*60*1000);
+loadSismo(); loadCF(); loadSpaceWx();
+setInterval(function(){loadSismo();loadCF();loadSpaceWx();},5*60*1000);
 </script>
 </body>
 </html>`;
