@@ -21,7 +21,8 @@ id = "7ed7834f05f64969ae9b8753df1a3708"
 binding = "AI"
 
 [triggers]
-crons = ["0 8 * * *", "0 13 * * *", "0 18 * * *", "0 23 * * *"]
+# Consolidati in un unico cron (stessi orari) per restare nel limite di 5 trigger/account del piano Free
+crons = ["0 8,13,18,23 * * *"]
 
 [observability]
 enabled = true

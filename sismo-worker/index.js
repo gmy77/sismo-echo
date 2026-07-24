@@ -8,7 +8,7 @@
 const ECHO_VERSION = "3.8";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
-const NOAA_KP     = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
+const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
 const NOAA_WIND   = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json";
 function getUpdateSecret(env) { return env?.UPDATE_SECRET || ""; }
 
@@ -78,13 +78,14 @@ async function fetchSolare() {
     let kpData = [];
     if (kpRes.status === 'fulfilled' && kpRes.value.ok) {
       const raw = await kpRes.value.json();
+      // il feed products è cambiato nel tempo: array-di-array con header in [0]
+      // (Kp in colonna 1) oppure array di oggetti {time_tag, Kp}
       kpData = raw
-        .filter((_,i) => i % 60 === 0)
+        .filter(r => Array.isArray(r) ? r[0] !== 'time_tag' : true)
         .slice(-72)
-        .map(r => ({
-          time: r.time_tag,
-          kp:   parseFloat(r.kp_index)||0,
-        }));
+        .map(r => Array.isArray(r)
+          ? { time: r[0],        kp: parseFloat(r[1])||0 }
+          : { time: r.time_tag,  kp: parseFloat(r.Kp)||0 });
     }
 
     let windData = null;
