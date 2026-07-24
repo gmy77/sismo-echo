@@ -3226,7 +3226,8 @@ function lastValid(rows,idx){
   return null;
 }
 function colIdx(rows,name,fallback){
-  const i=Array.isArray(rows&&rows[0])?rows[0].indexOf(name):-1;
+  if(!Array.isArray(rows&&rows[0]))return fallback;
+  const i=rows[0].findIndex(h=>String(h).toLowerCase()===name.toLowerCase());
   return i>=0?i:fallback;
 }
 function flareClass(f){
