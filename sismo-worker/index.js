@@ -3218,11 +3218,16 @@ async function loadCF(){
 /* ── SPACE WEATHER — dati live NOAA SWPC ── */
 const SWPC='https://services.swpc.noaa.gov';
 function lastValid(rows,idx){
+  if(idx<0)return null;
   for(let i=rows.length-1;i>=1;i--){
     const v=parseFloat(rows[i][idx]);
     if(!isNaN(v))return v;
   }
   return null;
+}
+function colIdx(rows,name,fallback){
+  const i=Array.isArray(rows&&rows[0])?rows[0].indexOf(name):-1;
+  return i>=0?i:fallback;
 }
 function flareClass(f){
   if(f>=1e-4)return['X'+(f/1e-4).toFixed(1),'#ff1744','X-Flare'];
@@ -3234,7 +3239,7 @@ function flareClass(f){
 async function loadSpaceWx(){
   try{
     const kpRows=await fetch(SWPC+'/products/noaa-planetary-k-index.json').then(r=>r.json());
-    const k=lastValid(kpRows,1);
+    const k=lastValid(kpRows,colIdx(kpRows,'Kp',1));
     if(k!==null){
       const el=document.getElementById('wxKp');
       el.textContent=k.toFixed(1);el.style.color=KC(k);
@@ -3247,7 +3252,7 @@ async function loadSpaceWx(){
   }catch(e){console.debug('spacewx:',e.message);}
   try{
     const plasma=await fetch(SWPC+'/products/solar-wind/plasma-2-hour.json').then(r=>r.json());
-    const speed=lastValid(plasma,2),dens=lastValid(plasma,1);
+    const speed=lastValid(plasma,colIdx(plasma,'speed',2)),dens=lastValid(plasma,colIdx(plasma,'density',1));
     if(speed!==null){
       const el=document.getElementById('wxWind');
       el.textContent=Math.round(speed);
@@ -3257,7 +3262,7 @@ async function loadSpaceWx(){
   }catch(e){console.debug('spacewx:',e.message);}
   try{
     const mag=await fetch(SWPC+'/products/solar-wind/mag-2-hour.json').then(r=>r.json());
-    const bt=lastValid(mag,6),bz=lastValid(mag,3);
+    const bt=lastValid(mag,colIdx(mag,'bt',-1)),bz=lastValid(mag,colIdx(mag,'bz_gsm',3));
     if(bt!==null||bz!==null)document.getElementById('wxBtBz').textContent=
       (bt!==null?bt.toFixed(1):'—')+' / '+(bz!==null?bz.toFixed(1):'—')+' nT';
   }catch(e){console.debug('spacewx:',e.message);}
@@ -3278,13 +3283,13 @@ async function loadSpaceWx(){
 
 applyKpAtmosphere(1); // valore neutro iniziale, in attesa del primo fetch reale
 // sequenziale: loadSpaceWx per ultimo, così il Kp live SWPC vince su skp/atmosfera
-let refreshBusy=false;
+let refreshingSince=0; // lock con scadenza: se un fetch resta appeso, dopo 60s si riparte comunque
 async function refreshAll(){
-  if(refreshBusy)return;
-  refreshBusy=true;
+  if(refreshingSince&&Date.now()-refreshingSince<60000)return;
+  refreshingSince=Date.now();
   try{await loadSismo();await loadCF();await loadSpaceWx();}
   catch(e){console.debug('refresh:',e.message);}
-  finally{refreshBusy=false;}
+  finally{refreshingSince=0;}
 }
 refreshAll();
 setInterval(refreshAll,5*60*1000);
