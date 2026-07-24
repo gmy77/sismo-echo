@@ -3243,18 +3243,18 @@ async function loadSpaceWx(){
     }
   }catch(e){}
   try{
-    const [plasma,mag]=await Promise.all([
-      fetch(SWPC+'/products/solar-wind/plasma-2-hour.json').then(r=>r.json()),
-      fetch(SWPC+'/products/solar-wind/mag-2-hour.json').then(r=>r.json()),
-    ]);
+    const plasma=await fetch(SWPC+'/products/solar-wind/plasma-2-hour.json').then(r=>r.json());
     const speed=lastValid(plasma,2),dens=lastValid(plasma,1);
-    const bt=lastValid(mag,6),bz=lastValid(mag,3);
     if(speed!==null){
       const el=document.getElementById('wxWind');
       el.textContent=Math.round(speed);
       el.style.color=speed<400?'#69f0ae':speed<550?'#ffd600':speed<700?'#ff6d00':'#ff1744';
     }
     if(dens!==null)document.getElementById('wxDens').textContent=dens.toFixed(1)+' n/cc';
+  }catch(e){}
+  try{
+    const mag=await fetch(SWPC+'/products/solar-wind/mag-2-hour.json').then(r=>r.json());
+    const bt=lastValid(mag,6),bz=lastValid(mag,3);
     if(bt!==null||bz!==null)document.getElementById('wxBtBz').textContent=
       (bt!==null?bt.toFixed(1):'—')+' / '+(bz!==null?bz.toFixed(1):'—')+' nT';
   }catch(e){}
