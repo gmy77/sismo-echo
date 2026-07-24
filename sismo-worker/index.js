@@ -3049,7 +3049,14 @@ setInterval(tick,1000); tick();
 document.getElementById('quote').textContent=QUOTES[Math.floor(Math.random()*QUOTES.length)];
 
 const API='https://sismo-fvg.gimmy077.workers.dev';
-const FJ=u=>fetch(u,{signal:AbortSignal.timeout(15000)}).then(r=>r.json()); // timeout 15s: nessun fetch può bloccare il refresh
+// fetch JSON con timeout 15s (AbortController: compatibile ovunque) e check HTTP
+function FJ(u){
+  const ac=new AbortController();
+  const t=setTimeout(()=>ac.abort(),15000);
+  return fetch(u,{signal:ac.signal})
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status+' '+u);return r.json();})
+    .finally(()=>clearTimeout(t));
+}
 const MC=m=>m>=3?'#ff1744':m>=2?'#ff6d00':m>=1?'#ffd600':'#69f0ae';
 const KC=k=>k>=7?'#ff1744':k>=5?'#ff6d00':k>=4?'#ffd600':k>=2?'#26c6da':'#69f0ae';
 
