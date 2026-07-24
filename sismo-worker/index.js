@@ -3049,6 +3049,7 @@ setInterval(tick,1000); tick();
 document.getElementById('quote').textContent=QUOTES[Math.floor(Math.random()*QUOTES.length)];
 
 const API='https://sismo-fvg.gimmy077.workers.dev';
+const FJ=u=>fetch(u,{signal:AbortSignal.timeout(15000)}).then(r=>r.json()); // timeout 15s: nessun fetch può bloccare il refresh
 const MC=m=>m>=3?'#ff1744':m>=2?'#ff6d00':m>=1?'#ffd600':'#69f0ae';
 const KC=k=>k>=7?'#ff1744':k>=5?'#ff6d00':k>=4?'#ffd600':k>=2?'#26c6da':'#69f0ae';
 
@@ -3156,9 +3157,9 @@ function setDot(id,m,d){
 async function loadSismo(){
   try{
     const [ev,st,sol]=await Promise.all([
-      fetch(API+'/api/events?giorni=3&mag=0.5').then(r=>r.json()),
-      fetch(API+'/api/stats').then(r=>r.json()),
-      fetch(API+'/api/solar').then(r=>r.json()),
+      FJ(API+'/api/events?giorni=3&mag=0.5'),
+      FJ(API+'/api/stats'),
+      FJ(API+'/api/solar'),
     ]);
     const last=(ev.events||[])[0];
     if(last){
@@ -3191,7 +3192,7 @@ async function loadSismo(){
 
 async function loadCF(){
   try{
-    const cf=await fetch(API+'/api/cf').then(r=>r.json());
+    const cf=await FJ(API+'/api/cf');
     if(cf.error){document.getElementById('cloc').textContent='—';document.getElementById('cdot').className='sdot';return;}
     if(cf.last){
       const m=parseFloat(cf.last.magnitudine)||0,d=new Date(cf.last.data_ora);
@@ -3239,7 +3240,7 @@ function flareClass(f){
 }
 async function loadSpaceWx(){
   try{
-    const kpRows=await fetch(SWPC+'/products/noaa-planetary-k-index.json').then(r=>r.json());
+    const kpRows=await FJ(SWPC+'/products/noaa-planetary-k-index.json');
     const k=lastValid(kpRows,colIdx(kpRows,'Kp',1));
     if(k!==null){
       const el=document.getElementById('wxKp');
@@ -3252,7 +3253,7 @@ async function loadSpaceWx(){
     }
   }catch(e){console.debug('spacewx:',e.message);}
   try{
-    const plasma=await fetch(SWPC+'/products/solar-wind/plasma-2-hour.json').then(r=>r.json());
+    const plasma=await FJ(SWPC+'/products/solar-wind/plasma-2-hour.json');
     const speed=lastValid(plasma,colIdx(plasma,'speed',2)),dens=lastValid(plasma,colIdx(plasma,'density',1));
     if(speed!==null){
       const el=document.getElementById('wxWind');
@@ -3262,13 +3263,13 @@ async function loadSpaceWx(){
     if(dens!==null)document.getElementById('wxDens').textContent=dens.toFixed(1)+' n/cc';
   }catch(e){console.debug('spacewx:',e.message);}
   try{
-    const mag=await fetch(SWPC+'/products/solar-wind/mag-2-hour.json').then(r=>r.json());
+    const mag=await FJ(SWPC+'/products/solar-wind/mag-2-hour.json');
     const bt=lastValid(mag,colIdx(mag,'bt',-1)),bz=lastValid(mag,colIdx(mag,'bz_gsm',3));
     if(bt!==null||bz!==null)document.getElementById('wxBtBz').textContent=
       (bt!==null?bt.toFixed(1):'—')+' / '+(bz!==null?bz.toFixed(1):'—')+' nT';
   }catch(e){console.debug('spacewx:',e.message);}
   try{
-    const xr=await fetch(SWPC+'/json/goes/primary/xrays-6-hour.json').then(r=>r.json());
+    const xr=await FJ(SWPC+'/json/goes/primary/xrays-6-hour.json');
     const long=xr.filter(d=>d.energy==='0.1-0.8nm');
     const last=long[long.length-1];
     const f=last?parseFloat(last.flux):NaN;
@@ -3284,13 +3285,13 @@ async function loadSpaceWx(){
 
 applyKpAtmosphere(1); // valore neutro iniziale, in attesa del primo fetch reale
 // sequenziale: loadSpaceWx per ultimo, così il Kp live SWPC vince su skp/atmosfera
-let refreshingSince=0; // lock con scadenza: se un fetch resta appeso, dopo 60s si riparte comunque
+let refreshBusy=false; // i fetch hanno timeout 15s, quindi il lock si libera sempre
 async function refreshAll(){
-  if(refreshingSince&&Date.now()-refreshingSince<60000)return;
-  refreshingSince=Date.now();
+  if(refreshBusy)return;
+  refreshBusy=true;
   try{await loadSismo();await loadCF();await loadSpaceWx();}
   catch(e){console.debug('refresh:',e.message);}
-  finally{refreshingSince=0;}
+  finally{refreshBusy=false;}
 }
 refreshAll();
 setInterval(refreshAll,5*60*1000);
