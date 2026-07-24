@@ -3244,7 +3244,7 @@ async function loadSpaceWx(){
       if(ke){ke.textContent=k.toFixed(1);ke.style.color=KC(k);}
       applyKpAtmosphere(k);
     }
-  }catch(e){}
+  }catch(e){console.debug('spacewx:',e.message);}
   try{
     const plasma=await fetch(SWPC+'/products/solar-wind/plasma-2-hour.json').then(r=>r.json());
     const speed=lastValid(plasma,2),dens=lastValid(plasma,1);
@@ -3254,13 +3254,13 @@ async function loadSpaceWx(){
       el.style.color=speed<400?'#69f0ae':speed<550?'#ffd600':speed<700?'#ff6d00':'#ff1744';
     }
     if(dens!==null)document.getElementById('wxDens').textContent=dens.toFixed(1)+' n/cc';
-  }catch(e){}
+  }catch(e){console.debug('spacewx:',e.message);}
   try{
     const mag=await fetch(SWPC+'/products/solar-wind/mag-2-hour.json').then(r=>r.json());
     const bt=lastValid(mag,6),bz=lastValid(mag,3);
     if(bt!==null||bz!==null)document.getElementById('wxBtBz').textContent=
       (bt!==null?bt.toFixed(1):'—')+' / '+(bz!==null?bz.toFixed(1):'—')+' nT';
-  }catch(e){}
+  }catch(e){console.debug('spacewx:',e.message);}
   try{
     const xr=await fetch(SWPC+'/json/goes/primary/xrays-6-hour.json').then(r=>r.json());
     const long=xr.filter(d=>d.energy==='0.1-0.8nm');
@@ -3273,12 +3273,19 @@ async function loadSpaceWx(){
       document.getElementById('wxFlux').textContent=f.toExponential(2)+' W/m²';
       document.getElementById('wxXStato').textContent=stato;
     }
-  }catch(e){}
+  }catch(e){console.debug('spacewx:',e.message);}
 }
 
 applyKpAtmosphere(1); // valore neutro iniziale, in attesa del primo fetch reale
 // sequenziale: loadSpaceWx per ultimo, così il Kp live SWPC vince su skp/atmosfera
-async function refreshAll(){await loadSismo();await loadCF();await loadSpaceWx();}
+let refreshBusy=false;
+async function refreshAll(){
+  if(refreshBusy)return;
+  refreshBusy=true;
+  try{await loadSismo();await loadCF();await loadSpaceWx();}
+  catch(e){console.debug('refresh:',e.message);}
+  finally{refreshBusy=false;}
+}
 refreshAll();
 setInterval(refreshAll,5*60*1000);
 </script>
