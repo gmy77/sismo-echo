@@ -3240,6 +3240,9 @@ async function loadSpaceWx(){
       el.textContent=k.toFixed(1);el.style.color=KC(k);
       document.getElementById('wxKpStato').textContent=
         k<2?'Silenzio cosmico':k<4?'Quiete':k<5?'Attivo':k<6?'Tempesta G1':k<7?'Tempesta G2':'Tempesta forte';
+      const ke=document.getElementById('skp');
+      if(ke){ke.textContent=k.toFixed(1);ke.style.color=KC(k);}
+      applyKpAtmosphere(k);
     }
   }catch(e){}
   try{
@@ -3262,8 +3265,8 @@ async function loadSpaceWx(){
     const xr=await fetch(SWPC+'/json/goes/primary/xrays-6-hour.json').then(r=>r.json());
     const long=xr.filter(d=>d.energy==='0.1-0.8nm');
     const last=long[long.length-1];
-    if(last&&last.flux!=null){
-      const f=parseFloat(last.flux);
+    const f=last?parseFloat(last.flux):NaN;
+    if(Number.isFinite(f)){
       const [cls,col,stato]=flareClass(f);
       const el=document.getElementById('wxXray');
       el.textContent=cls;el.style.color=col;
@@ -3274,8 +3277,10 @@ async function loadSpaceWx(){
 }
 
 applyKpAtmosphere(1); // valore neutro iniziale, in attesa del primo fetch reale
-loadSismo(); loadCF(); loadSpaceWx();
-setInterval(function(){loadSismo();loadCF();loadSpaceWx();},5*60*1000);
+// sequenziale: loadSpaceWx per ultimo, così il Kp live SWPC vince su skp/atmosfera
+async function refreshAll(){await loadSismo();await loadCF();await loadSpaceWx();}
+refreshAll();
+setInterval(refreshAll,5*60*1000);
 </script>
 </body>
 </html>`;
