@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.8";
+const ECHO_VERSION = "3.9";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -885,6 +885,17 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-desc">groovebox · rave anni '90</div>
         <div class="app-tag">Music Lab</div>
         <div class="app-go">SUONA <span>→</span></div>
+      </a>
+
+      <a href="https://sismo.gimmycloud.net" target="_blank" class="app-card" style="--app:#ff3b30"
+         data-tt-title="SismoGlobe" data-tt-badge="NUOVO"
+         data-tt="Monitoraggio dei terremoti di tutto il pianeta in tempo reale su globo 3D con confini nazionali: feed USGS live, avvisi sui nuovi sismi, cerchi e anelli proporzionali alla magnitudo, istogramma 30 giorni ed energia rilasciata. Open source su GitHub.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🌍</div>
+        <div class="app-name">SismoGlobe</div>
+        <div class="app-desc">terremoti live · globo 3D</div>
+        <div class="app-tag">Earth Watch</div>
+        <div class="app-go">ESPLORA <span>→</span></div>
       </a>
 
     </div>
