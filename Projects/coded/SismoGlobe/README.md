@@ -4,7 +4,7 @@ Monitoraggio dei terremoti di tutto il pianeta in tempo reale, su un globo 3D in
 
 ## Funzionalità
 
-- **Globo 3D** (WebGL, [globe.gl](https://globe.gl)) con texture notturna, atmosfera e confini nazionali (world-atlas TopoJSON); hover su una nazione ne mostra il nome.
+- **Globo 3D** (WebGL, [globe.gl](https://globe.gl)) con texture notturna, atmosfera e confini nazionali (world-atlas TopoJSON, disegnati come singola mesh di linee per non pesare sul rendering).
 - **Feed live USGS**: polling ogni 60 secondi del feed `all_day` / `all_week` / `all_month`.
 - **Avvisi in tempo reale**: ogni nuovo terremoto genera un toast con magnitudo, località, profondità e ora; opzionale segnale acustico (tono più grave per magnitudo più alte) e "volo" della camera sull'epicentro per M ≥ 4.5.
 - **Cerchi proporzionali alla magnitudo**: ogni sisma è un cerchio colorato la cui dimensione cresce con la magnitudo; gli eventi delle ultime 3 ore emettono anelli animati (onde sismiche) con raggio e velocità proporzionali alla magnitudo.
@@ -12,6 +12,15 @@ Monitoraggio dei terremoti di tutto il pianeta in tempo reale, su un globo 3D in
 - **Statistiche**: eventi oggi, eventi nell'ultima ora, magnitudo massima 24h, energia sismica rilasciata nelle ultime 24h (equivalente TNT).
 - **Filtri**: finestra temporale (24h / 7g / 30g) e magnitudo minima.
 - **Lista eventi** cliccabile (vola sull'epicentro), tooltip dettagliato al passaggio del mouse, indicazione allerta tsunami.
+
+## Prestazioni
+
+La rotazione gira a 60 FPS anche nella vista a 30 giorni (~11.000 eventi). Accorgimenti adottati:
+
+- confini nazionali resi come **una sola** mesh `LineSegments` invece del layer poligoni di globe.gl (da ~1.400 a ~1 draw call);
+- punti fusi in un'unica geometria (`pointsMerge`) quando gli eventi visibili superano i 600;
+- anelli animati limitati ai 20 sismi più forti e geometria dei punti semplificata (`pointResolution`);
+- pixel ratio del renderer limitato a 1,25 (sugli schermi ad alta densità il costo cresce col quadrato).
 
 ## Avvio
 

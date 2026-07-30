@@ -1,7 +1,7 @@
 /* SismoGlobe — monitoraggio terremoti in tempo reale (dati USGS) */
 'use strict';
 
-const APP_VERSION = 'v1.1.0';
+const APP_VERSION = 'v1.2.0';
 const USGS = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
 const FEEDS = { day: 'all_day.geojson', week: 'all_week.geojson', month: 'all_month.geojson' };
 const POLL_MS = 60_000;          // refresh feed corrente
@@ -79,7 +79,7 @@ function parseFeed(geojson) {
 }
 
 // ---------- Globo ----------
-const globe = Globe()($('globe'))
+const globe = Globe({ rendererConfig: { antialias: true, powerPreference: 'high-performance' } })($('globe'))
   .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
   .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
   .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
@@ -90,7 +90,8 @@ const globe = Globe()($('globe'))
   .pointColor(d => magColor(d.mag))
   .pointAltitude(0.008)
   .pointRadius(d => Math.max(0.13, d.mag * d.mag * 0.032))
-  .pointsTransitionDuration(500)
+  .pointResolution(6)
+  .pointsTransitionDuration(300)
   .pointLabel(d => `
     <div class="globe-tip">
       <b style="color:${magColor(d.mag)}">M ${d.mag.toFixed(1)}</b> — ${d.place}<br>
@@ -104,6 +105,9 @@ const globe = Globe()($('globe'))
   .ringMaxRadius(d => Math.max(2, d.mag * 2.2))
   .ringPropagationSpeed(d => Math.max(1, d.mag * 0.8))
   .ringRepeatPeriod(d => Math.max(400, 1600 - d.mag * 150));
+
+// Limita il costo di rendering (il pixel ratio alto pesa molto sui portatili)
+globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
 
 globe.controls().autoRotate = true;
 globe.controls().autoRotateSpeed = 0.4;
@@ -126,20 +130,37 @@ new ResizeObserver(() => { syncTopbarHeight(); fitGlobe(); }).observe($('topbar'
 syncTopbarHeight();
 fitGlobe();
 
-// Confini nazionali (TopoJSON world-atlas)
+// Confini nazionali (TopoJSON world-atlas), fusi in un'unica mesh di linee:
+// il layer poligoni di globe.gl genera ~1400 draw call, questa 1 sola.
 fetch('https://unpkg.com/world-atlas@2.0.2/countries-110m.json')
   .then(r => r.json())
   .then(world => {
-    const countries = topojson.feature(world, world.objects.countries).features;
-    globe
-      .polygonsData(countries)
-      .polygonCapColor(() => 'rgba(90,130,255,0.05)')
-      .polygonSideColor(() => 'rgba(0,0,0,0)')
-      .polygonStrokeColor(() => 'rgba(140,175,255,0.5)')
-      .polygonAltitude(0.006)
-      .polygonLabel(d => `<div class="globe-tip"><b>${d.properties.name}</b></div>`)
-      .onPolygonHover(p => globe.polygonCapColor(c =>
-        c === p ? 'rgba(90,130,255,0.28)' : 'rgba(90,130,255,0.05)'));
+    const lines = topojson.mesh(world, world.objects.countries).coordinates;
+    const pos = [];
+    for (const line of lines) {
+      for (let i = 0; i < line.length - 1; i++) {
+        const a = globe.getCoords(line[i][1], line[i][0], 0.006);
+        const b = globe.getCoords(line[i + 1][1], line[i + 1][0], 0.006);
+        pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
+    }
+    // I costruttori vanno presi dall'istanza three INTERNA di globe.gl (dal
+    // graticolo nascosto già in scena): oggetti creati con un three esterno
+    // mandano in crash il loop di rendering. La classe base del graticolo
+    // (GeoJsonGeometry) è BufferGeometry.
+    let proto = null;
+    globe.scene().traverse(o => { if (!proto && o.isLineSegments) proto = o; });
+    if (!proto) throw new Error('graticolo interno non trovato');
+    const BufferGeometryCls = Object.getPrototypeOf(proto.geometry.constructor);
+    const AttributeCls = proto.geometry.attributes.position.constructor;
+    const geo = new BufferGeometryCls();
+    geo.setAttribute('position', new AttributeCls(new Float32Array(pos), 3));
+    const mat = proto.material.clone();
+    mat.color.set('#8cafff');
+    mat.transparent = true;
+    mat.opacity = 0.55;
+    mat.depthWrite = false;
+    globe.scene().add(new (proto.constructor)(geo, mat));
   })
   .catch(err => console.error('Confini non caricati:', err));
 
@@ -195,11 +216,17 @@ function render() {
   const vis = visibleQuakes();
   const now = Date.now();
 
+  // Nelle viste affollate (7g/30g) i punti vengono fusi in un'unica mesh:
+  // molto più fluido, si perde solo il tooltip al passaggio del mouse
+  globe.pointsMerge(vis.length > 600);
   globe.pointsData(vis);
-  // Anelli solo su eventi recenti (o sempre, se si guarda un giorno passato con M>=5)
-  const rings = state.selectedDay
+  // Anelli solo su eventi recenti (o M>=5 se si guarda un giorno passato),
+  // limitati ai 20 più forti: ogni anello animato costa parecchi frame
+  const rings = (state.selectedDay
     ? vis.filter(q => q.mag >= 5)
-    : vis.filter(q => now - q.time < RING_WINDOW_MS);
+    : vis.filter(q => now - q.time < RING_WINDOW_MS))
+    .sort((a, b) => b.mag - a.mag)
+    .slice(0, 20);
   globe.ringsData(rings);
 
   renderList(vis);
@@ -374,6 +401,7 @@ window.addEventListener('resize', fitGlobe);
 setInterval(() => render(), POLL_MS);
 
 // ---------- Avvio ----------
+window.SG = { globe, state }; // per diagnostica da console
 $('app-version').textContent = 'SismoGlobe ' + APP_VERSION;
 (async () => {
   await loadFeed();
