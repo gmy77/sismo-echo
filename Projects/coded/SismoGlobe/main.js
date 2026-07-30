@@ -1,6 +1,7 @@
 /* SismoGlobe — monitoraggio terremoti in tempo reale (dati USGS) */
 'use strict';
 
+const APP_VERSION = 'v1.1.0';
 const USGS = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
 const FEEDS = { day: 'all_day.geojson', week: 'all_week.geojson', month: 'all_month.geojson' };
 const POLL_MS = 60_000;          // refresh feed corrente
@@ -107,6 +108,23 @@ const globe = Globe()($('globe'))
 globe.controls().autoRotate = true;
 globe.controls().autoRotateSpeed = 0.4;
 globe.pointOfView({ lat: 20, lng: 10, altitude: 2.2 });
+
+// Centra il globo nello spazio libero a destra del pannello: il canvas viene
+// allargato oltre il bordo destro (nascosto da overflow:hidden) così che il
+// centro cada a metà dell'area visibile, non a metà finestra.
+function fitGlobe() {
+  const panel = $('panel');
+  const pw = panel && panel.offsetWidth > 0 ? panel.getBoundingClientRect().right : 0;
+  globe.width(window.innerWidth + Math.max(0, pw)).height(window.innerHeight);
+}
+
+// Pannello e avvisi partono sotto la barra, qualunque sia la sua altezza reale
+function syncTopbarHeight() {
+  document.documentElement.style.setProperty('--topbar-h', $('topbar').offsetHeight + 'px');
+}
+new ResizeObserver(() => { syncTopbarHeight(); fitGlobe(); }).observe($('topbar'));
+syncTopbarHeight();
+fitGlobe();
 
 // Confini nazionali (TopoJSON world-atlas)
 fetch('https://unpkg.com/world-atlas@2.0.2/countries-110m.json')
@@ -350,14 +368,13 @@ $('globe').addEventListener('pointerup', () => {
   setTimeout(() => { globe.controls().autoRotate = $('chk-rotate').checked; }, 3000);
 });
 
-window.addEventListener('resize', () => {
-  globe.width(window.innerWidth).height(window.innerHeight);
-});
+window.addEventListener('resize', fitGlobe);
 
 // Aggiorna i "tempo fa" della lista una volta al minuto
 setInterval(() => render(), POLL_MS);
 
 // ---------- Avvio ----------
+$('app-version').textContent = 'SismoGlobe ' + APP_VERSION;
 (async () => {
   await loadFeed();
   loadMonth();
