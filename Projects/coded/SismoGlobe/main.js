@@ -1,7 +1,7 @@
 /* SismoGlobe — monitoraggio terremoti in tempo reale (dati USGS) */
 'use strict';
 
-const APP_VERSION = 'v1.2.2';
+const APP_VERSION = 'v1.3.0';
 const USGS = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
 const FEEDS = { day: 'all_day.geojson', week: 'all_week.geojson', month: 'all_month.geojson' };
 const POLL_MS = 60_000;          // refresh feed corrente
@@ -441,6 +441,20 @@ $('chk-sound').onchange = e => {
 $('chk-rotate').onchange = e => { globe.controls().autoRotate = e.target.checked; };
 $('chk-fly').onchange = e => { state.flyToNew = e.target.checked; };
 $('day-reset').onclick = () => selectDay(null);
+
+// Guida: il testo sta già nell'HTML (serve anche a motori di ricerca e IA,
+// che non eseguono JavaScript), qui si gestisce solo l'apertura.
+function toggleInfo(open) {
+  const info = $('info');
+  const show = open === undefined ? info.hidden : open;
+  info.hidden = !show;
+  document.body.classList.toggle('info-open', show);
+  $('btn-info').setAttribute('aria-expanded', String(show));
+  if (show) info.scrollTop = 0;
+}
+$('btn-info').onclick = () => toggleInfo();
+$('info-close').onclick = () => toggleInfo(false);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleInfo(false); });
 
 // Pausa rotazione durante l'interazione
 $('globe').addEventListener('pointerdown', () => { globe.controls().autoRotate = false; });

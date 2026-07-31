@@ -261,6 +261,74 @@ main { height: 100%; }
 }
 .globe-tip b { font-size: 13px; }
 
+/* ---------- Guida / informazioni ---------- */
+#btn-info {
+  background: #101830;
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+#btn-info:hover { border-color: var(--accent); color: #fff; }
+
+#info {
+  position: fixed;
+  top: calc(var(--topbar-h) + 12px);
+  right: 12px;
+  bottom: 12px;
+  width: min(560px, calc(100vw - 360px));
+  z-index: 25;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 22px 26px 26px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 40px #000a;
+  line-height: 1.6;
+  font-size: 14px;
+}
+#info[hidden] { display: none; }
+#info h2 {
+  font-size: 15px;
+  margin: 20px 0 7px;
+  color: #fff;
+  letter-spacing: .3px;
+}
+#info h2:first-of-type { margin-top: 0; }
+#info p { margin-bottom: 4px; color: var(--text); }
+#info strong { color: #fff; }
+#info a { color: var(--accent); }
+#info .info-foot {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+#info-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  background: rgba(13,18,34,.9);
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  width: 26px; height: 26px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-left: 12px;
+}
+#info-close:hover { color: #fff; border-color: var(--accent); }
+
+body.info-open #footer { display: none; }   /* la guida ha già i suoi link in fondo */
+
+#info::-webkit-scrollbar { width: 7px; }
+#info::-webkit-scrollbar-thumb { background: rgba(90,130,255,.3); border-radius: 4px; }
+
 /* ---------- Footer ---------- */
 #footer {
   position: fixed;
