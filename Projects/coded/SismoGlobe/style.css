@@ -350,4 +350,8 @@ body.info-open #footer { display: none; }   /* la guida ha già i suoi link in f
 @media (max-width: 900px) {
   #panel { width: 260px; }
   #brand .sub { display: none; }
+  /* Sotto i 900px lo spazio a destra del pannello non basta: la guida
+     occupa tutta la larghezza disponibile. Senza questo, su schermi molto
+     stretti calc(100vw - 360px) diventa negativa e la larghezza non è valida. */
+  #info { left: 12px; width: auto; padding: 18px 20px 22px; }
 }

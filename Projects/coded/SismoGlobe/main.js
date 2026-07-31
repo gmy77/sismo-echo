@@ -1,7 +1,7 @@
 /* SismoGlobe — monitoraggio terremoti in tempo reale (dati USGS) */
 'use strict';
 
-const APP_VERSION = 'v1.3.0';
+const APP_VERSION = 'v1.3.3';
 const USGS = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
 const FEEDS = { day: 'all_day.geojson', week: 'all_week.geojson', month: 'all_month.geojson' };
 const POLL_MS = 60_000;          // refresh feed corrente
@@ -115,6 +115,11 @@ globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
 // fluido spostandolo sullo sfondo (lì il raggio manca la sfera e il test esce
 // subito). Per una sfera basta l'intersezione analitica; graticolo e confini
 // non sono interattivi e dal test si possono escludere del tutto.
+// Costanti di three.js per material.side (three non è accessibile da qui:
+// globe.gl incorpora la propria istanza e non la espone).
+const THREE_BACK_SIDE = 1;
+const THREE_DOUBLE_SIDE = 2;
+
 function speedUpRaycasting() {
   globe.scene().traverse(o => {
     if (o.__fastRaycast) return;
@@ -141,9 +146,9 @@ function speedUpRaycasting() {
         const tNear = -b - sq;                      // faccia frontale
         const tFar = -b + sq;                       // faccia posteriore
         let t;
-        if (side === 1) t = tFar;                   // BackSide
-        else if (side === 2) t = tNear >= 0 ? tNear : tFar;  // DoubleSide
-        else t = tNear;                             // FrontSide (default)
+        if (side === THREE_BACK_SIDE) t = tFar;
+        else if (side === THREE_DOUBLE_SIDE) t = tNear >= 0 ? tNear : tFar;
+        else t = tNear;                             // FrontSide, il predefinito
         if (t < 0 || t < raycaster.near || t > raycaster.far) return;
         intersects.push({
           distance: t,
@@ -184,9 +189,45 @@ fitGlobe();
 
 // Confini nazionali (TopoJSON world-atlas), fusi in un'unica mesh di linee:
 // il layer poligoni di globe.gl genera ~1400 draw call, questa 1 sola.
+// globe.gl crea il proprio oggetto di linee (il graticolo, che tiene nascosto)
+// poco DOPO l'inizializzazione, non necessariamente prima che arrivi il
+// TopoJSON: a cache calda il file arriva per primo e senza questa attesa i
+// confini non venivano disegnati affatto. Si usa setTimeout e non
+// requestAnimationFrame perché quest'ultimo è sospeso nelle schede in secondo
+// piano, e il sito verrebbe aperto senza confini.
+function findLinePrototype(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    const look = () => {
+      let proto = null;
+      globe.scene().traverse(o => { if (!proto && o.isLineSegments) proto = o; });
+      if (proto) return resolve(proto);
+      if (Date.now() > deadline) return reject(new Error('nessun oggetto di linee interno da cui clonare'));
+      setTimeout(look, 30);
+    };
+    look();
+  });
+}
+
+// Restituisce una BufferGeometry vuota della three INTERNA di globe.gl.
+// La geometria del graticolo è una sottoclasse (GeoJsonGeometry) il cui
+// costruttore pretende argomenti GeoJSON, e cui clone() va in errore perché li
+// ha persi: si risale quindi alla classe base. Il ciclo con la prova d'uso
+// evita di dipendere dalla profondità esatta della gerarchia.
+function newInternalBufferGeometry(protoGeometry) {
+  const candidates = [Object.getPrototypeOf(protoGeometry.constructor), protoGeometry.constructor];
+  for (const Cls of candidates) {
+    try {
+      const g = new Cls();
+      if (typeof g.setAttribute === 'function') return g;
+    } catch (_) { /* non istanziabile senza argomenti: prova la prossima */ }
+  }
+  throw new Error('classe BufferGeometry interna non individuata');
+}
+
 fetch('https://unpkg.com/world-atlas@2.0.2/countries-110m.json')
   .then(r => r.json())
-  .then(world => {
+  .then(async world => {
     const lines = topojson.mesh(world, world.objects.countries).coordinates;
     const pos = [];
     for (const line of lines) {
@@ -196,17 +237,18 @@ fetch('https://unpkg.com/world-atlas@2.0.2/countries-110m.json')
         pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
       }
     }
-    // I costruttori vanno presi dall'istanza three INTERNA di globe.gl (dal
-    // graticolo nascosto già in scena): oggetti creati con un three esterno
-    // mandano in crash il loop di rendering. La classe base del graticolo
-    // (GeoJsonGeometry) è BufferGeometry.
-    let proto = null;
-    globe.scene().traverse(o => { if (!proto && o.isLineSegments) proto = o; });
-    if (!proto) throw new Error('graticolo interno non trovato');
-    const BufferGeometryCls = Object.getPrototypeOf(proto.geometry.constructor);
+    // Geometria e materiale vanno creati con l'istanza three INTERNA di
+    // globe.gl: oggetti costruiti con un three importato a parte mandano in
+    // stallo il loop di rendering, senza errori in console. Si parte quindi da
+    // un oggetto di linee già in scena (il graticolo, che globe.gl crea sempre
+    // anche quando è invisibile) e se ne clona la geometria sostituendone il
+    // solo attributo "position": così non si dipende dalla catena di prototipi
+    // del suo costruttore, che potrebbe cambiare fra le versioni.
+    const proto = await findLinePrototype();
     const AttributeCls = proto.geometry.attributes.position.constructor;
-    const geo = new BufferGeometryCls();
+    const geo = newInternalBufferGeometry(proto.geometry);
     geo.setAttribute('position', new AttributeCls(new Float32Array(pos), 3));
+    geo.computeBoundingSphere();
     const mat = proto.material.clone();
     mat.color.set('#8cafff');
     mat.transparent = true;
@@ -468,7 +510,12 @@ window.addEventListener('resize', fitGlobe);
 setInterval(() => render(), POLL_MS);
 
 // ---------- Avvio ----------
-window.SG = { globe, state }; // per diagnostica da console
+// Diagnostica da console: solo in locale o con ?debug in coda all'indirizzo,
+// per non esporre lo stato dell'app in produzione.
+if (['localhost', '127.0.0.1'].includes(location.hostname) ||
+    new URLSearchParams(location.search).has('debug')) {
+  window.SG = { globe, state };
+}
 $('app-version').textContent = 'SismoGlobe ' + APP_VERSION;
 (async () => {
   await loadFeed();
