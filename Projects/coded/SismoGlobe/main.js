@@ -510,8 +510,9 @@ window.addEventListener('resize', fitGlobe);
 setInterval(() => render(), POLL_MS);
 
 // ---------- Avvio ----------
-// Diagnostica da console: solo in locale o con ?debug in coda all'indirizzo,
-// per non esporre lo stato dell'app in produzione.
+// Diagnostica da console: attiva in locale e, su richiesta esplicita, con
+// ?debug in coda all'indirizzo. Serve per ispezionare il sito pubblicato
+// quando c'è da indagare un problema; di suo, in produzione, non è esposta.
 if (['localhost', '127.0.0.1'].includes(location.hostname) ||
     new URLSearchParams(location.search).has('debug')) {
   window.SG = { globe, state };

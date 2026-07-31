@@ -1,6 +1,7 @@
 # Indicizzazione — cosa è già fatto e cosa devi fare tu
 
-Stato al 2026-07-31, SismoGlobe v1.3.0.
+Stato al 2026-07-31. I passaggi qui descritti non dipendono dalla versione dell'applicazione:
+per quella fa fede il numero mostrato in basso a destra nel sito.
 
 ## Già fatto nel sito (nessuna azione richiesta)
 
