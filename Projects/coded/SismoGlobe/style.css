@@ -261,6 +261,15 @@ main { height: 100%; }
 }
 .globe-tip b { font-size: 13px; }
 
+/* Tooltip del puntamento manuale (viste con i punti fusi) */
+#custom-tip {
+  position: fixed;
+  z-index: 30;
+  display: none;
+  pointer-events: none;
+  max-width: 320px;
+}
+
 /* ---------- Guida / informazioni ---------- */
 #btn-info {
   background: #101830;

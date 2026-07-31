@@ -1,7 +1,7 @@
 /* SismoGlobe — monitoraggio terremoti in tempo reale (dati USGS) */
 'use strict';
 
-const APP_VERSION = 'v1.3.3';
+const APP_VERSION = 'v1.4.0';
 const USGS = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
 const FEEDS = { day: 'all_day.geojson', week: 'all_week.geojson', month: 'all_month.geojson' };
 const POLL_MS = 60_000;          // refresh feed corrente
@@ -295,6 +295,125 @@ function showToast(d, isNew = true) {
   while ($('toasts').children.length > 5) $('toasts').lastChild.remove();
 }
 
+// ---------- Puntamento dei terremoti con i punti fusi ----------
+// Con pointsMerge globe.gl disegna tutti i punti come un unico oggetto e non sa
+// più dire quale si stia puntando: nelle viste affollate tooltip e clic
+// sull'epicentro smetterebbero di funzionare. Qui il puntamento lo facciamo a
+// mano: si interseca il raggio del mouse con la sfera del globo e si cerca il
+// terremoto più vicino al punto colpito. È un ciclo su un vettore di posizioni
+// precalcolate, quindi costa una frazione di millisecondo e non tocca la GPU.
+const GLOBE_RADIUS = 100;   // raggio del globo nelle unità interne di globe.gl
+const PICK_TOLERANCE = 1.6; // ~180 km: quanto si può sbagliare mira
+// Le posizioni stanno in un Float32Array invece che in un vettore di oggetti:
+// con 11.000 eventi il ciclo di ricerca scende da ~0,8 a ~0,2 ms, e gira a
+// ogni movimento del mouse.
+let hitPos = new Float32Array(0);
+let hitQuakes = [];
+let customTip = null;
+
+function rebuildHitIndex(list) {
+  hitPos = new Float32Array(list.length * 3);
+  hitQuakes = list;
+  for (let i = 0; i < list.length; i++) {
+    const v = globe.getCoords(list[i].lat, list[i].lng, 0.008);
+    hitPos[i * 3] = v.x;
+    hitPos[i * 3 + 1] = v.y;
+    hitPos[i * 3 + 2] = v.z;
+  }
+}
+
+function pickQuakeAt(clientX, clientY) {
+  if (!hitQuakes.length) return null;
+  const cam = globe.camera();
+  const rect = globe.renderer().domElement.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  const Vec3 = cam.position.constructor;
+  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+  const dir = new Vec3(ndcX, ndcY, 0.5).unproject(cam).sub(cam.position).normalize();
+  const o = cam.position;
+  // intersezione raggio-sfera: si tiene solo la faccia rivolta verso di noi,
+  // così i terremoti dell'altro emisfero non vengono puntati "attraverso" il globo
+  const b = o.x * dir.x + o.y * dir.y + o.z * dir.z;
+  const c = o.x * o.x + o.y * o.y + o.z * o.z - GLOBE_RADIUS * GLOBE_RADIUS;
+  const disc = b * b - c;
+  if (disc < 0) return null;                    // il puntatore è fuori dal globo
+  const t = -b - Math.sqrt(disc);
+  if (t < 0) return null;
+  const px = o.x + dir.x * t, py = o.y + dir.y * t, pz = o.z + dir.z * t;
+
+  let bestIdx = -1, bestD2 = Infinity;
+  for (let i = 0, j = 0; j < hitPos.length; i++, j += 3) {
+    const dx = hitPos[j] - px, dy = hitPos[j + 1] - py, dz = hitPos[j + 2] - pz;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 < bestD2) { bestD2 = d2; bestIdx = i; }
+  }
+  if (bestIdx < 0) return null;
+  const best = hitQuakes[bestIdx];
+  // la tolleranza segue il raggio disegnato: i sismi forti sono cerchi più grandi
+  const tol = Math.max(PICK_TOLERANCE, Math.max(0.13, best.mag * best.mag * 0.032) * 1.4);
+  return bestD2 <= tol * tol ? best : null;
+}
+
+function showCustomTip(q, x, y) {
+  if (!customTip) {
+    customTip = document.createElement('div');
+    customTip.className = 'globe-tip';
+    customTip.id = 'custom-tip';
+    document.body.appendChild(customTip);
+  }
+  customTip.innerHTML = `
+    <b style="color:${magColor(q.mag)}">M ${q.mag.toFixed(1)}</b> — ${q.place}<br>
+    ${fmtTime(q.time)} (${timeAgo(q.time)})<br>
+    Profondità: ${q.depth?.toFixed(0)} km${q.tsunami ? '<br>⚠️ Allerta tsunami' : ''}`;
+  customTip.style.display = 'block';
+  // si sposta a sinistra del cursore se altrimenti uscirebbe dallo schermo
+  const w = customTip.offsetWidth;
+  customTip.style.left = (x + 14 + w > window.innerWidth ? x - w - 14 : x + 14) + 'px';
+  customTip.style.top = (y + 14) + 'px';
+}
+
+function hideCustomTip() {
+  if (customTip) customTip.style.display = 'none';
+}
+
+// Attivo solo quando i punti sono fusi: altrimenti ci pensa globe.gl da sé e
+// si otterrebbero due tooltip sovrapposti.
+function customPickingActive() {
+  return globe.pointsMerge();
+}
+
+(() => {
+  const el = $('globe');
+  let downAt = null;
+
+  el.addEventListener('pointermove', ev => {
+    if (!customPickingActive()) { hideCustomTip(); return; }
+    const q = pickQuakeAt(ev.clientX, ev.clientY);
+    if (q) {
+      showCustomTip(q, ev.clientX, ev.clientY);
+      el.style.cursor = 'pointer';
+    } else {
+      hideCustomTip();
+      el.style.cursor = '';
+    }
+  });
+
+  el.addEventListener('pointerleave', hideCustomTip);
+  el.addEventListener('pointerdown', ev => { downAt = { x: ev.clientX, y: ev.clientY }; });
+
+  // Un clic vale solo se il puntatore non si è spostato: trascinando si ruota
+  // il globo, e non deve partire l'azione sull'epicentro.
+  el.addEventListener('pointerup', ev => {
+    if (!customPickingActive() || !downAt) { downAt = null; return; }
+    const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y);
+    downAt = null;
+    if (moved > 5) return;
+    const q = pickQuakeAt(ev.clientX, ev.clientY);
+    if (q) { flyTo(q, 1.2); showToast(q, false); }
+  });
+})();
+
 // ---------- Rendering dati ----------
 function visibleQuakes() {
   let list;
@@ -315,6 +434,7 @@ function render() {
   // molto più fluido, si perde solo il tooltip al passaggio del mouse
   globe.pointsMerge(vis.length > 600);
   globe.pointsData(vis);
+  rebuildHitIndex(vis);   // puntamento a mano quando i punti sono fusi
   // Anelli solo su eventi recenti (o M>=5 se si guarda un giorno passato),
   // limitati ai 20 più forti: ogni anello animato costa parecchi frame
   const rings = (state.selectedDay
