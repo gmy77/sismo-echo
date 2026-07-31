@@ -20,7 +20,8 @@ La rotazione gira a 60 FPS anche nella vista a 30 giorni (~11.000 eventi). Accor
 - confini nazionali resi come **una sola** mesh `LineSegments` invece del layer poligoni di globe.gl (da ~1.400 a ~1 draw call);
 - punti fusi in un'unica geometria (`pointsMerge`) quando gli eventi visibili superano i 600;
 - anelli animati limitati ai 20 sismi più forti e geometria dei punti semplificata (`pointResolution`);
-- pixel ratio del renderer limitato a 1,25 (sugli schermi ad alta densità il costo cresce col quadrato).
+- pixel ratio del renderer limitato a 1,25 (sugli schermi ad alta densità il costo cresce col quadrato);
+- **raycasting**: il test "cosa sta puntando il mouse" gira a ogni frame e contro la sfera del globo three.js provava tutti i suoi ~11.000 triangoli (~2,8 ms a frame per sfera, il globo scattava solo col puntatore sopra e tornava fluido sullo sfondo). Sostituito con l'intersezione analitica sfera-raggio, rispettando `material.side` perché l'atmosfera è `BackSide` e la sua faccia vicina non deve contare, altrimenti coprirebbe i terremoti. Graticolo e confini sono esclusi dal test. Da ~6,9 ms a ~0,33 ms per frame.
 
 ## Avvio
 

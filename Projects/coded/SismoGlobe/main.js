@@ -1,7 +1,7 @@
 /* SismoGlobe — monitoraggio terremoti in tempo reale (dati USGS) */
 'use strict';
 
-const APP_VERSION = 'v1.2.0';
+const APP_VERSION = 'v1.2.2';
 const USGS = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
 const FEEDS = { day: 'all_day.geojson', week: 'all_week.geojson', month: 'all_month.geojson' };
 const POLL_MS = 60_000;          // refresh feed corrente
@@ -109,6 +109,58 @@ const globe = Globe({ rendererConfig: { antialias: true, powerPreference: 'high-
 // Limita il costo di rendering (il pixel ratio alto pesa molto sui portatili)
 globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
 
+// Il test "cosa sta puntando il mouse" gira a ogni frame. Contro la sfera del
+// globo three.js prova tutti i suoi ~11.000 triangoli: ~2,8 ms per frame, per
+// questo il globo scattava appena il puntatore ci passava sopra e tornava
+// fluido spostandolo sullo sfondo (lì il raggio manca la sfera e il test esce
+// subito). Per una sfera basta l'intersezione analitica; graticolo e confini
+// non sono interattivi e dal test si possono escludere del tutto.
+function speedUpRaycasting() {
+  globe.scene().traverse(o => {
+    if (o.__fastRaycast) return;
+    if (o.isMesh && o.geometry && o.geometry.type === 'SphereGeometry') {
+      o.geometry.computeBoundingSphere();
+      const localRadius = o.geometry.boundingSphere.radius;
+      o.raycast = function (raycaster, intersects) {
+        const ray = raycaster.ray;
+        const e = this.matrixWorld.elements;
+        const radius = localRadius * Math.hypot(e[0], e[1], e[2]);
+        const d = ray.direction;
+        const ox = ray.origin.x - e[12];
+        const oy = ray.origin.y - e[13];
+        const oz = ray.origin.z - e[14];
+        const b = ox * d.x + oy * d.y + oz * d.z;
+        const c = ox * ox + oy * oy + oz * oz - radius * radius;
+        const disc = b * b - c;
+        if (disc < 0) return;                       // il raggio manca la sfera
+        const sq = Math.sqrt(disc);
+        // Va rispettato il lato del materiale come fa three.js: l'atmosfera è
+        // disegnata solo all'interno (BackSide), quindi la sua faccia vicina
+        // non conta — altrimenti "coprirebbe" i terremoti al passaggio del mouse.
+        const side = this.material && this.material.side;
+        const tNear = -b - sq;                      // faccia frontale
+        const tFar = -b + sq;                       // faccia posteriore
+        let t;
+        if (side === 1) t = tFar;                   // BackSide
+        else if (side === 2) t = tNear >= 0 ? tNear : tFar;  // DoubleSide
+        else t = tNear;                             // FrontSide (default)
+        if (t < 0 || t < raycaster.near || t > raycaster.far) return;
+        intersects.push({
+          distance: t,
+          object: this,
+          point: new (ray.origin.constructor)(
+            ray.origin.x + d.x * t, ray.origin.y + d.y * t, ray.origin.z + d.z * t),
+        });
+      };
+      o.__fastRaycast = true;
+    } else if (o.isLineSegments) {
+      o.raycast = () => {};
+      o.__fastRaycast = true;
+    }
+  });
+}
+speedUpRaycasting();
+
 globe.controls().autoRotate = true;
 globe.controls().autoRotateSpeed = 0.4;
 globe.pointOfView({ lat: 20, lng: 10, altitude: 2.2 });
@@ -161,6 +213,7 @@ fetch('https://unpkg.com/world-atlas@2.0.2/countries-110m.json')
     mat.opacity = 0.55;
     mat.depthWrite = false;
     globe.scene().add(new (proto.constructor)(geo, mat));
+    speedUpRaycasting(); // esclude anche i confini appena aggiunti
   })
   .catch(err => console.error('Confini non caricati:', err));
 
