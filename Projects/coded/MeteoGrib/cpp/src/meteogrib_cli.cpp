@@ -30,6 +30,7 @@ static void usage() {
         "Uso:\n"
         "  meteogrib info    FILE\n"
         "  meteogrib plot    FILE --index N [--out X.bmp] [--no-cities] [--no-max]\n"
+        "                                    [--no-smooth] [--grid]\n"
         "  meteogrib export  FILE --index N [--out X.csv]\n"
         "  meteogrib auto    FILE [--outdir DIR]\n");
 }
@@ -87,6 +88,8 @@ int main(int argc, char** argv) {
         RenderOpts o;
         o.showCities = !hasFlag(argc,argv,"--no-cities");
         o.showMax    = !hasFlag(argc,argv,"--no-max");
+        o.smooth     = !hasFlag(argc,argv,"--no-smooth");
+        o.showGrid   =  hasFlag(argc,argv,"--grid");
         Image img = renderField(g, classify(g), o);
         std::string out = argVal(argc,argv,"--out",
                                  "campo_" + std::to_string(idx) + "_" + g.shortName + ".bmp");

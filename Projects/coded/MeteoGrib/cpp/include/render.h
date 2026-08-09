@@ -28,9 +28,30 @@ inline const std::vector<City>& cities() {
 struct RenderOpts {
     bool showCities = true;
     bool showMax    = true;
-    bool showGrid   = true;
+    bool showGrid   = false;  // reticolo sopra il campo (spento = più realistico)
+    bool smooth     = true;   // interpolazione bilineare (mappa sfumata)
     int  width      = 1000;   // larghezza immagine desiderata
 };
+
+// Valore interpolato bilinearmente alla posizione frazionaria (fi, fj) della
+// griglia.  Gestisce i NaN facendo la media pesata dei soli punti validi.
+inline double sampleBilinear(const GribField& g, double fi, double fj) {
+    int i0 = (int)std::floor(fi), j0 = (int)std::floor(fj);
+    double ti = fi - i0, tj = fj - j0;
+    int ni = (int)g.ni, nj = (int)g.nj;
+    int i1 = std::min(i0 + 1, ni - 1), j1 = std::min(j0 + 1, nj - 1);
+    i0 = std::max(0, std::min(i0, ni - 1));
+    j0 = std::max(0, std::min(j0, nj - 1));
+    auto V = [&](int j, int i){ return g.values[size_t(j)*ni + i]; };
+    double v00=V(j0,i0), v01=V(j0,i1), v10=V(j1,i0), v11=V(j1,i1);
+    double w00=(1-ti)*(1-tj), w01=ti*(1-tj), w10=(1-ti)*tj, w11=ti*tj;
+    double sw=0, sv=0;
+    if (!std::isnan(v00)){ sv+=w00*v00; sw+=w00; }
+    if (!std::isnan(v01)){ sv+=w01*v01; sw+=w01; }
+    if (!std::isnan(v10)){ sv+=w10*v10; sw+=w10; }
+    if (!std::isnan(v11)){ sv+=w11*v11; sw+=w11; }
+    return sw > 0 ? sv/sw : std::nan("");
+}
 
 inline RGB pickColor(Kind k, double t) {
     switch (k) {
@@ -75,14 +96,29 @@ inline Image renderField(const GribField& g, Kind k, const RenderOpts& o) {
     double span = (g.vmax - g.vmin);
     if (span <= 0) span = 1;
     double cellW = double(plotW)/g.ni, cellH = double(plotH)/g.nj;
-    for (long j=0;j<g.nj;++j){
-        for (long i=0;i<g.ni;++i){
-            double v = g.values[size_t(j)*g.ni + i];
-            RGB col = std::isnan(v) ? RGB{60,60,60}
-                                    : pickColor(k, (v-g.vmin)/span);
-            int x0 = mL + int(i*cellW),     x1 = mL + int((i+1)*cellW)-1;
-            int y0 = mT + int(j*cellH),     y1 = mT + int((j+1)*cellH)-1;
-            img.fillRect(x0,y0,x1,y1,col);
+    if (o.smooth && g.ni > 1 && g.nj > 1) {
+        // resa sfumata: ogni pixel è interpolato tra i 4 punti di griglia
+        // vicini, così sparisce l'effetto "scacchiera"
+        for (int py = mT; py < mT+plotH; ++py) {
+            double fj = double(py-mT)/std::max(1,plotH-1) * (g.nj-1);
+            for (int px = mL; px < mL+plotW; ++px) {
+                double fi = double(px-mL)/std::max(1,plotW-1) * (g.ni-1);
+                double v = sampleBilinear(g, fi, fj);
+                img.set(px, py, std::isnan(v) ? RGB{60,60,60}
+                                              : pickColor(k, (v-g.vmin)/span));
+            }
+        }
+    } else {
+        // resa a blocchi (un colore per cella)
+        for (long j=0;j<g.nj;++j){
+            for (long i=0;i<g.ni;++i){
+                double v = g.values[size_t(j)*g.ni + i];
+                RGB col = std::isnan(v) ? RGB{60,60,60}
+                                        : pickColor(k, (v-g.vmin)/span);
+                int x0 = mL + int(i*cellW),     x1 = mL + int((i+1)*cellW)-1;
+                int y0 = mT + int(j*cellH),     y1 = mT + int((j+1)*cellH)-1;
+                img.fillRect(x0,y0,x1,y1,col);
+            }
         }
     }
     if (o.showGrid) {

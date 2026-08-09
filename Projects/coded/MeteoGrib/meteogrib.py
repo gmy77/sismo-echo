@@ -431,7 +431,7 @@ def plot_message(m: Message, out: str, title_extra: str = ""):
         ax.clabel(cs, inline=True, fontsize=7, fmt="%d")
         cbar = fig.colorbar(cf, ax=ax, shrink=0.8, pad=0.02)
     else:
-        mesh = ax.pcolormesh(lons, lats, data, cmap=st["cmap"], shading="auto", **tk)
+        mesh = ax.pcolormesh(lons, lats, data, cmap=st["cmap"], shading="gouraud", **tk)
         cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
     cbar.set_label(f"{m.short_name}  [{st['unit'] or m.units}]")
 
@@ -462,7 +462,7 @@ def plot_wind(mu: Message, mv: Message, out: str):
     speed = np.hypot(mu.values, mv.values)
     fig, ax, proj = _make_geo_fig(_extent_of(mu))
     tk = {"transform": proj} if proj is not None else {}
-    mesh = ax.pcolormesh(mu.lons, mu.lats, speed, cmap="YlOrRd", shading="auto", **tk)
+    mesh = ax.pcolormesh(mu.lons, mu.lats, speed, cmap="YlOrRd", shading="gouraud", **tk)
     cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
     cbar.set_label("velocità vento [m/s]")
     # sottocampioniamo le frecce puntando a ~18 per lato, così restano
@@ -511,7 +511,7 @@ def plot_shear(hi: Message, hv: Message, lo: Message, lv: Message, out: str):
 
     fig, ax, proj = _make_geo_fig(_extent_of(hi))
     tk = {"transform": proj} if proj is not None else {}
-    mesh = ax.pcolormesh(hi.lons, hi.lats, shear, cmap="BuPu", shading="auto", **tk)
+    mesh = ax.pcolormesh(hi.lons, hi.lats, shear, cmap="BuPu", shading="gouraud", **tk)
     cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
     cbar.set_label("wind shear [m/s]")
     sy, sx = _quiver_step(shear.shape)
@@ -547,7 +547,7 @@ def plot_storm(cape: Message, du, dv, out: str):
     fig, ax, proj = _make_geo_fig(_extent_of(cape))
     tk = {"transform": proj} if proj is not None else {}
     mesh = ax.pcolormesh(cape.lons, cape.lats, cape.values,
-                         cmap="YlOrRd", shading="auto", **tk)
+                         cmap="YlOrRd", shading="gouraud", **tk)
     cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
     cbar.set_label("CAPE [J/kg]")
     sy, sx = _quiver_step(cape.values.shape)

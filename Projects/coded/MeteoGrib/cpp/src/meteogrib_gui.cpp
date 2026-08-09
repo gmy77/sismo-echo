@@ -38,7 +38,7 @@ static const char* GH_API =
 enum {
     IDC_OPEN = 101, IDC_SAVEBMP, IDC_SAVECSV,
     IDC_LIST, IDC_CHK_CITIES, IDC_CHK_MAX, IDC_CHK_GRID, IDC_STATUS, IDC_ABOUT,
-    IDC_UPDATE
+    IDC_UPDATE, IDC_CHK_SMOOTH
 };
 
 static const char* ABOUT_TEXT =
@@ -337,9 +337,11 @@ static LRESULT CALLBACK WndProc(HWND w, UINT msg, WPARAM wp, LPARAM lp) {
         CreateWindowA("BUTTON","Badge del massimo",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,
                       10,y,200,22,w,(HMENU)IDC_CHK_MAX,0,0);
         CheckDlgButton(w,IDC_CHK_MAX,BST_CHECKED); y+=26;
+        CreateWindowA("BUTTON","Sfuma (interpola)",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,
+                      10,y,200,22,w,(HMENU)IDC_CHK_SMOOTH,0,0);
+        CheckDlgButton(w,IDC_CHK_SMOOTH,BST_CHECKED); y+=26;
         CreateWindowA("BUTTON","Griglia",WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX,
-                      10,y,200,22,w,(HMENU)IDC_CHK_GRID,0,0);
-        CheckDlgButton(w,IDC_CHK_GRID,BST_CHECKED); y+=32;
+                      10,y,200,22,w,(HMENU)IDC_CHK_GRID,0,0); y+=32;
         CreateWindowA("STATIC","Campi:",WS_CHILD|WS_VISIBLE,10,y,200,16,w,0,0,0); y+=20;
         g_list = CreateWindowA("LISTBOX","",
                       WS_CHILD|WS_VISIBLE|WS_VSCROLL|LBS_NOTIFY,
@@ -374,6 +376,9 @@ static LRESULT CALLBACK WndProc(HWND w, UINT msg, WPARAM wp, LPARAM lp) {
             rerender(w); break;
         case IDC_CHK_GRID:
             g_opts.showGrid = IsDlgButtonChecked(w,IDC_CHK_GRID)==BST_CHECKED;
+            rerender(w); break;
+        case IDC_CHK_SMOOTH:
+            g_opts.smooth = IsDlgButtonChecked(w,IDC_CHK_SMOOTH)==BST_CHECKED;
             rerender(w); break;
         case IDC_LIST:
             if (code == LBN_SELCHANGE) {
