@@ -7,6 +7,7 @@ numpy>=1.21
 matplotlib>=3.5
 eccodes>=1.6
 
-# Opzionale: coste e confini nazionali sulle mappe.
-# Se assente, MeteoGrib disegna comunque una griglia lat/lon leggibile.
-# cartopy>=0.21
+# Consigliato: coste, confini nazionali e fiumi in sottofondo alle mappe
+# (indispensabile per inquadrare regioni piccole come il FVG).
+# Se assente, MeteoGrib funziona comunque con una griglia lat/lon leggibile.
+cartopy>=0.21

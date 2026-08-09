@@ -278,32 +278,54 @@ def _import_mpl():
         sys.exit("Manca matplotlib.  Installa con:  pip install matplotlib")
 
 
-def _make_geo_fig():
+def _make_geo_fig(extent=None):
     """Crea figura + assi geografici.
 
-    Se cartopy è installato restituisce un vero ``GeoAxes`` con coste e
-    confini e la relativa proiezione (da passare come ``transform`` ai
-    plot).  Altrimenti un Axes normale con una griglia lat/lon leggibile.
+    Se cartopy è installato restituisce un vero ``GeoAxes`` con **coste e
+    confini nazionali** in sottofondo (risoluzione 10m, adatta anche a
+    regioni piccole come il FVG) e la proiezione da passare come
+    ``transform`` ai plot.  Altrimenti un Axes normale con griglia lat/lon.
 
-    Ritorna (fig, ax, transform) dove ``transform`` è None senza cartopy.
+    ``extent`` = (lon_min, lon_max, lat_min, lat_max): inquadra la mappa
+    sull'area dei dati.  Ritorna (fig, ax, transform); transform è None
+    senza cartopy.
     """
     plt = _import_mpl()
     try:
         import cartopy.crs as ccrs        # opzionale, non richiesto
         import cartopy.feature as cfeature
         proj = ccrs.PlateCarree()
-        fig = plt.figure(figsize=(9, 7))
+        fig = plt.figure(figsize=(9, 7), layout="constrained")
         ax = plt.axes(projection=proj)
-        ax.add_feature(cfeature.COASTLINE, linewidth=0.6, edgecolor="#333")
-        ax.add_feature(cfeature.BORDERS, linewidth=0.3, edgecolor="#666")
-        ax.gridlines(draw_labels=True, linewidth=0.3, color="gray", alpha=0.4)
+        if extent:
+            ax.set_extent(extent, crs=proj)
+        # feature ad alta risoluzione, disegnate SOPRA il campo colorato
+        # (zorder alto) così l'outline del FVG resta sempre visibile
+        ax.add_feature(cfeature.COASTLINE.with_scale("10m"),
+                       linewidth=0.8, edgecolor="#1b1b1b", zorder=6)
+        ax.add_feature(cfeature.BORDERS.with_scale("10m"),
+                       linewidth=0.6, edgecolor="#333", linestyle="--", zorder=6)
+        ax.add_feature(cfeature.RIVERS.with_scale("10m"),
+                       linewidth=0.4, edgecolor="#3a6ea5", alpha=0.5, zorder=5)
+        gl = ax.gridlines(draw_labels=True, linewidth=0.3, color="gray",
+                          alpha=0.4, zorder=4)
+        gl.top_labels = gl.right_labels = False
         return fig, ax, proj
     except Exception:
-        fig, ax = plt.subplots(figsize=(9, 7))
+        fig, ax = plt.subplots(figsize=(9, 7), layout="constrained")
         ax.grid(True, linewidth=0.3, color="gray", alpha=0.4)
         ax.set_xlabel("Longitudine")
         ax.set_ylabel("Latitudine")
         return fig, ax, None
+
+
+def _extent_of(m: "Message"):
+    """Riquadro (lon_min, lon_max, lat_min, lat_max) dei dati di un campo."""
+    try:
+        return (float(np.nanmin(m.lons)), float(np.nanmax(m.lons)),
+                float(np.nanmin(m.lats)), float(np.nanmax(m.lats)))
+    except Exception:
+        return None
 
 
 def plot_message(m: Message, out: str, title_extra: str = ""):
@@ -317,7 +339,7 @@ def plot_message(m: Message, out: str, title_extra: str = ""):
     st = _STYLE[kind]
     data = st["conv"](m.values)
 
-    fig, ax, proj = _make_geo_fig()
+    fig, ax, proj = _make_geo_fig(_extent_of(m))
     tk = {"transform": proj} if proj is not None else {}
 
     lons, lats = m.lons, m.lats
@@ -338,7 +360,9 @@ def plot_message(m: Message, out: str, title_extra: str = ""):
         f"{m.name}  ·  {m.level_label()}\n{when}   +{m.step}h{title_extra}",
         fontsize=11,
     )
-    fig.tight_layout()
+    # Le figure usano layout="constrained": niente tight_layout né
+    # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
+    # del gridliner e ritaglio errato della mappa.
     fig.savefig(out, dpi=130)
     plt.close(fig)
     return out
@@ -350,7 +374,7 @@ def plot_wind(mu: Message, mv: Message, out: str):
     if not (mu.is_2d and mv.is_2d):
         return None
     speed = np.hypot(mu.values, mv.values)
-    fig, ax, proj = _make_geo_fig()
+    fig, ax, proj = _make_geo_fig(_extent_of(mu))
     tk = {"transform": proj} if proj is not None else {}
     mesh = ax.pcolormesh(mu.lons, mu.lats, speed, cmap="YlOrRd", shading="auto", **tk)
     cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
@@ -368,10 +392,117 @@ def plot_wind(mu: Message, mv: Message, out: str):
     vdt = mu.valid_datetime
     when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else mu.date
     ax.set_title(f"Vento a {mu.level_label()}\n{when}   +{mu.step}h", fontsize=11)
-    fig.tight_layout()
+    # Le figure usano layout="constrained": niente tight_layout né
+    # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
+    # del gridliner e ritaglio errato della mappa.
     fig.savefig(out, dpi=130)
     plt.close(fig)
     return out
+
+
+def _quiver_step(shape):
+    ny, nx = shape
+    return max(1, round(ny / 18)), max(1, round(nx / 18))
+
+
+def plot_shear(hi: Message, hv: Message, lo: Message, lv: Message, out: str):
+    """Wind shear = vento in quota − vento al suolo.
+
+    Ingrediente chiave per i temporali: molta CAPE con forte shear favorisce
+    temporali organizzati/supercelle.  Restituisce (file, modulo_shear).
+    """
+    plt = _import_mpl()
+    if not all(x.is_2d for x in (hi, hv, lo, lv)):
+        return None
+    if hi.values.shape != lo.values.shape:
+        return None  # griglie diverse: non confrontabili direttamente
+    du = hi.values - lo.values
+    dv = hv.values - lv.values
+    shear = np.hypot(du, dv)
+
+    fig, ax, proj = _make_geo_fig(_extent_of(hi))
+    tk = {"transform": proj} if proj is not None else {}
+    mesh = ax.pcolormesh(hi.lons, hi.lats, shear, cmap="BuPu", shading="auto", **tk)
+    cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
+    cbar.set_label("wind shear [m/s]")
+    sy, sx = _quiver_step(shear.shape)
+    ax.quiver(hi.lons[::sy, ::sx], hi.lats[::sy, ::sx],
+              du[::sy, ::sx], dv[::sy, ::sx],
+              scale=220, width=0.003, color="#222", **tk)
+    vdt = hi.valid_datetime
+    when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else hi.date
+    ax.set_title(
+        f"Wind shear  {hi.level_label()} − {lo.level_label()}\n{when}   +{hi.step}h",
+        fontsize=11,
+    )
+    # Le figure usano layout="constrained": niente tight_layout né
+    # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
+    # del gridliner e ritaglio errato della mappa.
+    fig.savefig(out, dpi=130)
+    plt.close(fig)
+    return out, shear
+
+
+def plot_storm(cape: Message, du, dv, out: str):
+    """Carta 'ingredienti temporali': CAPE ombreggiata + frecce di shear.
+
+    È la vista che usano i previsori: dove c'è insieme molta energia (CAPE)
+    e shear marcato, aumenta il potenziale di temporali forti/organizzati.
+    """
+    plt = _import_mpl()
+    if not cape.is_2d or cape.values.shape != du.shape:
+        return None
+    fig, ax, proj = _make_geo_fig(_extent_of(cape))
+    tk = {"transform": proj} if proj is not None else {}
+    mesh = ax.pcolormesh(cape.lons, cape.lats, cape.values,
+                         cmap="YlOrRd", shading="auto", **tk)
+    cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
+    cbar.set_label("CAPE [J/kg]")
+    sy, sx = _quiver_step(cape.values.shape)
+    ax.quiver(cape.lons[::sy, ::sx], cape.lats[::sy, ::sx],
+              du[::sy, ::sx], dv[::sy, ::sx],
+              scale=220, width=0.0035, color="#10263b", **tk)
+    vdt = cape.valid_datetime
+    when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else cape.date
+    ax.set_title(f"Ingredienti temporali: CAPE + shear\n{when}   +{cape.step}h",
+                 fontsize=11)
+    # Le figure usano layout="constrained": niente tight_layout né
+    # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
+    # del gridliner e ritaglio errato della mappa.
+    fig.savefig(out, dpi=130)
+    plt.close(fig)
+    return out
+
+
+def interpret_storm(cape_max, shear_max):
+    """Giudizio qualitativo (NON una previsione ufficiale) da CAPE e shear."""
+    if cape_max < 300:
+        ci = "instabilità debole"
+    elif cape_max < 1000:
+        ci = "instabilità moderata"
+    elif cape_max < 2500:
+        ci = "instabilità forte"
+    else:
+        ci = "instabilità estrema"
+    if shear_max < 10:
+        si = "shear debole → temporali isolati/monocellulari"
+    elif shear_max < 20:
+        si = "shear moderato → temporali organizzati/multicellulari"
+    else:
+        si = "shear forte → possibili supercelle"
+    if cape_max >= 1000 and shear_max >= 15:
+        rischio = "ALTO"
+    elif cape_max >= 500 and shear_max >= 10:
+        rischio = "MODERATO"
+    elif cape_max >= 300:
+        rischio = "BASSO-MODERATO"
+    else:
+        rischio = "BASSO"
+    return (
+        f"CAPE max ≈ {cape_max:.0f} J/kg ({ci}); "
+        f"shear max ≈ {shear_max:.0f} m/s ({si}). "
+        f"Potenziale temporali: {rischio}."
+    )
 
 
 # ===========================================================================
@@ -404,12 +535,14 @@ def cmd_auto(args):
     produced = []                       # (png, titolo)
     metas = []                          # metadati leggeri per la dashboard
     winds = {"wind_u": {}, "wind_v": {}}
+    capes = {}                          # step -> Message CAPE (per la carta ingredienti)
     when = None
     count = 0
 
     # Streaming: teniamo in RAM un solo campo per volta (i valori del campo
     # precedente vengono liberati appena passiamo al successivo).  Uniche
-    # eccezioni: le componenti del vento, poche, trattenute per accoppiare U/V.
+    # eccezioni (poche): componenti del vento e CAPE, trattenute perché
+    # servono ai prodotti derivati (shear, carta temporali).
     for m in read_messages(args.file):
         count += 1
         metas.append(dict(number=m.number, short_name=m.short_name,
@@ -419,7 +552,7 @@ def cmd_auto(args):
 
         kind = field_kind(m)
         if kind in ("wind_u", "wind_v"):
-            winds[kind][(m.level, m.step)] = m   # trattenuto per l'accoppiamento
+            winds[kind][(m.type_of_level, m.level, m.step)] = m
             continue
         if not m.is_2d:
             continue
@@ -427,27 +560,75 @@ def cmd_auto(args):
         if plot_message(m, fname):
             produced.append((os.path.basename(fname), f"{m.name} · {m.level_label()}"))
             print(f"  ✓ {os.path.basename(fname)}  ({m.name})")
+        if kind == "cape":
+            capes.setdefault(str(m.step), m)   # trattenuta per la carta ingredienti
 
     if count == 0:
         sys.exit("Nessun messaggio GRIB nel file.")
 
-    # Vento: uniamo U e V con stesso livello+step
+    # --- Vento per quota: uniamo U e V con stesso livello+step -------------
+    pairs = []
     for key, mu in winds["wind_u"].items():
         mv = winds["wind_v"].get(key)
-        if mv is not None:
-            fname = os.path.join(outdir, f"wind_{_safe(mu.level)}_{_safe(mu.step)}.png")
-            if plot_wind(mu, mv, fname):
-                produced.append((os.path.basename(fname), f"Vento · {mu.level_label()}"))
-                print(f"  ✓ {os.path.basename(fname)}  (vento)")
+        if mv is None or not (mu.is_2d and mv.is_2d):
+            continue
+        fname = os.path.join(outdir, f"wind_{_safe(mu.level)}_{_safe(mu.step)}.png")
+        if plot_wind(mu, mv, fname):
+            produced.append((os.path.basename(fname), f"Vento · {mu.level_label()}"))
+            print(f"  ✓ {os.path.basename(fname)}  (vento {mu.level_label()})")
+        pairs.append(dict(tol=(mu.type_of_level or "").lower(), level=mu.level,
+                          step=str(mu.step), mu=mu, mv=mv, sn=mu.short_name.lower()))
+
+    # --- Wind shear + carta ingredienti temporali --------------------------
+    interpretation = None
+
+    def _is_surface(p):
+        return "heightaboveground" in p["tol"] or p["sn"].startswith("10")
+
+    def _is_upper(p):
+        return "isobaric" in p["tol"]
+
+    for step in sorted({p["step"] for p in pairs}):
+        lo = [p for p in pairs if p["step"] == step and _is_surface(p)]
+        hi = [p for p in pairs if p["step"] == step and _is_upper(p)]
+        if not (lo and hi):
+            continue
+        plo = lo[0]
+        phi = sorted(hi, key=lambda p: p["level"])[0]   # quota più alta = p minima
+        fname = os.path.join(outdir, f"shear_{step}.png")
+        res = plot_shear(phi["mu"], phi["mv"], plo["mu"], plo["mv"], fname)
+        if not res:
+            continue
+        _, shear = res
+        produced.append((os.path.basename(fname),
+                         f"Wind shear · {phi['mu'].level_label()} − {plo['mu'].level_label()}"))
+        print(f"  ✓ {os.path.basename(fname)}  (wind shear)")
+
+        # Carta 'ingredienti': CAPE + frecce di shear, se abbiamo la CAPE
+        cape = capes.get(step)
+        du = phi["mu"].values - plo["mu"].values
+        dv = phi["mv"].values - plo["mv"].values
+        if cape is not None:
+            sfname = os.path.join(outdir, f"storm_{step}.png")
+            if plot_storm(cape, du, dv, sfname):
+                produced.append((os.path.basename(sfname), "Ingredienti temporali: CAPE + shear"))
+                print(f"  ✓ {os.path.basename(sfname)}  (carta temporali)")
+            interpretation = interpret_storm(np.nanmax(cape.values), np.nanmax(shear))
+            print(f"\n  ⚡ {interpretation}")
 
     # Cruscotto HTML che raccoglie tutte le immagini
-    _write_dashboard(outdir, os.path.basename(args.file), metas, produced, when)
+    _write_dashboard(outdir, os.path.basename(args.file), metas, produced, when, interpretation)
     print(f"\nFatto.  {len(produced)} grafici in '{outdir}/'.  Apri:  {outdir}/index.html")
 
 
-def _write_dashboard(outdir, filename, metas, produced, vdt):
+def _write_dashboard(outdir, filename, metas, produced, vdt, interpretation=None):
     esc = _html.escape
     when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else "n/d"
+    banner = (
+        f'<div class="banner">⚡ {esc(interpretation)}'
+        f'<span class="disc">giudizio automatico indicativo — non è una previsione ufficiale</span></div>'
+        if interpretation else ""
+    )
     # Tutte le stringhe che finiscono nell'HTML sono ripulite con html.escape:
     # un GRIB con metadati "strani" non può iniettare markup nel dashboard.
     cards = "\n".join(
@@ -482,6 +663,11 @@ def _write_dashboard(outdir, filename, metas, produced, vdt):
  table {{ width:100%; border-collapse:collapse; margin-top:28px; font-size:.85rem; }}
  th,td {{ text-align:left; padding:7px 10px; border-bottom:1px solid #1e2f4d; }}
  th {{ color:#8aa0be; font-weight:600; }}
+ .banner {{ margin:20px 0 4px; padding:14px 18px; border-radius:12px;
+            background:linear-gradient(135deg,#3a1a10,#2a1220);
+            border:1px solid #5a2a1a; color:#ffd9c2; font-size:1rem; }}
+ .banner .disc {{ display:block; margin-top:6px; color:#c9a68f; font-size:.78rem;
+            font-style:italic; }}
  footer {{ padding:20px 32px; color:#6f86a6; font-size:.8rem; }}
 </style></head><body>
 <header>
@@ -489,6 +675,7 @@ def _write_dashboard(outdir, filename, metas, produced, vdt):
  <div class="meta">File: <b>{filename}</b> · {len(metas)} campi · valido {when}</div>
 </header>
 <main>
+ {banner}
  <div class="grid">
  {cards or '<p>Nessun campo mappabile (griglie non regolari).</p>'}
  </div>

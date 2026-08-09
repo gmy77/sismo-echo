@@ -83,10 +83,26 @@ MeteoGrib riconosce i campi e produce il grafico **adatto a ciascuno**:
 - 🎈 **pressione al livello del mare** → carta con **isobare etichettate**
 - 💨 **vento** (unisce le componenti U e V) → velocità a colori + **frecce**
 - 🌧️ **precipitazione** → mappa in scala di blu (mm)
+- ⚡ **CAPE / CIN** → mappa dell'energia convettiva (instabilità temporali)
 - 💧 umidità, ☁️ nuvolosità, e altro → mappa a colori adeguata
 
-Alla fine apri `grafici/index.html`: un cruscotto che raccoglie tutte le mappe e
-l'inventario completo.
+**Prodotti derivati** (calcolati in automatico quando i dati lo permettono):
+
+- 🌀 **Wind shear** — se il file ha il vento a due quote (es. 500 hPa e 10 m),
+  MeteoGrib calcola lo *shear* (vento in quota − vento al suolo): ingrediente
+  chiave per i temporali organizzati.
+- ⛈️ **Carta "ingredienti temporali"** — CAPE ombreggiata + frecce di shear
+  sovrapposte, la vista che usano i previsori per il rischio temporali.
+- 🧭 **Giudizio automatico** — una riga di sintesi su CAPE e shear massimi con
+  una stima qualitativa del potenziale temporali *(indicativo, non una
+  previsione ufficiale)*.
+
+Alla fine apri `grafici/index.html`: un cruscotto che raccoglie tutte le mappe,
+il giudizio e l'inventario completo.
+
+Se hai installato **cartopy** (vedi sotto), tutte le mappe hanno in sottofondo
+**coste, confini nazionali e fiumi** ad alta risoluzione — indispensabile per
+inquadrare regioni piccole come il Friuli Venezia Giulia.
 
 ### 3. Plot — un singolo campo
 
@@ -112,7 +128,23 @@ lat,lon,valore
 
 ## 🖼️ Esempi
 
-Generati dal file di test `examples/` (temperatura, pressione, vento sul Mediterraneo):
+### Caso reale: CAPE sul Friuli Venezia Giulia (con sfondo cartopy)
+
+Da `examples/FVG_CAPE_20260809.grib2` — una previsione con CAPE e vento a due
+quote. Prova con: `python meteogrib.py auto examples/FVG_CAPE_20260809.grib2 --outdir grafici`
+
+| CAPE (energia temporali) | Wind shear 500 hPa − 10 m | Ingredienti temporali (CAPE + shear) |
+|---|---|---|
+| ![cape](examples/fvg_cape.png) | ![shear](examples/fvg_shear.png) | ![storm](examples/fvg_storm.png) |
+
+Si vedono la costa adriatica, la laguna di Grado/Marano e i confini con Slovenia
+e Austria (tratteggiati). Giudizio automatico prodotto su questo file:
+
+> ⚡ CAPE max ≈ 1147 J/kg (instabilità forte); shear max ≈ 12 m/s (shear moderato
+> → temporali organizzati/multicellulari). **Potenziale temporali: MODERATO.**
+> *(indicativo, non una previsione ufficiale)*
+
+### Campi base (dal file di test `examples/sample.grib2`)
 
 | Temperatura a 2 m | Pressione (isobare) | Vento a 10 m |
 |---|---|---|
@@ -120,17 +152,21 @@ Generati dal file di test `examples/` (temperatura, pressione, vento sul Mediter
 
 ---
 
-## 🌍 Coste e confini sulle mappe (opzionale)
+## 🌍 Coste e confini sulle mappe (cartopy)
 
-Di base MeteoGrib disegna una griglia lat/lon pulita. Se vuoi le **linee di
-costa e i confini nazionali** sulle mappe, installa `cartopy`:
+Le coste, i confini nazionali e i fiumi in sottofondo alle mappe li fornisce
+**cartopy**, già incluso in `requirements.txt`. La prima volta cartopy scarica
+da solo i file cartografici (Natural Earth) e li mette in cache.
+
+Se preferisci un'installazione minima puoi ometterlo: MeteoGrib lo rileva da
+solo e, quando manca, ripiega su una griglia lat/lon pulita senza dare errori.
 
 ```bash
-pip install cartopy
+pip install cartopy      # se hai saltato requirements.txt
 ```
 
-MeteoGrib lo rileva da solo e lo usa quando disponibile; se manca, continua a
-funzionare senza problemi.
+> Nota: la prima mappa con cartopy richiede connessione a Internet per scaricare
+> la cartografia; dopo funziona anche offline.
 
 ---
 
