@@ -165,11 +165,13 @@ e Austria (tratteggiati). Giudizio automatico prodotto su questo file:
 ## 🌍 Coste e confini sulle mappe (cartopy)
 
 Le coste, i confini nazionali e i fiumi in sottofondo alle mappe li fornisce
-**cartopy**, già incluso in `requirements.txt`. La prima volta cartopy scarica
-da solo i file cartografici (Natural Earth) e li mette in cache.
+**cartopy**, incluso in `requirements.txt` come **dipendenza base**. La prima
+volta cartopy scarica da solo i file cartografici (Natural Earth) e li mette in
+cache.
 
-Se preferisci un'installazione minima puoi ometterlo: MeteoGrib lo rileva da
-solo e, quando manca, ripiega su una griglia lat/lon pulita senza dare errori.
+Per un'**installazione minima**, togli la riga `cartopy` da `requirements.txt`
+(su alcuni sistemi cartopy richiede le librerie GEOS/PROJ): MeteoGrib rileva da
+solo l'assenza e ripiega su una griglia lat/lon pulita, senza dare errori.
 
 ```bash
 pip install cartopy      # se hai saltato requirements.txt

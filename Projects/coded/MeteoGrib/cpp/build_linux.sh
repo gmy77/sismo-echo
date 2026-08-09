@@ -2,9 +2,11 @@
 # Build della sola CLI su Linux/macOS (per test).  Su Windows si usa la
 # soluzione Visual Studio MeteoGrib.sln — vedi README_CPP.md.
 #
-# Richiede ecCodes con header C.  Esempi per trovarli:
-#   - pacchetto di sistema:  sudo apt install libeccodes-dev
-#   - via pip (bundle):      ECDIR=$(python3 -c "import eccodes,os;print(os.path.dirname(eccodes.__file__))")/../eccodeslib
+# Richiede ecCodes con header C.  Esempi per impostare ECCODES_DIR:
+#   - pacchetto di sistema:  sudo apt install libeccodes-dev   (poi ECCODES_DIR=/usr)
+#   - via pip (bundle 2.48): usa anche ECKIT_DIR, es.
+#       PKG=$(python3 -c "import eccodes,os;print(os.path.dirname(eccodes.__file__))")
+#       ECCODES_DIR="$PKG/../eccodeslib" ECKIT_DIR="$PKG/../eckitlib" ./build_linux.sh
 set -e
 cd "$(dirname "$0")"
 

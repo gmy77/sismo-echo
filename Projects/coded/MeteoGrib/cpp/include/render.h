@@ -72,8 +72,24 @@ inline double nearestValue(const GribField& g, double lat, double lon) {
 }
 
 // Costruisce l'immagine del campo.  Ritorna un'Image pronta da salvare/blit.
-inline Image renderField(const GribField& g, Kind k, const RenderOpts& o) {
+inline Image renderField(const GribField& gorig, Kind k, const RenderOpts& o) {
     const RGB BG{18,26,38}, INK{230,237,247}, BLACK{0,0,0}, WHITE{255,255,255};
+
+    // Convertiamo i valori nell'unità che mostreremo (K->°C, Pa->hPa), così
+    // numeri, colorbar, città e badge sono coerenti con l'etichetta. Le altre
+    // grandezze (CAPE J/kg, vento m/s, ...) restano invariate.
+    GribField g = gorig;
+    if (k == Kind::Temperature || k == Kind::Pressure) {
+        double off = (k == Kind::Temperature) ? -273.15 : 0.0;
+        double mul = (k == Kind::Pressure)    ? 0.01    : 1.0;
+        double mn =  1e300, mx = -1e300, sum = 0; long cnt = 0;
+        for (double& v : g.values) {
+            if (std::isnan(v)) continue;
+            v = v * mul + off;
+            mn = std::min(mn, v); mx = std::max(mx, v); sum += v; ++cnt;
+        }
+        if (cnt) { g.vmin = mn; g.vmax = mx; g.vmean = sum / cnt; }
+    }
 
     // area dati (bounding box) — la mappa parte da lat max in alto
     double lon0=g.lons[0], lon1=g.lons[0], lat0=g.lats[0], lat1=g.lats[0];

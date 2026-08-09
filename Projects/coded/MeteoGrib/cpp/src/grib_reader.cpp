@@ -45,8 +45,14 @@ std::string GribField::levelLabel() const {
 }
 
 std::string GribField::inventoryLine() const {
-    char d[40];
-    std::snprintf(d, sizeof(d), "%.20s%02ld", dataDate.c_str(), dataTime/100);
+    std::string d;
+    if (dataDate.empty()) {
+        d = "?";                       // GRIB senza metadati temporali
+    } else {
+        char b[40];
+        std::snprintf(b, sizeof(b), "%.20s%02ld", dataDate.c_str(), dataTime/100);
+        d = b;
+    }
     return std::to_string(number) + ":GRIB" + std::to_string(edition)
          + ":d=" + d + ":" + shortName + ":" + levelLabel() + ":step " + step;
 }
@@ -74,14 +80,16 @@ Kind classify(const GribField& f) {
 }
 
 const char* displayUnit(Kind k, const std::string& fallback) {
+    // Solo per le grandezze che il renderer converte davvero (temperatura
+    // K->°C, pressione Pa->hPa) restituiamo l'unità convertita; per le altre
+    // usiamo l'unità originale del GRIB, per non mostrare numeri con unità
+    // sbagliate.
     switch (k) {
         case Kind::Temperature: return "C";
         case Kind::Pressure:    return "hPa";
-        case Kind::Precip:      return "mm";
-        case Kind::Humidity:    return "%";
         case Kind::Cape:        return "J/kg";
         case Kind::WindU: case Kind::WindV: return "m/s";
-        default: return fallback.c_str();
+        default: return fallback.c_str();   // precip, umidità, generico
     }
 }
 

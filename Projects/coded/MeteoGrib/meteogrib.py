@@ -136,7 +136,7 @@ class Message:
         tl = (self.type_of_level or "").lower()
         if "isobaric" in tl or tl in ("pl", "isobaricinhpa"):
             return f"{self.level} hPa"
-        if "heightaboveground" in tl or tl == "sfc" and self.level:
+        if "heightaboveground" in tl:
             return f"{self.level} m dal suolo"
         if "surface" in tl or tl == "sfc":
             return "superficie"

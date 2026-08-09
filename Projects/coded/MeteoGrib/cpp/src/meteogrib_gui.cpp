@@ -222,7 +222,24 @@ static std::string jsonString(const std::string& s, const std::string& key) {
     return s.substr(a + 1, b - a - 1);
 }
 
-// Primo asset .exe tra i browser_download_url della release.
+// Accetta solo URL HTTPS su domini GitHub attesi (gli asset delle release
+// stanno su github.com o *.githubusercontent.com).  Evita di scaricare ed
+// eseguire un binario da un host arbitrario finito nel JSON.
+static bool isTrustedGithubUrl(const std::string& u) {
+    if (u.rfind("https://", 0) != 0) return false;
+    size_t host0 = 8;                         // dopo "https://"
+    size_t host1 = u.find('/', host0);
+    std::string host = u.substr(host0, host1 == std::string::npos
+                                       ? std::string::npos : host1 - host0);
+    auto endsWith = [](const std::string& s, const char* suf) {
+        std::string t(suf); return s.size() >= t.size() &&
+               s.compare(s.size()-t.size(), t.size(), t) == 0;
+    };
+    return host == "github.com" ||
+           endsWith(host, ".githubusercontent.com");
+}
+
+// Primo asset .exe (su dominio GitHub) tra i browser_download_url.
 static std::string firstExeAsset(const std::string& s) {
     const std::string k = "\"browser_download_url\"";
     size_t p = 0;
@@ -232,7 +249,8 @@ static std::string firstExeAsset(const std::string& s) {
         a = s.find('"', c);
         size_t b = s.find('"', a + 1);
         std::string url = s.substr(a + 1, b - a - 1);
-        if (url.size() > 4 && url.substr(url.size() - 4) == ".exe") return url;
+        if (url.size() > 4 && url.substr(url.size() - 4) == ".exe"
+            && isTrustedGithubUrl(url)) return url;
         p = b;
     }
     return "";
@@ -303,9 +321,9 @@ static void checkUpdate(HWND w, bool silent) {
     if (silent) { setStatus(w, ("Aggiornamento disponibile: " + tag).c_str()); return; }
     if (MessageBoxA(w, msg.c_str(), "Aggiornamento", MB_ICONQUESTION | MB_YESNO) != IDYES)
         return;
-    if (asset.empty()) {
-        MessageBoxA(w, "La release non contiene un file .exe da scaricare.",
-                    "Aggiornamento", MB_ICONWARNING);
+    if (asset.empty() || !isTrustedGithubUrl(asset)) {
+        MessageBoxA(w, "La release non contiene un file .exe scaricabile da un "
+                       "dominio GitHub attendibile.", "Aggiornamento", MB_ICONWARNING);
         return;
     }
     char tmp[MAX_PATH]; GetTempPathA(MAX_PATH, tmp);
