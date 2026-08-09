@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/GRIB-1%20%7C%202-26c6da" />
   <img src="https://img.shields.io/badge/motore-ecCodes%20(ECMWF)-orange" />
   <img src="https://img.shields.io/badge/Windows-senza%20Cygwin-success?logo=windows" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow" />
+  <img src="https://img.shields.io/badge/License-All%20Rights%20Reserved-red" />
 </p>
 
 <p align="center">
@@ -157,7 +157,7 @@ Scarica un file `.grib2` e provalo con `python meteogrib.py auto tuofile.grib2`.
 ---
 
 <p align="center">
-  parte del progetto <strong>SISMO ECHO</strong> · Gimmy Pignolo © 2026 · licenza MIT<br/>
+  parte del progetto <strong>SISMO ECHO</strong> · Gimmy Pignolo © 2026 · tutti i diritti riservati (vedi <a href="../../../LICENSE">LICENSE</a>)<br/>
   dati GRIB via <a href="https://confluence.ecmwf.int/display/ECC">ecCodes</a> (ECMWF) ·
   ispirato a <a href="https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/">wgrib2</a> (NOAA)
 </p>

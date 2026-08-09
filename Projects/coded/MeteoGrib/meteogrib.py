@@ -18,12 +18,14 @@ Uso rapido:
     python meteogrib.py auto    file.grib2 --outdir grafici
     python meteogrib.py export  file.grib2 --index 1 --out campo.csv
 
-Autore: progetto SISMO ECHO · Gimmy Pignolo © 2026 · licenza MIT
+Autore: progetto SISMO ECHO · Gimmy Pignolo © 2026 · tutti i diritti riservati (vedi LICENSE)
 """
 from __future__ import annotations
 
 import argparse
+import html as _html
 import os
+import re as _re
 import sys
 import datetime as _dt
 
@@ -138,6 +140,11 @@ class Message:
         if self.level:
             return f"{self.type_of_level or 'lev'} {self.level}"
         return self.type_of_level or "superficie"
+
+
+def _safe(s: str) -> str:
+    """Rende una stringa sicura come nome di file."""
+    return _re.sub(r"[^A-Za-z0-9._-]", "_", str(s))
 
 
 def _get(gid, key, default=None):
@@ -266,20 +273,32 @@ def _import_mpl():
         sys.exit("Manca matplotlib.  Installa con:  pip install matplotlib")
 
 
-def _draw_geo_axes(ax, m: Message):
-    """Cornice geografica: coste (se c'è cartopy) o una griglia leggera."""
+def _make_geo_fig():
+    """Crea figura + assi geografici.
+
+    Se cartopy è installato restituisce un vero ``GeoAxes`` con coste e
+    confini e la relativa proiezione (da passare come ``transform`` ai
+    plot).  Altrimenti un Axes normale con una griglia lat/lon leggibile.
+
+    Ritorna (fig, ax, transform) dove ``transform`` è None senza cartopy.
+    """
+    plt = _import_mpl()
     try:
-        import cartopy.crs as ccrs  # opzionale, non richiesto
+        import cartopy.crs as ccrs        # opzionale, non richiesto
         import cartopy.feature as cfeature
+        proj = ccrs.PlateCarree()
+        fig = plt.figure(figsize=(9, 7))
+        ax = plt.axes(projection=proj)
         ax.add_feature(cfeature.COASTLINE, linewidth=0.6, edgecolor="#333")
         ax.add_feature(cfeature.BORDERS, linewidth=0.3, edgecolor="#666")
         ax.gridlines(draw_labels=True, linewidth=0.3, color="gray", alpha=0.4)
-        return True
+        return fig, ax, proj
     except Exception:
+        fig, ax = plt.subplots(figsize=(9, 7))
         ax.grid(True, linewidth=0.3, color="gray", alpha=0.4)
         ax.set_xlabel("Longitudine")
         ax.set_ylabel("Latitudine")
-        return False
+        return fig, ax, None
 
 
 def plot_message(m: Message, out: str, title_extra: str = ""):
@@ -293,18 +312,18 @@ def plot_message(m: Message, out: str, title_extra: str = ""):
     st = _STYLE[kind]
     data = st["conv"](m.values)
 
-    fig, ax = plt.subplots(figsize=(9, 7))
-    _draw_geo_axes(ax, m)
+    fig, ax, proj = _make_geo_fig()
+    tk = {"transform": proj} if proj is not None else {}
 
     lons, lats = m.lons, m.lats
     if st["kind"] == "contour" and kind in ("pressure", "geopotential"):
         # isobare/isoipse: linee etichettate
-        cf = ax.contourf(lons, lats, data, levels=18, cmap=st["cmap"], alpha=0.55)
-        cs = ax.contour(lons, lats, data, levels=14, colors="k", linewidths=0.7)
+        cf = ax.contourf(lons, lats, data, levels=18, cmap=st["cmap"], alpha=0.55, **tk)
+        cs = ax.contour(lons, lats, data, levels=14, colors="k", linewidths=0.7, **tk)
         ax.clabel(cs, inline=True, fontsize=7, fmt="%d")
         cbar = fig.colorbar(cf, ax=ax, shrink=0.8, pad=0.02)
     else:
-        mesh = ax.pcolormesh(lons, lats, data, cmap=st["cmap"], shading="auto")
+        mesh = ax.pcolormesh(lons, lats, data, cmap=st["cmap"], shading="auto", **tk)
         cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
     cbar.set_label(f"{m.short_name}  [{st['unit'] or m.units}]")
 
@@ -326,9 +345,9 @@ def plot_wind(mu: Message, mv: Message, out: str):
     if not (mu.is_2d and mv.is_2d):
         return None
     speed = np.hypot(mu.values, mv.values)
-    fig, ax = plt.subplots(figsize=(9, 7))
-    _draw_geo_axes(ax, mu)
-    mesh = ax.pcolormesh(mu.lons, mu.lats, speed, cmap="YlOrRd", shading="auto")
+    fig, ax, proj = _make_geo_fig()
+    tk = {"transform": proj} if proj is not None else {}
+    mesh = ax.pcolormesh(mu.lons, mu.lats, speed, cmap="YlOrRd", shading="auto", **tk)
     cbar = fig.colorbar(mesh, ax=ax, shrink=0.8, pad=0.02)
     cbar.set_label("velocità vento [m/s]")
     # sottocampioniamo le frecce puntando a ~18 per lato, così restano
@@ -339,7 +358,7 @@ def plot_wind(mu: Message, mv: Message, out: str):
     ax.quiver(
         mu.lons[::sy, ::sx], mu.lats[::sy, ::sx],
         mu.values[::sy, ::sx], mv.values[::sy, ::sx],
-        scale=220, width=0.003, color="#222",
+        scale=220, width=0.003, color="#222", **tk,
     )
     vdt = mu.valid_datetime
     when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else mu.date
@@ -376,51 +395,68 @@ def cmd_plot(args):
 def cmd_auto(args):
     outdir = args.outdir or "meteogrib_out"
     os.makedirs(outdir, exist_ok=True)
-    msgs = list(read_messages(args.file))
-    if not msgs:
-        sys.exit("Nessun messaggio GRIB nel file.")
 
-    produced = []  # (png, titolo)
+    produced = []                       # (png, titolo)
+    metas = []                          # metadati leggeri per la dashboard
     winds = {"wind_u": {}, "wind_v": {}}
+    when = None
+    count = 0
 
-    for m in msgs:
+    # Streaming: teniamo in RAM un solo campo per volta (i valori del campo
+    # precedente vengono liberati appena passiamo al successivo).  Uniche
+    # eccezioni: le componenti del vento, poche, trattenute per accoppiare U/V.
+    for m in read_messages(args.file):
+        count += 1
+        metas.append(dict(number=m.number, short_name=m.short_name,
+                          name=m.name, level=m.level_label(), units=m.units))
+        if when is None and m.valid_datetime:
+            when = m.valid_datetime
+
         kind = field_kind(m)
         if kind in ("wind_u", "wind_v"):
-            winds[kind][(m.level, m.step)] = m  # accoppiamo dopo
+            winds[kind][(m.level, m.step)] = m   # trattenuto per l'accoppiamento
             continue
         if not m.is_2d:
             continue
-        fname = os.path.join(outdir, f"{m.number:02d}_{m.short_name}.png")
+        fname = os.path.join(outdir, f"{m.number:02d}_{_safe(m.short_name)}.png")
         if plot_message(m, fname):
             produced.append((os.path.basename(fname), f"{m.name} · {m.level_label()}"))
             print(f"  ✓ {os.path.basename(fname)}  ({m.name})")
+
+    if count == 0:
+        sys.exit("Nessun messaggio GRIB nel file.")
 
     # Vento: uniamo U e V con stesso livello+step
     for key, mu in winds["wind_u"].items():
         mv = winds["wind_v"].get(key)
         if mv is not None:
-            fname = os.path.join(outdir, f"wind_{mu.level}_{mu.step}.png")
+            fname = os.path.join(outdir, f"wind_{_safe(mu.level)}_{_safe(mu.step)}.png")
             if plot_wind(mu, mv, fname):
                 produced.append((os.path.basename(fname), f"Vento · {mu.level_label()}"))
                 print(f"  ✓ {os.path.basename(fname)}  (vento)")
 
     # Cruscotto HTML che raccoglie tutte le immagini
-    _write_dashboard(outdir, os.path.basename(args.file), msgs, produced)
+    _write_dashboard(outdir, os.path.basename(args.file), metas, produced, when)
     print(f"\nFatto.  {len(produced)} grafici in '{outdir}/'.  Apri:  {outdir}/index.html")
 
 
-def _write_dashboard(outdir, filename, msgs, produced):
-    vdt = next((m.valid_datetime for m in msgs if m.valid_datetime), None)
+def _write_dashboard(outdir, filename, metas, produced, vdt):
+    esc = _html.escape
     when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else "n/d"
+    # Tutte le stringhe che finiscono nell'HTML sono ripulite con html.escape:
+    # un GRIB con metadati "strani" non può iniettare markup nel dashboard.
     cards = "\n".join(
-        f'<figure><img src="{png}" alt="{title}"><figcaption>{title}</figcaption></figure>'
+        f'<figure><img src="{esc(png, quote=True)}" alt="{esc(title, quote=True)}">'
+        f'<figcaption>{esc(title)}</figcaption></figure>'
         for png, title in produced
     )
     rows = "\n".join(
-        f"<tr><td>{m.number}</td><td>{m.short_name}</td><td>{m.name}</td>"
-        f"<td>{m.level_label()}</td><td>{m.units}</td></tr>"
-        for m in msgs
+        f"<tr><td>{md['number']}</td><td>{esc(str(md['short_name']))}</td>"
+        f"<td>{esc(str(md['name']))}</td><td>{esc(str(md['level']))}</td>"
+        f"<td>{esc(str(md['units']))}</td></tr>"
+        for md in metas
     )
+    filename = esc(filename)
     html = f"""<!doctype html><html lang="it"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MeteoGrib · {filename}</title>
@@ -445,7 +481,7 @@ def _write_dashboard(outdir, filename, msgs, produced):
 </style></head><body>
 <header>
  <h1>🌦️ Meteo<span>Grib</span></h1>
- <div class="meta">File: <b>{filename}</b> · {len(msgs)} campi · valido {when}</div>
+ <div class="meta">File: <b>{filename}</b> · {len(metas)} campi · valido {when}</div>
 </header>
 <main>
  <div class="grid">
