@@ -328,6 +328,77 @@ def _extent_of(m: "Message"):
         return None
 
 
+# Città del Friuli Venezia Giulia e dintorni (nome, lat, lon).  Vengono
+# disegnate solo quelle che ricadono dentro l'area della mappa.
+CITIES = [
+    ("Udine", 46.07, 13.23),
+    ("Trieste", 45.65, 13.77),
+    ("Pordenone", 45.96, 12.66),
+    ("Gorizia", 45.94, 13.62),
+    ("Tolmezzo", 46.40, 13.02),
+    ("Tarvisio", 46.51, 13.58),
+    ("Cividale", 46.09, 13.43),
+    ("Grado", 45.68, 13.40),
+    ("Sacile", 45.95, 12.50),
+    ("Venezia", 45.44, 12.34),
+    ("Klagenfurt", 46.62, 14.31),
+    ("Ljubljana", 46.06, 14.51),
+]
+
+
+def _text_stroke():
+    """Contorno nero attorno al testo bianco, per leggibilità su ogni colore."""
+    import matplotlib.patheffects as pe
+    return [pe.withStroke(linewidth=2.2, foreground="black")]
+
+
+def _nearest_value(lons, lats, field, lat, lon):
+    """Valore del campo nel punto di griglia più vicino a (lat, lon)."""
+    try:
+        d = (lats - lat) ** 2 + (lons - lon) ** 2
+        j, i = np.unravel_index(np.nanargmin(d), d.shape)
+        return float(field[j, i])
+    except Exception:
+        return float("nan")
+
+
+def _overlay_cities(ax, lons, lats, field, proj, unit, extent):
+    """Punti + nome città + valore del campo campionato nella città."""
+    if extent is None:
+        return
+    tk = {"transform": proj} if proj is not None else {}
+    lon0, lon1, lat0, lat1 = extent
+    stroke = _text_stroke()
+    for name, la, lo in CITIES:
+        if not (lon0 <= lo <= lon1 and lat0 <= la <= lat1):
+            continue
+        ax.plot(lo, la, marker="o", ms=4.5, mfc="white", mec="black",
+                mew=0.9, zorder=8, **tk)
+        val = _nearest_value(lons, lats, field, la, lo)
+        label = f"{name}\n{val:.0f} {unit}" if np.isfinite(val) else name
+        t = ax.text(lo, la, label, fontsize=7.2, fontweight="bold",
+                    color="white", ha="left", va="bottom", zorder=9,
+                    **({"transform": proj} if proj is not None else {}))
+        t.set_path_effects(stroke)
+
+
+def _annotate_max(ax, lons, lats, field, proj, unit):
+    """Stella sul massimo + badge grande, così l'intensità 'salta all'occhio'."""
+    try:
+        j, i = np.unravel_index(np.nanargmax(field), field.shape)
+        vmax = float(field[j, i])
+        la, lo = float(lats[j, i]), float(lons[j, i])
+    except Exception:
+        return
+    tk = {"transform": proj} if proj is not None else {}
+    ax.plot(lo, la, marker="*", ms=20, mfc="#ffe14d", mec="black",
+            mew=1.1, zorder=10, **tk)
+    ax.text(0.015, 0.985, f"MAX {vmax:.0f} {unit}", transform=ax.transAxes,
+            fontsize=15, fontweight="bold", va="top", ha="left", color="white",
+            zorder=11,
+            bbox=dict(boxstyle="round,pad=0.35", fc="#c0392b", ec="white", lw=1.3))
+
+
 def plot_message(m: Message, out: str, title_extra: str = ""):
     """Disegna un singolo campo scegliendo lo stile in base al contenuto."""
     plt = _import_mpl()
@@ -360,6 +431,11 @@ def plot_message(m: Message, out: str, title_extra: str = ""):
         f"{m.name}  ·  {m.level_label()}\n{when}   +{m.step}h{title_extra}",
         fontsize=11,
     )
+    unit = st["unit"] or m.units
+    ext = _extent_of(m)
+    _overlay_cities(ax, lons, lats, data, proj, unit, ext)
+    if st["kind"] != "contour":         # badge del massimo solo sui campi "pieni"
+        _annotate_max(ax, lons, lats, data, proj, unit)
     # Le figure usano layout="constrained": niente tight_layout né
     # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
     # del gridliner e ritaglio errato della mappa.
@@ -392,6 +468,9 @@ def plot_wind(mu: Message, mv: Message, out: str):
     vdt = mu.valid_datetime
     when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else mu.date
     ax.set_title(f"Vento a {mu.level_label()}\n{when}   +{mu.step}h", fontsize=11)
+    ext = _extent_of(mu)
+    _overlay_cities(ax, mu.lons, mu.lats, speed, proj, "m/s", ext)
+    _annotate_max(ax, mu.lons, mu.lats, speed, proj, "m/s")
     # Le figure usano layout="constrained": niente tight_layout né
     # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
     # del gridliner e ritaglio errato della mappa.
@@ -435,6 +514,9 @@ def plot_shear(hi: Message, hv: Message, lo: Message, lv: Message, out: str):
         f"Wind shear  {hi.level_label()} − {lo.level_label()}\n{when}   +{hi.step}h",
         fontsize=11,
     )
+    ext = _extent_of(hi)
+    _overlay_cities(ax, hi.lons, hi.lats, shear, proj, "m/s", ext)
+    _annotate_max(ax, hi.lons, hi.lats, shear, proj, "m/s")
     # Le figure usano layout="constrained": niente tight_layout né
     # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
     # del gridliner e ritaglio errato della mappa.
@@ -466,6 +548,9 @@ def plot_storm(cape: Message, du, dv, out: str):
     when = vdt.strftime("%Y-%m-%d %H:%M UTC") if vdt else cape.date
     ax.set_title(f"Ingredienti temporali: CAPE + shear\n{when}   +{cape.step}h",
                  fontsize=11)
+    ext = _extent_of(cape)
+    _overlay_cities(ax, cape.lons, cape.lats, cape.values, proj, "J/kg", ext)
+    _annotate_max(ax, cape.lons, cape.lats, cape.values, proj, "J/kg")
     # Le figure usano layout="constrained": niente tight_layout né
     # bbox_inches, che con i GeoAxes di cartopy danno rispettivamente crash
     # del gridliner e ritaglio errato della mappa.
