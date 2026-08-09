@@ -215,6 +215,8 @@ _FIELD_KIND = {
     (0, 2, 2): "wind_u",        # componente U
     (0, 2, 3): "wind_v",        # componente V
     (0, 6, 1): "cloud",         # copertura nuvolosa
+    (0, 7, 6): "cape",          # CAPE (energia convettiva)
+    (0, 7, 7): "cape",          # CIN, stessa famiglia di stabilità
 }
 
 
@@ -235,6 +237,8 @@ def field_kind(m: Message) -> str:
         return "wind_v"
     if sn in ("r", "rh", "2r"):
         return "humidity"
+    if sn in ("cape", "cin", "mlcape", "mucape"):
+        return "cape"
     return "generic"
 
 
@@ -253,6 +257,7 @@ _STYLE = {
     "geopotential":dict(cmap="viridis",  conv=lambda v: v, unit="gpm", kind="contour"),
     "precip":      dict(cmap="Blues",    conv=lambda v: v, unit="mm", kind="fill"),
     "humidity":    dict(cmap="YlGnBu",   conv=lambda v: v, unit="%", kind="fill"),
+    "cape":        dict(cmap="YlOrRd",   conv=lambda v: v, unit="J/kg", kind="fill"),
     "cloud":       dict(cmap="Greys",    conv=lambda v: v, unit="%", kind="fill"),
     "wind_u":      dict(cmap="RdBu_r",   conv=lambda v: v, unit="m/s", kind="fill"),
     "wind_v":      dict(cmap="RdBu_r",   conv=lambda v: v, unit="m/s", kind="fill"),
