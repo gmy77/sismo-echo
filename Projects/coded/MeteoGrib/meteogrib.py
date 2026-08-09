@@ -18,9 +18,12 @@ Uso rapido:
     python meteogrib.py auto    file.grib2 --outdir grafici
     python meteogrib.py export  file.grib2 --index 1 --out campo.csv
 
-Autore: progetto SISMO ECHO · Gimmy Pignolo © 2026 · tutti i diritti riservati (vedi LICENSE)
+Una creazione di Gimmy Pignolo & Anthropic (Claude Code) · progetto SISMO ECHO
+© 2026 Gimmy Pignolo · tutti i diritti riservati (vedi LICENSE)
 """
 from __future__ import annotations
+
+__version__ = "1.0.0"
 
 import argparse
 import html as _html
@@ -197,7 +200,8 @@ def cmd_info(args):
     if not rows:
         print("Nessun messaggio GRIB trovato nel file.")
     else:
-        print(f"\n{len(rows)} messaggi.  ecCodes v{ec.codes_get_api_version()}")
+        print(f"\n{len(rows)} messaggi.  MeteoGrib v{__version__} "
+              f"· ecCodes v{ec.codes_get_api_version()}")
 
 
 # ===========================================================================
@@ -268,6 +272,12 @@ _STYLE = {
 # ===========================================================================
 #  Disegno delle mappe
 # ===========================================================================
+def _credit(fig):
+    """Firma discreta: MeteoGrib è una creazione di Gimmy Pignolo & Anthropic."""
+    fig.text(0.995, 0.005, "MeteoGrib · Gimmy Pignolo & Anthropic",
+             ha="right", va="bottom", fontsize=6.5, color="#8aa0be", alpha=0.9)
+
+
 def _import_mpl():
     try:
         import matplotlib
@@ -809,8 +819,11 @@ def build_parser():
     p = argparse.ArgumentParser(
         prog="meteogrib",
         description="Legge file GRIB (meteo) e ne fa inventario, mappe e grafici. "
-                    "Alternativa a wgrib2 che funziona anche su Windows senza Cygwin.",
+                    "Alternativa a wgrib2 che funziona anche su Windows senza Cygwin. "
+                    "Creazione di Gimmy Pignolo & Anthropic (progetto SISMO ECHO).",
     )
+    p.add_argument("--version", action="version",
+                   version=f"MeteoGrib {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pi = sub.add_parser("info", help="inventario dei campi (stile wgrib2)")

@@ -14,6 +14,16 @@
   scegliendo da solo il tipo di grafico giusto in base a cosa c'è dentro il file.
 </p>
 
+<p align="center">
+  <em>Una creazione di <strong>Gimmy Pignolo &amp; Anthropic</strong> — nata perché su Windows
+  mancano gestori GRIB semplici e nativi.</em>
+</p>
+
+> 🪟 **Cerchi la versione Windows con interfaccia grafica?** C'è un porting in
+> **C++ nativo con GUI Win32 e soluzione Visual Studio** (apri il GRIB, mappa a
+> schermo, opzioni, salva BMP/CSV, **auto-aggiornamento da GitHub**):
+> vedi **[`cpp/README_CPP.md`](cpp/README_CPP.md)**.
+
 ---
 
 ## 🤔 Perché non wgrib2?
