@@ -119,7 +119,9 @@ class Message:
         if len(self.date) == 8:
             try:
                 d = _dt.datetime.strptime(self.date, "%Y%m%d")
-                return d + _dt.timedelta(hours=self.time // 100)
+                # dataTime è HHMM: teniamo sia ore sia minuti
+                hh, mm = divmod(int(self.time), 100)
+                return d + _dt.timedelta(hours=hh, minutes=mm)
             except ValueError:
                 return None
         return None

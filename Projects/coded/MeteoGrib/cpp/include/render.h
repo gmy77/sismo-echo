@@ -154,10 +154,12 @@ inline Image renderField(const GribField& g, Kind k, const RenderOpts& o) {
     }
 
     // stella sul massimo + badge grande
+    bool haveMax = false;
     if (o.showMax) {
         size_t im=0; double mx=-1e30;
         for (size_t i=0;i<g.values.size();++i)
-            if (!std::isnan(g.values[i]) && g.values[i]>mx){ mx=g.values[i]; im=i; }
+            if (!std::isnan(g.values[i]) && g.values[i]>mx){ mx=g.values[i]; im=i; haveMax=true; }
+        if (haveMax) {
         img.star(X(g.lons[im]), Y(g.lats[im]), 9, RGB{255,225,77});
         std::string badge = "MAX " + std::to_string((long)std::lround(mx))
                           + " " + unit;
@@ -165,6 +167,7 @@ inline Image renderField(const GribField& g, Kind k, const RenderOpts& o) {
         img.fillRect(mL+4, 4, mL+4+bw, 28, RGB{192,57,43});
         img.rect(mL+4, 4, mL+4+bw, 28, WHITE);
         img.text(mL+10, 9, badge, WHITE, 2);
+        }  // haveMax
     }
 
     // titolo (in alto a destra dell'area badge)

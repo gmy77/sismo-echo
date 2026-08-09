@@ -70,8 +70,8 @@ static void rerender(HWND w) {
         const GribField& g = g_fields[g_sel];
         g_img.reset(new Image(renderField(g, classify(g), g_opts)));
         char buf[256];
-        wsprintfA(buf, "%s  |  max %ld  min %ld",
-                  g.shortName.c_str(), (long)g.vmax, (long)g.vmin);
+        snprintf(buf, sizeof(buf), "%.60s  |  max %ld  min %ld",
+                 g.shortName.c_str(), (long)g.vmax, (long)g.vmin);
         setStatus(w, buf);
     } else if (g_sel >= 0) {
         setStatus(w, "Campo su griglia non regolare: mappa non disponibile.");
@@ -129,6 +129,12 @@ static void saveBmp(HWND w) {
 static void saveCsv(HWND w) {
     if (g_sel < 0) return;
     const GribField& g = g_fields[g_sel];
+    if (g.lats.size() != g.values.size() || g.lons.size() != g.values.size()
+        || g.values.empty()) {
+        MessageBoxA(w, "Coordinate lat/lon non disponibili per questo campo:\n"
+                       "export CSV non possibile.", "MeteoGrib", MB_ICONWARNING);
+        return;
+    }
     char path[MAX_PATH] = "campo.csv";
     OPENFILENAMEA ofn = {0};
     ofn.lStructSize = sizeof(ofn); ofn.hwndOwner = w;
@@ -156,7 +162,9 @@ static void blit(HDC hdc, const Image& img, RECT area) {
     int dx = area.left + ((area.right-area.left)-dw)/2;
     int dy = area.top  + ((area.bottom-area.top)-dh)/2;
 
-    std::vector<uint32_t> buf(size_t(img.w)*img.h);
+    // buffer 32-bit riusato tra i WM_PAINT: evita di riallocare a ogni frame
+    static std::vector<uint32_t> buf;
+    buf.resize(size_t(img.w)*img.h);
     for (size_t i=0;i<buf.size();++i) {
         RGB c = img.px[i];
         buf[i] = (uint32_t(c.r)<<16)|(uint32_t(c.g)<<8)|uint32_t(c.b);
@@ -193,12 +201,13 @@ static bool httpGet(const std::string& url, std::string* out, const char* toFile
     FILE* f = toFile ? fopen(toFile, "wb") : nullptr;
     if (toFile && !f) { InternetCloseHandle(hU); InternetCloseHandle(hI); return false; }
 
-    char buf[8192]; DWORD n = 0; bool ok = true;
-    while (InternetReadFile(hU, buf, sizeof(buf), &n) && n > 0) {
-        if (f) fwrite(buf, 1, n, f);
+    char buf[8192]; DWORD n = 0; bool ok = true; BOOL r = TRUE;
+    while ((r = InternetReadFile(hU, buf, sizeof(buf), &n)) && n > 0) {
+        if (f) { if (fwrite(buf, 1, n, f) != n) { ok = false; break; } }
         else   out->append(buf, n);
     }
-    if (f) fclose(f);
+    if (!r) ok = false;   // InternetReadFile ha fallito prima dell'EOF
+    if (f) { if (fclose(f) != 0) ok = false; }
     InternetCloseHandle(hU); InternetCloseHandle(hI);
     return ok;
 }

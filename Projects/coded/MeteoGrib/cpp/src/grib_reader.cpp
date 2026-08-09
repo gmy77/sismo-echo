@@ -2,6 +2,7 @@
 #include "grib_reader.h"
 
 #include <eccodes.h>
+#include <cctype>
 #include <cstdio>
 #include <cmath>
 #include <cstring>

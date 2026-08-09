@@ -50,6 +50,12 @@ static int findIndex(const std::vector<GribField>& fs, int idx) {
 }
 
 static bool exportCsv(const GribField& g, const std::string& out) {
+    if (g.lats.size() != g.values.size() || g.lons.size() != g.values.size()
+        || g.values.empty()) {
+        std::printf("Coordinate lat/lon non disponibili per questo campo: "
+                    "export CSV non possibile.\n");
+        return false;
+    }
     FILE* f = std::fopen(out.c_str(), "wb");
     if (!f) return false;
     std::fprintf(f, "# %s [%s] %s step %s\n",
