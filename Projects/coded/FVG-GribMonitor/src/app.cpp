@@ -13,15 +13,23 @@
 #ifndef UNICODE
 #define UNICODE
 #endif
+// windows.h defines min()/max() macros that break std::min/std::max (used here
+// and in colormap.h). NOMINMAX disables them; gdiplus.h in turn references
+// min/max unqualified, so we pull them in from std before including it.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <commctrl.h>
 #include <commdlg.h>
 #include <shlobj.h>
+#include <algorithm>
+#include <cmath>
+using std::min;
+using std::max;
 #include <gdiplus.h>
 #include <string>
 #include <vector>
-#include <cmath>
-#include <algorithm>
 
 #include "grib2.h"
 #include "colormap.h"

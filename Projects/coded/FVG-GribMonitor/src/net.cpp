@@ -1,5 +1,8 @@
 // net.cpp — WinHTTP implementation of net.h.
 #include "net.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <winhttp.h>
 #include <cstdio>
