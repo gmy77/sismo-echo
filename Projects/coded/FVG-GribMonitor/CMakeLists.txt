@@ -28,6 +28,12 @@ if(MSVC)
     target_link_options(FVG-GribMonitor PRIVATE /MANIFEST:NO)
 endif()
 
+# Portable parser test (console app), run via CTest — no need for cl.exe on PATH.
+enable_testing()
+add_executable(test_grib test/test_grib.cpp src/grib2.cpp)
+add_test(NAME parser
+    COMMAND test_grib ${CMAKE_SOURCE_DIR}/test/sample_FVG_CAPE.grib2)
+
 # Copy the sample GRIB and config next to the built exe for a ready-to-run app.
 add_custom_command(TARGET FVG-GribMonitor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

@@ -33,10 +33,7 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Run parser test
-        shell: cmd
-        run: |
-          cl /nologo /EHsc /std:c++17 test\test_grib.cpp src\grib2.cpp /Fe:test_grib.exe
-          test_grib.exe test\sample_FVG_CAPE.grib2
+        run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Stage package
         shell: pwsh
