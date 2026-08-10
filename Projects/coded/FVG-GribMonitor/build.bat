@@ -28,7 +28,7 @@ rc /nologo /fo src\app.res src\app.rc
 cl /nologo /EHsc /O2 /std:c++17 /DUNICODE /D_UNICODE ^
    src\app.cpp src\grib2.cpp src\net.cpp src\app.res ^
    /Fe:FVG-GribMonitor.exe ^
-   /link /SUBSYSTEM:WINDOWS gdiplus.lib comctl32.lib comdlg32.lib winhttp.lib shell32.lib gdi32.lib user32.lib ole32.lib
+   /link /SUBSYSTEM:WINDOWS /MANIFEST:NO gdiplus.lib comctl32.lib comdlg32.lib winhttp.lib shell32.lib gdi32.lib user32.lib ole32.lib
 if %errorlevel% neq 0 ( echo Errore di compilazione. & pause & exit /b 1 )
 del /q *.obj src\app.res 2>nul
 goto :done

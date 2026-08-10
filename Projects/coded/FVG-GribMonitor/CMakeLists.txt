@@ -22,6 +22,12 @@ if(MINGW)
     target_link_options(FVG-GribMonitor PRIVATE -municode -static -static-libgcc -static-libstdc++)
 endif()
 
+if(MSVC)
+    # We embed our own manifest via app.rc; stop the linker from generating a
+    # second one (otherwise: CVT1100 "duplicate resource type:MANIFEST").
+    target_link_options(FVG-GribMonitor PRIVATE /MANIFEST:NO)
+endif()
+
 # Copy the sample GRIB and config next to the built exe for a ready-to-run app.
 add_custom_command(TARGET FVG-GribMonitor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
