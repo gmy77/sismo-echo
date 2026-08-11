@@ -125,6 +125,27 @@ int main(int argc,char**argv){
     poly(im,prBody,FVG_PROV_TS,FVG_PROV_TS_N,110,110,120);
     poly(im,prBody,FVG_PROV_PN,FVG_PROV_PN_N,110,110,120);
     poly(im,prBody,FVG_REGION,FVG_REGION_N,30,30,45);
+    // wind arrows: 10 m U/V overlaid on the CAPE map (same as the app does)
+    const grib2::Field *fu=nullptr,*fv=nullptr;
+    for(auto&f:fields){ if(f.shortName()=="U"&&f.levelType==103)fu=&f; if(f.shortName()=="V"&&f.levelType==103)fv=&f; }
+    auto thick=[&](double x0,double y0,double x1,double y1,uint8_t r,uint8_t g,uint8_t b,int rad){
+        double dx=x1-x0,dy=y1-y0; int n=(int)std::max(std::fabs(dx),std::fabs(dy))+1;
+        for(int i=0;i<=n;i++){double t=(double)i/n; disc(im,(int)std::lround(x0+dx*t),(int)std::lround(y0+dy*t),rad,r,g,b);} };
+    if(fu&&fv){
+        for(int r=0;r<fu->nj;r++)for(int c=0;c<fu->ni;c++){
+            double uu=fu->at(c,r),vv=fv->at(c,r); if(std::isnan(uu)||std::isnan(vv))continue;
+            double lon=std::min(fu->lon1,fu->lon2)+c*fu->di, lat=std::min(fu->lat1,fu->lat2)+r*fu->dj;
+            if(!inRegion(FVG_REGION,FVG_REGION_N,lon,lat))continue;
+            double bx,by; prBody.toPixel(lon,lat,bx,by);
+            double spd=std::hypot(uu,vv), L=std::min(24.0,7.0+spd*3.0);
+            double ex=bx+(spd>1e-6?uu/spd:0)*L, ey=by-(spd>1e-6?vv/spd:0)*L;
+            double ang=std::atan2(ey-by,ex-bx);
+            double h1x=ex+7*std::cos(ang+2.6),h1y=ey+7*std::sin(ang+2.6);
+            double h2x=ex+7*std::cos(ang-2.6),h2y=ey+7*std::sin(ang-2.6);
+            thick(bx,by,ex,ey,255,255,255,2); thick(ex,ey,h1x,h1y,255,255,255,2); thick(ex,ey,h2x,h2y,255,255,255,2);
+            thick(bx,by,ex,ey,15,15,25,0);    thick(ex,ey,h1x,h1y,15,15,25,0);    thick(ex,ey,h2x,h2y,15,15,25,0);
+        }
+    }
     // cities as dots (white halo + dark center)
     for(int i=0;i<FVG_CITIES_N;i++){double x,y;prBody.toPixel(FVG_CITIES[i].lon,FVG_CITIES[i].lat,x,y);
         disc(im,(int)x,(int)y,4,255,255,255); disc(im,(int)x,(int)y,2,20,20,30);}

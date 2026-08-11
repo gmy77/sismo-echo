@@ -13,11 +13,13 @@ BEGIN
   BEGIN
     BLOCK "040904b0"
     BEGIN
-      VALUE "CompanyName", "gmy77"
-      VALUE "FileDescription", "FVG GRIB Monitor"
+      VALUE "CompanyName", "Gimmy (gmy77)"
+      VALUE "FileDescription", "FVG GRIB Monitor - visualizzatore GRIB2 per il Friuli Venezia Giulia"
       VALUE "FileVersion", "1.0.0.0"
       VALUE "ProductName", "FVG GRIB Monitor"
       VALUE "ProductVersion", "1.0.0.0"
+      VALUE "LegalCopyright", "Copyright (C) 2026 Gimmy (gmy77). Tutti i diritti riservati."
+      VALUE "OriginalFilename", "FVG-GribMonitor.exe"
     END
   END
   BLOCK "VarFileInfo"

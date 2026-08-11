@@ -20,6 +20,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <windowsx.h>
 #include <commctrl.h>
 #include <commdlg.h>
 #include <shlobj.h>
@@ -294,30 +295,47 @@ static void paintMap(HDC hdc, RECT rc) {
         drawPolyline(gfx, pr, FVG_REGION, FVG_REGION_N, region);
     }
 
-    // Wind arrows (only for wind views).
-    if (g.showArrows && !g.views.empty() && g.views[g.current].isWind) {
-        const View& vw = g.views[g.current];
-        Pen ap(Color(210, 20, 20, 30), 1.4f);
-        for (int r = 0; r < vw.u->nj; ++r) {
-            for (int c = 0; c < vw.u->ni; ++c) {
-                double uu = vw.u->at(c, r), vv = vw.v->at(c, r);
-                if (std::isnan(uu) || std::isnan(vv)) continue;
-                double lon = std::min(vw.u->lon1, vw.u->lon2) + c * vw.u->di;
-                double lat = std::min(vw.u->lat1, vw.u->lat2) + r * vw.u->dj;
-                if (g.clipFVG && !inRegion(FVG_REGION, FVG_REGION_N, lon, lat)) continue;
-                PointF base = pr.toPixel(lon, lat);
-                double spd = std::hypot(uu, vv);
-                double L = std::min(22.0, 6.0 + spd * 3.0);
-                // meteo convention: arrow points TO where wind blows (u east, v north).
-                double dx = (spd > 1e-6 ? uu / spd : 0) * L;
-                double dy = -(spd > 1e-6 ? vv / spd : 0) * L; // screen y down
-                PointF tip((REAL)(base.X + dx), (REAL)(base.Y + dy));
-                gfx.DrawLine(&ap, base, tip);
-                // arrowhead
-                double ang = std::atan2(dy, dx);
-                double a1 = ang + 2.6, a2 = ang - 2.6;
-                gfx.DrawLine(&ap, tip, PointF((REAL)(tip.X + 6 * std::cos(a1)), (REAL)(tip.Y + 6 * std::sin(a1))));
-                gfx.DrawLine(&ap, tip, PointF((REAL)(tip.X + 6 * std::cos(a2)), (REAL)(tip.Y + 6 * std::sin(a2))));
+    // Wind arrows. On a wind view use its own U/V; on any other field (CAPE, a
+    // single component) overlay the surface (10 m) wind, so the arrows are
+    // always visible and not hidden behind the scalar selection.
+    if (g.showArrows && !g.views.empty()) {
+        const grib2::Field *fu = nullptr, *fv = nullptr;
+        if (g.views[g.current].isWind) { fu = g.views[g.current].u; fv = g.views[g.current].v; }
+        else {
+            for (auto& a : g.fields) {
+                if (a.shortName() != "U") continue;
+                for (auto& b : g.fields) {
+                    if (b.shortName() != "V") continue;
+                    if (a.levelType == b.levelType && a.levelValue == b.levelValue)
+                        if (!fu || a.levelType == 103) { fu = &a; fv = &b; } // prefer 10 m
+                }
+            }
+        }
+        if (fu && fv) {
+            Pen halo(Color(200, 255, 255, 255), 3.4f); // white outline for contrast
+            Pen ap(Color(235, 15, 15, 25), 1.7f);
+            for (int r = 0; r < fu->nj; ++r) {
+                for (int c = 0; c < fu->ni; ++c) {
+                    double uu = fu->at(c, r), vv = fv->at(c, r);
+                    if (std::isnan(uu) || std::isnan(vv)) continue;
+                    double lon = std::min(fu->lon1, fu->lon2) + c * fu->di;
+                    double lat = std::min(fu->lat1, fu->lat2) + r * fu->dj;
+                    if (g.clipFVG && !inRegion(FVG_REGION, FVG_REGION_N, lon, lat)) continue;
+                    PointF base = pr.toPixel(lon, lat);
+                    double spd = std::hypot(uu, vv);
+                    double L = std::min(24.0, 7.0 + spd * 3.0);
+                    // meteo convention: arrow points TO where the wind blows (u east, v north).
+                    double dx = (spd > 1e-6 ? uu / spd : 0) * L;
+                    double dy = -(spd > 1e-6 ? vv / spd : 0) * L; // screen y is down
+                    PointF tip((REAL)(base.X + dx), (REAL)(base.Y + dy));
+                    double ang = std::atan2(dy, dx);
+                    PointF h1((REAL)(tip.X + 7 * std::cos(ang + 2.6)), (REAL)(tip.Y + 7 * std::sin(ang + 2.6)));
+                    PointF h2((REAL)(tip.X + 7 * std::cos(ang - 2.6)), (REAL)(tip.Y + 7 * std::sin(ang - 2.6)));
+                    gfx.DrawLine(&halo, base, tip);
+                    gfx.DrawLine(&halo, tip, h1); gfx.DrawLine(&halo, tip, h2);
+                    gfx.DrawLine(&ap, base, tip);
+                    gfx.DrawLine(&ap, tip, h1); gfx.DrawLine(&ap, tip, h2);
+                }
             }
         }
     }
@@ -359,6 +377,16 @@ static void paintMap(HDC hdc, RECT rc) {
         swprintf(buf, 64, L"%.0f", vw.vmin); gfx.DrawString(buf, -1, &font, PointF((REAL)(lx + lw + 5), (REAL)(ly + lh - 12)), &txt);
         gfx.DrawString(vw.unit.c_str(), -1, &font, PointF((REAL)lx, (REAL)(ly - 18)), &txt);
     }
+
+    // Discreet copyright watermark (bottom-right of the map).
+    {
+        FontFamily ff(L"Segoe UI"); Font font(&ff, 11, FontStyleRegular, UnitPixel);
+        SolidBrush wm(Color(150, 40, 40, 55));
+        const wchar_t* credit = L"\x00A9 2026 Gimmy (gmy77) \x2014 sviluppato con Claude (Anthropic)";
+        RectF box; gfx.MeasureString(credit, -1, &font, PointF(0, 0), &box);
+        gfx.DrawString(credit, -1, &font,
+                       PointF((REAL)(x0 + w - box.Width - 10), (REAL)(y0 + h - box.Height - 8)), &wm);
+    }
 }
 
 // ----------------------------- info text ----------------------------------
@@ -385,6 +413,9 @@ static void loadFile(const std::wstring& path) {
     if (fields.empty()) { setStatus(L"Nessun campo GRIB2 valido nel file."); return; }
     g.fields = std::move(fields);
     rebuildViews();
+    // Default to CAPE if the file has it (these extracts are named FVG_CAPE).
+    for (size_t i = 0; i < g.views.size(); ++i)
+        if (g.views[i].scalar && g.views[i].scalar->shortName() == "CAPE") { g.current = (int)i; break; }
 
     size_t sl = path.find_last_of(L"\\/");
     g.loadedName = sl == std::wstring::npos ? path : path.substr(sl + 1);
@@ -496,7 +527,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         mkButton(hwnd, L"Controlla aggiornamenti", IDC_UPDATE,   x, y, PANEL_W - 30, 30); y += 42;
 
         g.info = mkLabel(hwnd, L"", x, y, PANEL_W - 30, 60, IDC_INFO); y += 66;
-        g.status = mkLabel(hwnd, L"Pronto.", x, y, PANEL_W - 30, 40, IDC_STATUS);
+        g.status = mkLabel(hwnd, L"Pronto.", x, y, PANEL_W - 30, 52, IDC_STATUS); y += 58;
+        mkLabel(hwnd, L"\x00A9 2026 Gimmy (gmy77)\r\nFVG GRIB Monitor v1.0.0\r\nSviluppato con Claude (Anthropic)",
+                x, y, PANEL_W - 30, 50, -1);
         updateInfo();
         return 0;
     }
@@ -524,6 +557,26 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (GetDlgCtrlID((HWND)lp) == IDC_ALPHA) {
             g.alpha = (int)SendMessageW((HWND)lp, TBM_GETPOS, 0, 0);
             InvalidateRect(hwnd, nullptr, FALSE);
+        }
+        return 0;
+    }
+    case WM_MOUSEMOVE: {
+        // Read out the value under the cursor into the status line.
+        int mx = GET_X_LPARAM(lp), my = GET_Y_LPARAM(lp);
+        if (mx >= PANEL_W && !g.views.empty()) {
+            RECT rc; GetClientRect(hwnd, &rc);
+            Proj pr; pr.setup(PANEL_W, 0, rc.right - PANEL_W, rc.bottom);
+            double lon, lat; pr.toGeo(mx, my, lon, lat);
+            wchar_t b[160];
+            if (lon >= pr.lonMin && lon <= pr.lonMax && lat >= pr.latMin && lat <= pr.latMax) {
+                double v = sampleView(g.views[g.current], lon, lat, g.smooth);
+                if (!std::isnan(v))
+                    swprintf(b, 160, L"%.3f N  %.3f E\r\n%.1f %s", lat, lon,
+                             v, g.views[g.current].unit.c_str());
+                else
+                    swprintf(b, 160, L"%.3f N  %.3f E", lat, lon);
+                setStatus(b);
+            }
         }
         return 0;
     }

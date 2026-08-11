@@ -38,6 +38,14 @@ Opzioni nel pannello: mostra città, mostra confini, frecce vento, sfumatura
 morbida, **ritaglia sul FVG** (colora solo dentro il confine regionale) e uno
 slider per l'**opacità** dei colori.
 
+**Frecce vento sempre disponibili:** le frecce del vento a 10 m si disegnano
+sopra *qualsiasi* mappa (anche il CAPE), con contorno bianco per leggerle su
+ogni colore. Su una vista "Vento @ … (vel.+dir.)" usano invece il vento di quel
+livello. All'avvio la vista predefinita è il **CAPE**.
+
+**Lettura al volo:** passando il mouse sulla mappa, in basso a sinistra
+compaiono le coordinate (lat/lon) e il **valore** del campo sotto il cursore.
+
 ---
 
 ## Compilare (Windows)
@@ -123,6 +131,16 @@ versione (in `app.cpp`, `APP_VERSION`).
 
 ---
 
-## Licenza
-Vedi `LICENSE` nella root del repository. Dati geografici: openpolis/geojson-italy
-(confini amministrativi ISTAT).
+## Copyright & crediti
+
+**Copyright © 2026 Gimmy (gmy77). Tutti i diritti riservati.**
+
+Sviluppato con **Claude (Anthropic)**.
+
+Visualizzatori GRIB nativi per **Windows** — e per giunta mirati al Friuli
+Venezia Giulia — sono rari: i più diffusi (Panoply, zyGrib, IDV…) sono
+cross-platform o pensati per Linux. Questo è un lettore leggero, nativo Win32,
+senza dipendenze esterne.
+
+Licenza del codice: vedi `LICENSE` nella root del repository.
+Dati geografici: openpolis/geojson-italy (confini amministrativi ISTAT).
