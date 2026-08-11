@@ -7,8 +7,10 @@ name: FVG-GribMonitor (Windows build)
 #    reads (api.github.com/.../releases/latest).
 on:
   push:
+    # NB: no `paths:` filter here on purpose — combining paths with a tag
+    # filter makes tag pushes fail to trigger (path filtering has no "new"
+    # commits to match against on a tag), so releases would never build.
     branches: [ main ]
-    paths: [ 'Projects/coded/FVG-GribMonitor/**', '.github/workflows/fvg-gribmonitor.yml' ]
     tags: [ 'fvg-v*' ]
   pull_request:
     paths: [ 'Projects/coded/FVG-GribMonitor/**' ]
