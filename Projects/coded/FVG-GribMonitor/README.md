@@ -131,6 +131,30 @@ versione (in `app.cpp`, `APP_VERSION`).
 
 ---
 
+## Sorgente dati automatica (pulsante "Scarica ultimo GRIB")
+
+Il pulsante scarica dall'URL in `config.ini`, impostato di default su un asset
+della Release **`fvg-data`**. Quell'asset viene generato in automatico dal
+workflow `.github/workflows/fvg-grib-data.yml`, che:
+
+1. scarica dal **GFS/NOMADS** il ritaglio **solo FVG** (12–14°E / 45–47°N):
+   CAPE, CIN, vento a 10 m e 500 hPa, temperatura, umidità;
+2. lo **ri-codifica in *simple packing*** (`grib_set packingType=grid_simple`),
+   l'unico che il lettore dell'app legge oggi (vedi `ROADMAP.md`, P0.1);
+3. lo pubblica come asset `FVG_latest.grib2` della Release `fvg-data`
+   (marcata *prerelease*, così non interferisce con "Controlla aggiornamenti").
+
+Gira ~4 volte al giorno (dopo i cicli GFS 00/06/12/18 UTC).
+
+**Prima attivazione:** su GitHub → **Actions** → *"FVG GRIB data (aggiorna il
+dato)"* → **Run workflow**. Crea la Release `fvg-data` e il primo file; dopo,
+il pulsante nell'app funziona subito.
+
+> Per cambiare sorgente (es. un tuo endpoint), basta incollare un altro URL in
+> `grib_url` dentro `config.ini`.
+
+---
+
 ## Copyright & crediti
 
 **Copyright © 2026 Gimmy (gmy77). Tutti i diritti riservati.**
