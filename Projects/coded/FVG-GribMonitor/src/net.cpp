@@ -19,6 +19,14 @@ static std::wstring toW(const std::string& s) {
     MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), &w[0], n);
     return w;
 }
+// Format the last Win32/WinHTTP error as "<what> (err N)" for the status line.
+static std::string winErr(const char* what) {
+    DWORD e = GetLastError();
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), "%s (err %lu)", what, e);
+    return buf;
+}
+
 bool httpGet(const std::wstring& url, std::vector<uint8_t>& out, std::string& err) {
     out.clear();
     URL_COMPONENTS uc; ZeroMemory(&uc, sizeof(uc)); uc.dwStructSize = sizeof(uc);
@@ -27,53 +35,57 @@ bool httpGet(const std::wstring& url, std::vector<uint8_t>& out, std::string& er
     uc.lpszUrlPath = path; uc.dwUrlPathLength = 2047;
     if (!WinHttpCrackUrl(url.c_str(), 0, 0, &uc)) { err = "URL non valido"; return false; }
 
+    // DEFAULT_PROXY uses the machine's static WinHTTP proxy config (direct on a
+    // normal home connection). AUTOMATIC_PROXY (WPAD) can fail on networks with
+    // no auto-config, which is a common cause of "download fallito".
     HINTERNET hs = WinHttpOpen(L"FVG-GribMonitor/1.0",
-        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME,
+        WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
         WINHTTP_NO_PROXY_BYPASS, 0);
-    if (!hs) { err = "WinHttpOpen fallita"; return false; }
+    if (!hs) { err = winErr("WinHttpOpen"); return false; }
+
+    WinHttpSetTimeouts(hs, 15000, 15000, 30000, 30000);
+    // Always follow redirects — GitHub release assets 302 to a CDN host.
+    DWORD redirect = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+    WinHttpSetOption(hs, WINHTTP_OPTION_REDIRECT_POLICY, &redirect, sizeof(redirect));
 
     bool https = (uc.nScheme == INTERNET_SCHEME_HTTPS);
     HINTERNET hc = WinHttpConnect(hs, host, uc.nPort, 0);
-    HINTERNET hr = hc ? WinHttpOpenRequest(hc, L"GET", path, nullptr,
+    if (!hc) { err = winErr("WinHttpConnect"); WinHttpCloseHandle(hs); return false; }
+    HINTERNET hr = WinHttpOpenRequest(hc, L"GET", path, nullptr,
         WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-        https ? WINHTTP_FLAG_SECURE : 0) : nullptr;
+        https ? WINHTTP_FLAG_SECURE : 0);
+    if (!hr) { err = winErr("WinHttpOpenRequest"); WinHttpCloseHandle(hc); WinHttpCloseHandle(hs); return false; }
 
     bool ok = false;
-    if (hr) {
-        // WinHTTP follows HTTP redirects by default, which is what we want for
-        // GitHub's release-asset download URLs (they redirect to a CDN).
-        if (WinHttpSendRequest(hr, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
-            WinHttpReceiveResponse(hr, nullptr)) {
-            DWORD status = 0, sz = sizeof(status);
-            WinHttpQueryHeaders(hr, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                WINHTTP_HEADER_NAME_BY_INDEX, &status, &sz, WINHTTP_NO_HEADER_INDEX);
-            if (status >= 200 && status < 300) {
-                DWORD avail = 0;
-                do {
-                    avail = 0;
-                    if (!WinHttpQueryDataAvailable(hr, &avail)) break;
-                    if (!avail) break;
-                    size_t off = out.size();
-                    out.resize(off + avail);
-                    DWORD read = 0;
-                    if (!WinHttpReadData(hr, out.data() + off, avail, &read)) break;
-                    out.resize(off + read);
-                } while (avail > 0);
-                ok = true;
-            } else {
-                char buf[64]; std::snprintf(buf, sizeof(buf), "HTTP %lu", status);
-                err = buf;
-            }
+    if (WinHttpSendRequest(hr, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+            WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+        WinHttpReceiveResponse(hr, nullptr)) {
+        DWORD status = 0, sz = sizeof(status);
+        WinHttpQueryHeaders(hr, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+            WINHTTP_HEADER_NAME_BY_INDEX, &status, &sz, WINHTTP_NO_HEADER_INDEX);
+        if (status >= 200 && status < 300) {
+            DWORD avail = 0;
+            do {
+                avail = 0;
+                if (!WinHttpQueryDataAvailable(hr, &avail)) break;
+                if (!avail) break;
+                size_t off = out.size();
+                out.resize(off + avail);
+                DWORD read = 0;
+                if (!WinHttpReadData(hr, out.data() + off, avail, &read)) break;
+                out.resize(off + read);
+            } while (avail > 0);
+            ok = true;
         } else {
-            err = "richiesta fallita (rete?)";
+            char buf[64]; std::snprintf(buf, sizeof(buf), "HTTP %lu", status);
+            err = buf;
         }
     } else {
-        err = "connessione fallita";
+        err = winErr("richiesta");
     }
-    if (hr) WinHttpCloseHandle(hr);
-    if (hc) WinHttpCloseHandle(hc);
-    if (hs) WinHttpCloseHandle(hs);
+    WinHttpCloseHandle(hr);
+    WinHttpCloseHandle(hc);
+    WinHttpCloseHandle(hs);
     return ok;
 }
 

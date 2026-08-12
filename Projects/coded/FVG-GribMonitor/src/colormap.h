@@ -65,6 +65,28 @@ inline Palette windSpeed() {
     }, false };
 }
 
+// Temperature: blue (cold) -> cyan -> green -> yellow -> orange -> red (hot).
+inline Palette thermal() {
+    return { "Temperatura", {
+        {0.00, { 40,  50, 150}},
+        {0.20, { 40, 140, 200}},
+        {0.40, { 70, 190, 130}},
+        {0.58, {235, 225,  90}},
+        {0.78, {240, 150,  50}},
+        {1.00, {200,  40,  40}},
+    }, false };
+}
+
+// Relative humidity: dry tan -> green -> blue (wet).
+inline Palette humidity() {
+    return { "Umidita", {
+        {0.00, {200, 170, 120}},
+        {0.45, {150, 200, 120}},
+        {0.75, { 70, 170, 190}},
+        {1.00, { 30,  80, 190}},
+    }, false };
+}
+
 // Diverging palette for signed components (U or V): blue - white - red.
 inline Palette diverging() {
     return { "Componente (segno)", {
