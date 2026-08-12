@@ -1,0 +1,13 @@
+# Build output
+/build/
+/dist/
+*.exe
+*.obj
+*.o
+*.res
+*.res.o
+# scaricati a runtime
+latest.grib2
+
+# binario di test compilato
+test/t
