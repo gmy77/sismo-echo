@@ -58,8 +58,11 @@ enum {
 
 // ----------------------------- settings -----------------------------------
 struct Settings {
+    // Baked-in default source so the app works out of the box even if config.ini
+    // is missing or has an empty grib_url. A non-empty grib_url in config.ini
+    // (next to the exe) overrides this.
     std::wstring gribUrl =
-        L"";  // set in config.ini — the "download latest GRIB" source
+        L"https://github.com/gmy77/sismo-echo/releases/download/fvg-data/FVG_latest.grib2";
     std::string updateOwner = "gmy77";
     std::string updateRepo  = "sismo-echo";
 };
@@ -90,9 +93,9 @@ static void loadSettings(Settings& s) {
         size_t eq = l.find('=');
         if (eq == std::string::npos) continue;
         std::string k = trim(l.substr(0, eq)), v = trim(l.substr(eq + 1));
-        if (k == "grib_url")      s.gribUrl = toW(v);
-        else if (k == "update_owner") s.updateOwner = v;
-        else if (k == "update_repo")  s.updateRepo = v;
+        if (k == "grib_url") { if (!v.empty()) s.gribUrl = toW(v); }  // empty => keep default
+        else if (k == "update_owner") { if (!v.empty()) s.updateOwner = v; }
+        else if (k == "update_repo")  { if (!v.empty()) s.updateRepo = v; }
     }
     fclose(fp);
 }
@@ -154,6 +157,10 @@ static void rebuildViewsFor(Snapshot& snap) {
             vw.palette = cmap::diverging();
         else if (sn == "CAPE" || sn == "CIN")
             vw.palette = cmap::cape();
+        else if (sn == "T")
+            vw.palette = cmap::thermal();
+        else if (sn == "RH")
+            vw.palette = cmap::humidity();
         else
             vw.palette = cmap::windSpeed();
         vw.label = toW(f.label());
@@ -783,7 +790,14 @@ static void actionCheckUpdate() {
     net::Release rel; std::string err;
     bool ok = net::latestRelease(g.settings.updateOwner, g.settings.updateRepo, rel, err);
     SetCursor(old);
-    if (!ok) { setStatus(L"Controllo fallito: " + toW(err)); return; }
+    if (!ok) {
+        // 404 on releases/latest just means no published app release yet.
+        if (err.find("404") != std::string::npos || err.find("nessuna") != std::string::npos)
+            setStatus(L"Nessuna release pubblicata (ancora).");
+        else
+            setStatus(L"Controllo fallito: " + toW(err));
+        return;
+    }
     int cmp = net::compareVersions(rel.tag, APP_VERSION);
     if (cmp > 0) {
         std::wstring msg = L"Nuova versione disponibile: " + toW(rel.tag) +

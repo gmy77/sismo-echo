@@ -59,7 +59,12 @@ Doppio-click su **`build.bat`**. Rileva da solo il compilatore, crea
 > Con Visual Studio: apri prima il *"x64 Native Tools Command Prompt for VS"* e
 > lancia `build.bat` da lì (così `cl.exe` è nel PATH).
 
-### Con CMake
+### Con la soluzione Visual Studio (.sln)
+Se preferisci il flusso classico col `.sln`: doppio-click su **`gen-sln.bat`**
+(o lancialo dal *"Developer Command Prompt for VS 2026"*). Genera
+`build\FVG-GribMonitor.sln`: aprilo in VS, scegli **Release**, premi Avvia.
+
+### Con CMake (riga di comando)
 ```bat
 cmake -B build -A x64
 cmake --build build --config Release
