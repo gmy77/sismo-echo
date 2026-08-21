@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
     img::Image im = img::renderTrueColor(g);  // natural true colour 1-4-3, calibrated
     if (im.empty()) { std::fprintf(stderr, "render failed\n"); return 1; }
 
-    const int UP = 2;
+    const int UP = argc > 3 ? std::max(1, atoi(argv[3])) : 2;
     Canvas cv(im.w * UP, im.h * UP);
     for (int y = 0; y < im.h; ++y)
         for (int x = 0; x < im.w; ++x) {
