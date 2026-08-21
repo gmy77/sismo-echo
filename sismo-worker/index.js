@@ -3336,6 +3336,68 @@ export default {
     const db     = env.DB;
     const SECRET = getUpdateSecret(env);
 
+    // ============================================================
+    // MODIS FVG — proxy + cache immagini reali NASA GIBS (Terra/Aqua).
+    // Usato dal visualizzatore desktop MODIS-FVG-Viewer: scarica lato edge,
+    // mette in cache, e serve il PNG al PC. Nessun DB richiesto.
+    //   GET /modis?sat=terra|aqua&product=truecolor|bands721|bands367|lst
+    //             &date=YYYY-MM-DD (default: ieri UTC)
+    //             &bbox=latMin,lonMin,latMax,lonMax (default: FVG)
+    //             &w=1024&h=768
+    // ============================================================
+    if (url.pathname === "/modis") {
+      const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+
+      const LAYERS = {
+        terra: { truecolor:"MODIS_Terra_CorrectedReflectance_TrueColor",
+                 bands721:"MODIS_Terra_CorrectedReflectance_Bands721",
+                 bands367:"MODIS_Terra_CorrectedReflectance_Bands367",
+                 lst:"MODIS_Terra_Land_Surface_Temp_Day" },
+        aqua:  { truecolor:"MODIS_Aqua_CorrectedReflectance_TrueColor",
+                 bands721:"MODIS_Aqua_CorrectedReflectance_Bands721",
+                 bands367:"MODIS_Aqua_CorrectedReflectance_Bands367",
+                 lst:"MODIS_Aqua_Land_Surface_Temp_Day" },
+      };
+      const sat     = (url.searchParams.get("sat") || "terra").toLowerCase();
+      const product = (url.searchParams.get("product") || "truecolor").toLowerCase();
+      const layer   = (LAYERS[sat] || LAYERS.terra)[product] || LAYERS.terra.truecolor;
+
+      let date = url.searchParams.get("date");
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {           // default: ieri (UTC)
+        date = new Date(Date.now() - 24*3600*1000).toISOString().slice(0,10);
+      }
+      const bbox = url.searchParams.get("bbox") || "45.5,12.3,46.7,13.9"; // lat,lon (WMS 1.3.0)
+      const w = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("w")||"1024") || 1024));
+      const h = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("h")||"768")  || 768));
+
+      const gibs = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
+        + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + layer
+        + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox
+        + "&WIDTH=" + w + "&HEIGHT=" + h + "&FORMAT=image/png&TIME=" + date;
+
+      const cache = caches.default;
+      const cacheKey = new Request(url.origin + "/modis?k=" + encodeURIComponent(layer+"|"+date+"|"+bbox+"|"+w+"x"+h));
+      const hit = await cache.match(cacheKey);
+      if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
+
+      let resp;
+      try { resp = await fetch(gibs, { cf: { cacheTtl: 86400, cacheEverything: true } }); }
+      catch (e) { return new Response(JSON.stringify({error:"fetch GIBS fallita", detail:String(e)}), {status:502, headers:{...CORS,"Content-Type":"application/json"}}); }
+      if (!resp.ok) return new Response(JSON.stringify({error:"GIBS HTTP "+resp.status, layer, date}), {status:502, headers:{...CORS,"Content-Type":"application/json"}});
+
+      const ct  = resp.headers.get("Content-Type") || "";
+      const buf = await resp.arrayBuffer();
+      if (!ct.includes("image") || buf.byteLength < 200)
+        return new Response(JSON.stringify({error:"nessuna immagine MODIS per questa data/area", layer, date, bbox}), {status:404, headers:{...CORS,"Content-Type":"application/json"}});
+
+      const headers = { ...CORS, "Content-Type":"image/png", "Cache-Control":"public, max-age=86400",
+                        "X-Cache":"MISS", "X-MODIS-Layer":layer, "X-MODIS-Date":date };
+      const out = new Response(buf, { headers });
+      try { await cache.put(cacheKey, out.clone()); } catch (_) {}
+      return out;
+    }
+
     if (!db) return new Response(JSON.stringify({error:"DB binding non trovato"}),{status:500,headers:{"Content-Type":"application/json"}});
 
     // Crea tabella solari se non esiste

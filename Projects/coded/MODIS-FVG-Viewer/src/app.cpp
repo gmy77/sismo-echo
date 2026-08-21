@@ -69,7 +69,7 @@ static const int FILM_H   = 116;
 static const int STATUS_H = 28;
 
 enum {
-    IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH,
+    IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH, IDC_LATEST, IDC_WORKER,
     IDC_BANDLIST, IDC_RGB, IDC_RCOMBO, IDC_GCOMBO, IDC_BCOMBO,
     IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE
 };
@@ -137,7 +137,7 @@ struct GranuleView {
 
 struct App {
     HWND hwnd = nullptr;
-    HWND satCombo=nullptr, prodCombo=nullptr, dateEdit=nullptr;
+    HWND satCombo=nullptr, prodCombo=nullptr, dateEdit=nullptr, workerChk=nullptr;
     HWND bandList=nullptr, rgbChk=nullptr, rCombo=nullptr, gCombo=nullptr, bCombo=nullptr;
     HWND citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr;
     ULONG_PTR gdip = 0;
@@ -151,6 +151,7 @@ struct App {
     int  rBand = 1, gBand = 4, bBand = 3;   // natural true colour by default
     bool showCities = true, showBorders = true;
     bool diffMode = false;                   // show |current - previous|
+    bool viaWorker = true;                   // fetch through the Cloudflare cache
 
     Bitmap* image = nullptr;
     int imgW = 0, imgH = 0;
@@ -479,25 +480,27 @@ static void loadCache() {
     if (loaded) logLine(L"CACHE: caricate " + std::to_wstring(loaded) + L" immagini reali");
 }
 
-static void doFetchGibs() {
-    int satIdx  = (int)SendMessageW(g.satCombo, CB_GETCURSEL, 0, 0);   // 0 Terra, 1 Aqua
-    int prodIdx = (int)SendMessageW(g.prodCombo, CB_GETCURSEL, 0, 0);
-    if (satIdx < 0) satIdx = 0;
-    if (prodIdx < 0) prodIdx = 0;
-    wchar_t dbuf[32] = L""; GetWindowTextW(g.dateEdit, dbuf, 32);
-    std::string date = toU8(dbuf);
-    if (date.size() != 10) { MessageBoxW(g.hwnd, L"Data non valida. Usa il formato AAAA-MM-GG.", APP_TITLE, MB_OK | MB_ICONWARNING); return; }
+static std::wstring dateMinusDays(int days) {
+    SYSTEMTIME st; GetSystemTime(&st); FILETIME ft; SystemTimeToFileTime(&st, &ft);
+    ULARGE_INTEGER u; u.LowPart = ft.dwLowDateTime; u.HighPart = ft.dwHighDateTime;
+    u.QuadPart -= (ULONGLONG)days * 24 * 60 * 60 * 10000000ULL;
+    ft.dwLowDateTime = u.LowPart; ft.dwHighDateTime = u.HighPart; FileTimeToSystemTime(&ft, &st);
+    wchar_t b[16]; swprintf(b, 16, L"%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay); return b;
+}
 
+// Core: fetch one granule for (satIdx, prodIdx, date). Uses the disk cache, then
+// the Cloudflare Worker (if enabled) or NASA GIBS directly. Reports errors.
+static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date) {
     int nProd; const gibs::Product* P = gibs::products(nProd);
     const gibs::Product& pr = P[prodIdx < nProd ? prodIdx : 0];
     std::string layer = (satIdx == 1) ? pr.aquaLayer : pr.terraLayer;
 
-    // Cache hit? Load from disk, no network.
+    // Disk cache hit? Load, no network.
     std::wstring cachePath = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, date);
     if (GetFileAttributesW(cachePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
         img::Image cim; std::wstring cerr;
         if (gibs::decodeFile(cachePath, cim, &cerr) && !cim.empty()) {
-            logLine(L"GIBS cache-hit: " + cachePath);
+            logLine(L"cache-hit: " + cachePath);
             addRemote(std::move(cim), satIdx, prodIdx, date);
             return;
         }
@@ -508,20 +511,49 @@ static void doFetchGibs() {
     int W = 1024, H = (int)std::lround(1024.0 * (LATMAX - LATMIN) / (LONMAX - LONMIN));
 
     HCURSOR prev = SetCursor(LoadCursor(nullptr, IDC_WAIT));
-    img::Image im; std::wstring err;
-    bool ok = gibs::download(layer, date, LATMIN, LATMAX, LONMIN, LONMAX, W, H, im, &err, cachePath);
+    img::Image im; std::wstring err; bool ok;
+    if (g.viaWorker) {
+        ok = gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
+                pr.id, date, LATMIN, LATMAX, LONMIN, LONMAX, W, H, im, &err, cachePath);
+    } else {
+        ok = gibs::download(layer, date, LATMIN, LATMAX, LONMIN, LONMAX, W, H, im, &err, cachePath);
+    }
     SetCursor(prev);
 
     if (!ok || im.empty()) {
-        logLine(L"GIBS FAIL: " + toW(layer) + L" " + toW(date) + L" — " + err);
-        MessageBoxW(g.hwnd, (L"Download GIBS non riuscito:\n" + err +
+        logLine(L"FETCH FAIL: " + toW(layer) + L" " + toW(date) + L" — " + err);
+        MessageBoxW(g.hwnd, (L"Download non riuscito:\n" + err +
             L"\n\nSuggerimento: prova una data diversa (alcuni giorni non hanno "
-            L"copertura MODIS sul FVG), o controlla la connessione.").c_str(),
+            L"copertura MODIS sul FVG), o controlla la connessione."
+            + (g.viaWorker ? L"\n(Sorgente: Cloudflare Worker)" : L"\n(Sorgente: NASA GIBS diretto)")).c_str(),
             APP_TITLE, MB_OK | MB_ICONWARNING);
         return;
     }
-    logLine(L"GIBS OK: " + toW(layer) + L" " + toW(date) + L" (in cache)");
+    logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": " + toW(layer) + L" " + toW(date));
     addRemote(std::move(im), satIdx, prodIdx, date);
+}
+
+static void doFetchGibs() {
+    int satIdx  = (int)SendMessageW(g.satCombo, CB_GETCURSEL, 0, 0);
+    int prodIdx = (int)SendMessageW(g.prodCombo, CB_GETCURSEL, 0, 0);
+    if (satIdx < 0) satIdx = 0;
+    if (prodIdx < 0) prodIdx = 0;
+    wchar_t dbuf[32] = L""; GetWindowTextW(g.dateEdit, dbuf, 32);
+    std::string date = toU8(dbuf);
+    if (date.size() != 10) { MessageBoxW(g.hwnd, L"Data non valida. Usa il formato AAAA-MM-GG.", APP_TITLE, MB_OK | MB_ICONWARNING); return; }
+    fetchGibsCore(satIdx, prodIdx, date);
+}
+
+// "Al volo": grab the most recent likely-available day (yesterday UTC) for the
+// selected satellite/product, straight from the Cloudflare cache.
+static void doFetchLatest() {
+    int satIdx  = (int)SendMessageW(g.satCombo, CB_GETCURSEL, 0, 0);
+    int prodIdx = (int)SendMessageW(g.prodCombo, CB_GETCURSEL, 0, 0);
+    if (satIdx < 0) satIdx = 0;
+    if (prodIdx < 0) prodIdx = 0;
+    std::string date = toU8(dateMinusDays(1));
+    SetWindowTextW(g.dateEdit, toW(date).c_str());
+    fetchGibsCore(satIdx, prodIdx, date);
 }
 
 // ----------------------------- timelapse ----------------------------------
@@ -578,7 +610,9 @@ static void doLayout() {
     MoveWindow(g.satCombo,  x, y, 96, 200, TRUE);
     MoveWindow(g.prodCombo, x + 104, y, w - 104, 200, TRUE); y += 32;
     MoveWindow(g.dateEdit, x, y, 110, 26, TRUE);
-    MoveWindow(GetDlgItem(g.hwnd, IDC_FETCH), x + 118, y, w - 118, 28, TRUE); y += 38;
+    MoveWindow(GetDlgItem(g.hwnd, IDC_FETCH), x + 118, y, w - 118, 28, TRUE); y += 34;
+    MoveWindow(GetDlgItem(g.hwnd, IDC_LATEST), x, y, w, 28, TRUE); y += 32;
+    MoveWindow(g.workerChk, x, y, w, 22, TRUE); y += 30;
 
     header(L"CANALE / BANDA");
     row(g.bandList, 122);
@@ -772,6 +806,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         g.dateEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", defaultDate().c_str(),
             WS_CHILD | WS_VISIBLE | ES_CENTER, 0,0,10,10, hwnd, (HMENU)IDC_DATE, nullptr, nullptr);
         mkButton(hwnd, L"Scarica reale", IDC_FETCH);
+        mkButton(hwnd, L"⤓ Ultima (al volo)", IDC_LATEST);
+        g.workerChk = mkCheck(hwnd, L"Via Cloudflare (cache edge)", IDC_WORKER, true);
 
         g.bandList = CreateWindowExW(0, L"LISTBOX", nullptr,
             WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY, 0,0,10,10, hwnd, (HMENU)IDC_BANDLIST, nullptr, nullptr);
@@ -798,6 +834,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         switch (id) {
         case IDC_OPEN:  doOpenDialog(); return 0;
         case IDC_FETCH: doFetchGibs(); return 0;
+        case IDC_LATEST: doFetchLatest(); return 0;
+        case IDC_WORKER: g.viaWorker = SendMessageW(g.workerChk, BM_GETCHECK, 0, 0) == BST_CHECKED; return 0;
         case IDC_RESET: fitView(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
         case IDC_MOVIE: doTimelapse(); return 0;
         case IDC_RGB:

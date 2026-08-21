@@ -107,6 +107,29 @@ Il download usa **WinHTTP**; l'immagine (PNG) è decodificata da **GDI+**. Non
 serve GDAL né HDF: GIBS restituisce già il prodotto proiettato in EPSG:4326 sul
 bbox richiesto, che è esattamente come il viewer geolocalizza un granulo.
 
+### Via Cloudflare (cache edge) — consigliato
+Con la spunta **"Via Cloudflare (cache edge)"** (attiva di default) il download
+passa da un **Cloudflare Worker** che scarica da GIBS lato edge, mette in
+**cache** l'immagine e la serve al PC — più veloce e senza toccare NASA dal
+client. Il Worker è nel repo (`sismo-worker/index.js`, rotta `/modis`) e gira
+sullo stesso account di SISMO ECHO:
+
+```
+GET https://sismo-fvg.gimmy077.workers.dev/modis
+      ?sat=terra|aqua
+      &product=truecolor|bands721|bands367|lst
+      &date=YYYY-MM-DD            # opzionale: default = ieri (UTC)
+      &bbox=45.5,12.3,46.7,13.9   # lat,lon (WMS 1.3.0), default FVG
+      &w=1024&h=768
+```
+
+Il pulsante **"⤓ Ultima (al volo)"** chiama questa rotta senza data: prende
+l'ultima immagine disponibile per il satellite/prodotto scelti, direttamente
+dalla cache. Deploy del Worker: `cd sismo-worker && npx wrangler deploy`.
+
+Ogni immagine scaricata (via Worker o diretta) finisce comunque nella **cache su
+disco locale** (`cache\` accanto all'exe) e viene ricaricata all'avvio.
+
 > Nota: alcune date non hanno copertura MODIS sul FVG (le orbite non passano
 > sull'Italia ogni giorno). Se il download fallisce, prova una data vicina. La
 > data di default è **due giorni fa** (i prodotti GIBS hanno una breve latenza).

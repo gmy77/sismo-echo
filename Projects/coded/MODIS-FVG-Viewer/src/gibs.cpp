@@ -34,14 +34,13 @@ static bool fail(std::wstring* err, const wchar_t* m, DWORD e = 0) {
     return false;
 }
 
-// GET https://gibs.earthdata.nasa.gov/... into `body`. Returns false on error.
-static bool httpGet(const std::wstring& path, std::vector<BYTE>& body, std::wstring* err) {
-    const wchar_t* host = L"gibs.earthdata.nasa.gov";
+// GET https://<host><path> into `body`. Returns false on error.
+static bool httpGet(const std::wstring& host, const std::wstring& path, std::vector<BYTE>& body, std::wstring* err) {
     HINTERNET hSession = WinHttpOpen(L"MODIS-FVG-Viewer/1.0",
         WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!hSession) return fail(err, L"WinHttpOpen fallita", GetLastError());
 
-    HINTERNET hConnect = WinHttpConnect(hSession, host, INTERNET_DEFAULT_HTTPS_PORT, 0);
+    HINTERNET hConnect = WinHttpConnect(hSession, host.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
     if (!hConnect) { WinHttpCloseHandle(hSession); return fail(err, L"WinHttpConnect fallita", GetLastError()); }
 
     HINTERNET hReq = WinHttpOpenRequest(hConnect, L"GET", path.c_str(), nullptr,
@@ -137,12 +136,37 @@ bool download(const std::string& layer, const std::string& date,
     std::wstring wpath(path.begin(), path.end());
 
     std::vector<BYTE> body;
-    if (!httpGet(wpath, body, err)) return false;
+    if (!httpGet(L"gibs.earthdata.nasa.gov", wpath, body, err)) return false;
     // A WMS error comes back as XML/text, not an image; guard on that.
     if (body.size() > 5 && (body[0] == '<' || (body[0] == 0xEF && body[1] == 0xBB)))
         return fail(err, L"GIBS ha restituito un errore (data senza copertura MODIS?)");
     if (!decode(body, out, err)) return false;
     if (!saveTo.empty()) writeFile(saveTo, body); // populate the disk cache
+    return true;
+}
+
+bool downloadViaWorker(const std::string& host, const std::string& sat,
+                       const std::string& product, const std::string& date,
+                       double latMin, double latMax, double lonMin, double lonMax,
+                       int width, int height, img::Image& out,
+                       std::wstring* err, const std::wstring& saveTo) {
+    char q[512];
+    // Worker expects bbox in lat,lon order (WMS 1.3.0), same as /modis.
+    std::snprintf(q, sizeof q,
+        "/modis?sat=%s&product=%s&bbox=%.5f,%.5f,%.5f,%.5f&w=%d&h=%d",
+        sat.c_str(), product.c_str(), latMin, lonMin, latMax, lonMax, width, height);
+    std::string path(q);
+    if (!date.empty()) { path += "&date="; path += date; } // else Worker uses "latest"
+    std::wstring wpath(path.begin(), path.end());
+    std::wstring whost(host.begin(), host.end());
+
+    std::vector<BYTE> body;
+    if (!httpGet(whost, wpath, body, err)) return false;
+    // The Worker returns JSON on error (no coverage, upstream failure).
+    if (body.size() > 2 && body[0] == '{')
+        return fail(err, L"il Worker non ha immagini per questa data/area (prova un'altra data)");
+    if (!decode(body, out, err)) return false;
+    if (!saveTo.empty()) writeFile(saveTo, body);
     return true;
 }
 
