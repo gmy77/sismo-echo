@@ -1,7 +1,7 @@
 /* SismoGlobe — monitoraggio terremoti in tempo reale (dati USGS) */
 'use strict';
 
-const APP_VERSION = 'v1.1.0';
+const APP_VERSION = 'v1.4.0';
 const USGS = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
 const FEEDS = { day: 'all_day.geojson', week: 'all_week.geojson', month: 'all_month.geojson' };
 const POLL_MS = 60_000;          // refresh feed corrente
@@ -79,7 +79,7 @@ function parseFeed(geojson) {
 }
 
 // ---------- Globo ----------
-const globe = Globe()($('globe'))
+const globe = Globe({ rendererConfig: { antialias: true, powerPreference: 'high-performance' } })($('globe'))
   .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
   .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
   .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
@@ -90,7 +90,8 @@ const globe = Globe()($('globe'))
   .pointColor(d => magColor(d.mag))
   .pointAltitude(0.008)
   .pointRadius(d => Math.max(0.13, d.mag * d.mag * 0.032))
-  .pointsTransitionDuration(500)
+  .pointResolution(6)
+  .pointsTransitionDuration(300)
   .pointLabel(d => `
     <div class="globe-tip">
       <b style="color:${magColor(d.mag)}">M ${d.mag.toFixed(1)}</b> — ${d.place}<br>
@@ -104,6 +105,66 @@ const globe = Globe()($('globe'))
   .ringMaxRadius(d => Math.max(2, d.mag * 2.2))
   .ringPropagationSpeed(d => Math.max(1, d.mag * 0.8))
   .ringRepeatPeriod(d => Math.max(400, 1600 - d.mag * 150));
+
+// Limita il costo di rendering (il pixel ratio alto pesa molto sui portatili)
+globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+
+// Il test "cosa sta puntando il mouse" gira a ogni frame. Contro la sfera del
+// globo three.js prova tutti i suoi ~11.000 triangoli: ~2,8 ms per frame, per
+// questo il globo scattava appena il puntatore ci passava sopra e tornava
+// fluido spostandolo sullo sfondo (lì il raggio manca la sfera e il test esce
+// subito). Per una sfera basta l'intersezione analitica; graticolo e confini
+// non sono interattivi e dal test si possono escludere del tutto.
+// Costanti di three.js per material.side (three non è accessibile da qui:
+// globe.gl incorpora la propria istanza e non la espone).
+const THREE_BACK_SIDE = 1;
+const THREE_DOUBLE_SIDE = 2;
+
+function speedUpRaycasting() {
+  globe.scene().traverse(o => {
+    if (o.__fastRaycast) return;
+    if (o.isMesh && o.geometry && o.geometry.type === 'SphereGeometry') {
+      o.geometry.computeBoundingSphere();
+      const localRadius = o.geometry.boundingSphere.radius;
+      o.raycast = function (raycaster, intersects) {
+        const ray = raycaster.ray;
+        const e = this.matrixWorld.elements;
+        const radius = localRadius * Math.hypot(e[0], e[1], e[2]);
+        const d = ray.direction;
+        const ox = ray.origin.x - e[12];
+        const oy = ray.origin.y - e[13];
+        const oz = ray.origin.z - e[14];
+        const b = ox * d.x + oy * d.y + oz * d.z;
+        const c = ox * ox + oy * oy + oz * oz - radius * radius;
+        const disc = b * b - c;
+        if (disc < 0) return;                       // il raggio manca la sfera
+        const sq = Math.sqrt(disc);
+        // Va rispettato il lato del materiale come fa three.js: l'atmosfera è
+        // disegnata solo all'interno (BackSide), quindi la sua faccia vicina
+        // non conta — altrimenti "coprirebbe" i terremoti al passaggio del mouse.
+        const side = this.material && this.material.side;
+        const tNear = -b - sq;                      // faccia frontale
+        const tFar = -b + sq;                       // faccia posteriore
+        let t;
+        if (side === THREE_BACK_SIDE) t = tFar;
+        else if (side === THREE_DOUBLE_SIDE) t = tNear >= 0 ? tNear : tFar;
+        else t = tNear;                             // FrontSide, il predefinito
+        if (t < 0 || t < raycaster.near || t > raycaster.far) return;
+        intersects.push({
+          distance: t,
+          object: this,
+          point: new (ray.origin.constructor)(
+            ray.origin.x + d.x * t, ray.origin.y + d.y * t, ray.origin.z + d.z * t),
+        });
+      };
+      o.__fastRaycast = true;
+    } else if (o.isLineSegments) {
+      o.raycast = () => {};
+      o.__fastRaycast = true;
+    }
+  });
+}
+speedUpRaycasting();
 
 globe.controls().autoRotate = true;
 globe.controls().autoRotateSpeed = 0.4;
@@ -126,20 +187,75 @@ new ResizeObserver(() => { syncTopbarHeight(); fitGlobe(); }).observe($('topbar'
 syncTopbarHeight();
 fitGlobe();
 
-// Confini nazionali (TopoJSON world-atlas)
+// Confini nazionali (TopoJSON world-atlas), fusi in un'unica mesh di linee:
+// il layer poligoni di globe.gl genera ~1400 draw call, questa 1 sola.
+// globe.gl crea il proprio oggetto di linee (il graticolo, che tiene nascosto)
+// poco DOPO l'inizializzazione, non necessariamente prima che arrivi il
+// TopoJSON: a cache calda il file arriva per primo e senza questa attesa i
+// confini non venivano disegnati affatto. Si usa setTimeout e non
+// requestAnimationFrame perché quest'ultimo è sospeso nelle schede in secondo
+// piano, e il sito verrebbe aperto senza confini.
+function findLinePrototype(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    const look = () => {
+      let proto = null;
+      globe.scene().traverse(o => { if (!proto && o.isLineSegments) proto = o; });
+      if (proto) return resolve(proto);
+      if (Date.now() > deadline) return reject(new Error('nessun oggetto di linee interno da cui clonare'));
+      setTimeout(look, 30);
+    };
+    look();
+  });
+}
+
+// Restituisce una BufferGeometry vuota della three INTERNA di globe.gl.
+// La geometria del graticolo è una sottoclasse (GeoJsonGeometry) il cui
+// costruttore pretende argomenti GeoJSON, e cui clone() va in errore perché li
+// ha persi: si risale quindi alla classe base. Il ciclo con la prova d'uso
+// evita di dipendere dalla profondità esatta della gerarchia.
+function newInternalBufferGeometry(protoGeometry) {
+  const candidates = [Object.getPrototypeOf(protoGeometry.constructor), protoGeometry.constructor];
+  for (const Cls of candidates) {
+    try {
+      const g = new Cls();
+      if (typeof g.setAttribute === 'function') return g;
+    } catch (_) { /* non istanziabile senza argomenti: prova la prossima */ }
+  }
+  throw new Error('classe BufferGeometry interna non individuata');
+}
+
 fetch('https://unpkg.com/world-atlas@2.0.2/countries-110m.json')
   .then(r => r.json())
-  .then(world => {
-    const countries = topojson.feature(world, world.objects.countries).features;
-    globe
-      .polygonsData(countries)
-      .polygonCapColor(() => 'rgba(90,130,255,0.05)')
-      .polygonSideColor(() => 'rgba(0,0,0,0)')
-      .polygonStrokeColor(() => 'rgba(140,175,255,0.5)')
-      .polygonAltitude(0.006)
-      .polygonLabel(d => `<div class="globe-tip"><b>${d.properties.name}</b></div>`)
-      .onPolygonHover(p => globe.polygonCapColor(c =>
-        c === p ? 'rgba(90,130,255,0.28)' : 'rgba(90,130,255,0.05)'));
+  .then(async world => {
+    const lines = topojson.mesh(world, world.objects.countries).coordinates;
+    const pos = [];
+    for (const line of lines) {
+      for (let i = 0; i < line.length - 1; i++) {
+        const a = globe.getCoords(line[i][1], line[i][0], 0.006);
+        const b = globe.getCoords(line[i + 1][1], line[i + 1][0], 0.006);
+        pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
+    }
+    // Geometria e materiale vanno creati con l'istanza three INTERNA di
+    // globe.gl: oggetti costruiti con un three importato a parte mandano in
+    // stallo il loop di rendering, senza errori in console. Si parte quindi da
+    // un oggetto di linee già in scena (il graticolo, che globe.gl crea sempre
+    // anche quando è invisibile) e se ne clona la geometria sostituendone il
+    // solo attributo "position": così non si dipende dalla catena di prototipi
+    // del suo costruttore, che potrebbe cambiare fra le versioni.
+    const proto = await findLinePrototype();
+    const AttributeCls = proto.geometry.attributes.position.constructor;
+    const geo = newInternalBufferGeometry(proto.geometry);
+    geo.setAttribute('position', new AttributeCls(new Float32Array(pos), 3));
+    geo.computeBoundingSphere();
+    const mat = proto.material.clone();
+    mat.color.set('#8cafff');
+    mat.transparent = true;
+    mat.opacity = 0.55;
+    mat.depthWrite = false;
+    globe.scene().add(new (proto.constructor)(geo, mat));
+    speedUpRaycasting(); // esclude anche i confini appena aggiunti
   })
   .catch(err => console.error('Confini non caricati:', err));
 
@@ -179,6 +295,125 @@ function showToast(d, isNew = true) {
   while ($('toasts').children.length > 5) $('toasts').lastChild.remove();
 }
 
+// ---------- Puntamento dei terremoti con i punti fusi ----------
+// Con pointsMerge globe.gl disegna tutti i punti come un unico oggetto e non sa
+// più dire quale si stia puntando: nelle viste affollate tooltip e clic
+// sull'epicentro smetterebbero di funzionare. Qui il puntamento lo facciamo a
+// mano: si interseca il raggio del mouse con la sfera del globo e si cerca il
+// terremoto più vicino al punto colpito. È un ciclo su un vettore di posizioni
+// precalcolate, quindi costa una frazione di millisecondo e non tocca la GPU.
+const GLOBE_RADIUS = 100;   // raggio del globo nelle unità interne di globe.gl
+const PICK_TOLERANCE = 1.6; // ~180 km: quanto si può sbagliare mira
+// Le posizioni stanno in un Float32Array invece che in un vettore di oggetti:
+// con 11.000 eventi il ciclo di ricerca scende da ~0,8 a ~0,2 ms, e gira a
+// ogni movimento del mouse.
+let hitPos = new Float32Array(0);
+let hitQuakes = [];
+let customTip = null;
+
+function rebuildHitIndex(list) {
+  hitPos = new Float32Array(list.length * 3);
+  hitQuakes = list;
+  for (let i = 0; i < list.length; i++) {
+    const v = globe.getCoords(list[i].lat, list[i].lng, 0.008);
+    hitPos[i * 3] = v.x;
+    hitPos[i * 3 + 1] = v.y;
+    hitPos[i * 3 + 2] = v.z;
+  }
+}
+
+function pickQuakeAt(clientX, clientY) {
+  if (!hitQuakes.length) return null;
+  const cam = globe.camera();
+  const rect = globe.renderer().domElement.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  const Vec3 = cam.position.constructor;
+  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+  const dir = new Vec3(ndcX, ndcY, 0.5).unproject(cam).sub(cam.position).normalize();
+  const o = cam.position;
+  // intersezione raggio-sfera: si tiene solo la faccia rivolta verso di noi,
+  // così i terremoti dell'altro emisfero non vengono puntati "attraverso" il globo
+  const b = o.x * dir.x + o.y * dir.y + o.z * dir.z;
+  const c = o.x * o.x + o.y * o.y + o.z * o.z - GLOBE_RADIUS * GLOBE_RADIUS;
+  const disc = b * b - c;
+  if (disc < 0) return null;                    // il puntatore è fuori dal globo
+  const t = -b - Math.sqrt(disc);
+  if (t < 0) return null;
+  const px = o.x + dir.x * t, py = o.y + dir.y * t, pz = o.z + dir.z * t;
+
+  let bestIdx = -1, bestD2 = Infinity;
+  for (let i = 0, j = 0; j < hitPos.length; i++, j += 3) {
+    const dx = hitPos[j] - px, dy = hitPos[j + 1] - py, dz = hitPos[j + 2] - pz;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 < bestD2) { bestD2 = d2; bestIdx = i; }
+  }
+  if (bestIdx < 0) return null;
+  const best = hitQuakes[bestIdx];
+  // la tolleranza segue il raggio disegnato: i sismi forti sono cerchi più grandi
+  const tol = Math.max(PICK_TOLERANCE, Math.max(0.13, best.mag * best.mag * 0.032) * 1.4);
+  return bestD2 <= tol * tol ? best : null;
+}
+
+function showCustomTip(q, x, y) {
+  if (!customTip) {
+    customTip = document.createElement('div');
+    customTip.className = 'globe-tip';
+    customTip.id = 'custom-tip';
+    document.body.appendChild(customTip);
+  }
+  customTip.innerHTML = `
+    <b style="color:${magColor(q.mag)}">M ${q.mag.toFixed(1)}</b> — ${q.place}<br>
+    ${fmtTime(q.time)} (${timeAgo(q.time)})<br>
+    Profondità: ${q.depth?.toFixed(0)} km${q.tsunami ? '<br>⚠️ Allerta tsunami' : ''}`;
+  customTip.style.display = 'block';
+  // si sposta a sinistra del cursore se altrimenti uscirebbe dallo schermo
+  const w = customTip.offsetWidth;
+  customTip.style.left = (x + 14 + w > window.innerWidth ? x - w - 14 : x + 14) + 'px';
+  customTip.style.top = (y + 14) + 'px';
+}
+
+function hideCustomTip() {
+  if (customTip) customTip.style.display = 'none';
+}
+
+// Attivo solo quando i punti sono fusi: altrimenti ci pensa globe.gl da sé e
+// si otterrebbero due tooltip sovrapposti.
+function customPickingActive() {
+  return globe.pointsMerge();
+}
+
+(() => {
+  const el = $('globe');
+  let downAt = null;
+
+  el.addEventListener('pointermove', ev => {
+    if (!customPickingActive()) { hideCustomTip(); return; }
+    const q = pickQuakeAt(ev.clientX, ev.clientY);
+    if (q) {
+      showCustomTip(q, ev.clientX, ev.clientY);
+      el.style.cursor = 'pointer';
+    } else {
+      hideCustomTip();
+      el.style.cursor = '';
+    }
+  });
+
+  el.addEventListener('pointerleave', hideCustomTip);
+  el.addEventListener('pointerdown', ev => { downAt = { x: ev.clientX, y: ev.clientY }; });
+
+  // Un clic vale solo se il puntatore non si è spostato: trascinando si ruota
+  // il globo, e non deve partire l'azione sull'epicentro.
+  el.addEventListener('pointerup', ev => {
+    if (!customPickingActive() || !downAt) { downAt = null; return; }
+    const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y);
+    downAt = null;
+    if (moved > 5) return;
+    const q = pickQuakeAt(ev.clientX, ev.clientY);
+    if (q) { flyTo(q, 1.2); showToast(q, false); }
+  });
+})();
+
 // ---------- Rendering dati ----------
 function visibleQuakes() {
   let list;
@@ -195,11 +430,18 @@ function render() {
   const vis = visibleQuakes();
   const now = Date.now();
 
+  // Nelle viste affollate (7g/30g) i punti vengono fusi in un'unica mesh:
+  // molto più fluido, si perde solo il tooltip al passaggio del mouse
+  globe.pointsMerge(vis.length > 600);
   globe.pointsData(vis);
-  // Anelli solo su eventi recenti (o sempre, se si guarda un giorno passato con M>=5)
-  const rings = state.selectedDay
+  rebuildHitIndex(vis);   // puntamento a mano quando i punti sono fusi
+  // Anelli solo su eventi recenti (o M>=5 se si guarda un giorno passato),
+  // limitati ai 20 più forti: ogni anello animato costa parecchi frame
+  const rings = (state.selectedDay
     ? vis.filter(q => q.mag >= 5)
-    : vis.filter(q => now - q.time < RING_WINDOW_MS);
+    : vis.filter(q => now - q.time < RING_WINDOW_MS))
+    .sort((a, b) => b.mag - a.mag)
+    .slice(0, 20);
   globe.ringsData(rings);
 
   renderList(vis);
@@ -362,6 +604,20 @@ $('chk-rotate').onchange = e => { globe.controls().autoRotate = e.target.checked
 $('chk-fly').onchange = e => { state.flyToNew = e.target.checked; };
 $('day-reset').onclick = () => selectDay(null);
 
+// Guida: il testo sta già nell'HTML (serve anche a motori di ricerca e IA,
+// che non eseguono JavaScript), qui si gestisce solo l'apertura.
+function toggleInfo(open) {
+  const info = $('info');
+  const show = open === undefined ? info.hidden : open;
+  info.hidden = !show;
+  document.body.classList.toggle('info-open', show);
+  $('btn-info').setAttribute('aria-expanded', String(show));
+  if (show) info.scrollTop = 0;
+}
+$('btn-info').onclick = () => toggleInfo();
+$('info-close').onclick = () => toggleInfo(false);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleInfo(false); });
+
 // Pausa rotazione durante l'interazione
 $('globe').addEventListener('pointerdown', () => { globe.controls().autoRotate = false; });
 $('globe').addEventListener('pointerup', () => {
@@ -374,6 +630,13 @@ window.addEventListener('resize', fitGlobe);
 setInterval(() => render(), POLL_MS);
 
 // ---------- Avvio ----------
+// Diagnostica da console: attiva in locale e, su richiesta esplicita, con
+// ?debug in coda all'indirizzo. Serve per ispezionare il sito pubblicato
+// quando c'è da indagare un problema; di suo, in produzione, non è esposta.
+if (['localhost', '127.0.0.1'].includes(location.hostname) ||
+    new URLSearchParams(location.search).has('debug')) {
+  window.SG = { globe, state };
+}
 $('app-version').textContent = 'SismoGlobe ' + APP_VERSION;
 (async () => {
   await loadFeed();

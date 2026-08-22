@@ -1,0 +1,32 @@
+# SismoGlobe — https://sismo.gimmycloud.net/
+# Contenuto libero: motori di ricerca e assistenti IA sono benvenuti.
+
+User-agent: *
+Allow: /
+
+# Crawler degli assistenti IA, esplicitamente ammessi
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+Sitemap: https://sismo.gimmycloud.net/sitemap.xml

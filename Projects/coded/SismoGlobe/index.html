@@ -3,9 +3,102 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SismoGlobe — Monitoraggio terremoti in tempo reale</title>
-<link rel="stylesheet" href="style.css">
+<title>SismoGlobe — Terremoti nel mondo in tempo reale su globo 3D</title>
+<meta name="description" content="Mappa dei terremoti di tutto il pianeta in tempo reale su un globo 3D interattivo: dati USGS aggiornati ogni minuto, cerchi proporzionali alla magnitudo, statistiche giornaliere ed energia sismica rilasciata.">
+<link rel="canonical" href="https://sismo.gimmycloud.net/">
+<meta name="theme-color" content="#05070f">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sismo.gimmycloud.net/">
+<meta property="og:site_name" content="SismoGlobe">
+<meta property="og:locale" content="it_IT">
+<meta property="og:title" content="SismoGlobe — Terremoti nel mondo in tempo reale su globo 3D">
+<meta property="og:description" content="Mappa dei terremoti di tutto il pianeta in tempo reale su un globo 3D interattivo: dati USGS aggiornati ogni minuto, cerchi proporzionali alla magnitudo, statistiche giornaliere ed energia sismica rilasciata.">
+<meta property="og:image" content="https://sismo.gimmycloud.net/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Globo terrestre 3D con i terremoti in tempo reale segnati da cerchi colorati">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SismoGlobe — Terremoti nel mondo in tempo reale su globo 3D">
+<meta name="twitter:description" content="Terremoti di tutto il pianeta in tempo reale su globo 3D. Dati USGS aggiornati ogni minuto.">
+<meta name="twitter:image" content="https://sismo.gimmycloud.net/og-image.png">
+
+<link rel="stylesheet" href="style.css?v=1.4.0">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "@id": "https://sismo.gimmycloud.net/#app",
+      "name": "SismoGlobe",
+      "url": "https://sismo.gimmycloud.net/",
+      "applicationCategory": "https://schema.org/BrowserApplication",
+      "operatingSystem": "Qualsiasi browser con WebGL",
+      "inLanguage": "it",
+      "description": "Applicazione web che visualizza i terremoti di tutto il pianeta in tempo reale su un globo terrestre 3D interattivo, con cerchi proporzionali alla magnitudo, istogramma degli eventi giornalieri e calcolo dell'energia sismica rilasciata.",
+      "featureList": [
+        "Globo 3D interattivo con confini nazionali",
+        "Aggiornamento dei terremoti ogni 60 secondi dai feed USGS",
+        "Avviso immediato a ogni nuovo sisma con magnitudo, località e profondità",
+        "Cerchi e onde animate proporzionali alla magnitudo",
+        "Istogramma dei terremoti al giorno negli ultimi 30 giorni",
+        "Energia sismica rilasciata nelle ultime 24 ore in equivalente TNT"
+      ],
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+      "license": "https://github.com/gmy77/sismoglobe",
+      "author": { "@type": "Person", "name": "Gimmy", "url": "https://gimmycloud.net/" }
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://sismo.gimmycloud.net/#dataset",
+      "name": "Terremoti mondiali in tempo reale (USGS)",
+      "description": "Eventi sismici rilevati in tutto il mondo negli ultimi 30 giorni: magnitudo, coordinate, profondità e orario, aggiornati ogni minuto.",
+      "inLanguage": "it",
+      "spatialCoverage": "Mondo",
+      "temporalCoverage": "P30D",
+      "isBasedOn": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php",
+      "creator": { "@type": "Organization", "name": "United States Geological Survey", "url": "https://www.usgs.gov/" },
+      "license": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "isAccessibleForFree": true
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://sismo.gimmycloud.net/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Da dove arrivano i dati sui terremoti?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Dai feed pubblici GeoJSON dello United States Geological Survey (USGS), che raccoglie le rilevazioni delle reti sismiche di tutto il mondo. SismoGlobe li interroga ogni 60 secondi." }
+        },
+        {
+          "@type": "Question",
+          "name": "Ogni quanto si aggiornano i terremoti?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Ogni 60 secondi per la finestra selezionata, e ogni 10 minuti per lo storico dei 30 giorni. Un terremoto compare tipicamente entro pochi minuti dalla scossa, il tempo che le reti sismiche lo elaborino." }
+        },
+        {
+          "@type": "Question",
+          "name": "Cosa significa la magnitudo di un terremoto?",
+          "acceptedAnswer": { "@type": "Answer", "text": "È una misura logaritmica dell'energia rilasciata: ogni punto in più corrisponde a circa 32 volte l'energia. Un terremoto di magnitudo 6 libera quindi circa 32 volte l'energia di uno di magnitudo 5 e circa mille volte quella di uno di magnitudo 4." }
+        },
+        {
+          "@type": "Question",
+          "name": "Come si legge il colore e la dimensione dei cerchi?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Il colore va dal verde (sotto magnitudo 3) al giallo, arancione, rosso e magenta (magnitudo 7 e oltre). La dimensione del cerchio cresce con il quadrato della magnitudo, così gli eventi forti restano riconoscibili anche fra migliaia di scosse minori." }
+        },
+        {
+          "@type": "Question",
+          "name": "SismoGlobe è un sistema di allerta terremoti?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. È uno strumento divulgativo che mostra terremoti già avvenuti e rilevati. Non prevede i terremoti e non sostituisce i canali ufficiali di protezione civile: in Italia i riferimenti sono l'INGV e il Dipartimento della Protezione Civile." }
+        }
+      ]
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -39,6 +132,7 @@
     <label class="chk"><input type="checkbox" id="chk-sound"> 🔔 audio</label>
     <label class="chk"><input type="checkbox" id="chk-rotate" checked> 🔄 rotazione</label>
     <label class="chk"><input type="checkbox" id="chk-fly" checked> 🎯 vola sui nuovi</label>
+    <button id="btn-info" type="button" aria-expanded="false" aria-controls="info">ℹ️ guida</button>
   </div>
 
   <div id="live">
@@ -73,12 +167,74 @@
   </aside>
 
   <div id="globe"></div>
+
+  <article id="info" hidden>
+    <button id="info-close" type="button" aria-label="Chiudi la guida">✕</button>
+
+    <h2>Che cos'è SismoGlobe</h2>
+    <p><strong>SismoGlobe</strong> è una mappa dei terremoti di tutto il pianeta in tempo reale, disegnata su un
+    globo terrestre in 3D che puoi ruotare e ingrandire. Ogni scossa rilevata nel mondo compare come un cerchio
+    colorato nel punto esatto dell'epicentro, con dimensione e colore che dipendono dalla magnitudo. È uno
+    strumento divulgativo gratuito e open source: nessuna registrazione, nessun tracciamento.</p>
+
+    <h2>Da dove arrivano i dati</h2>
+    <p>I terremoti provengono dai feed pubblici dello <strong>United States Geological Survey (USGS)</strong>,
+    l'ente geologico statunitense che raccoglie e distribuisce le rilevazioni delle reti sismiche di tutto il
+    mondo. SismoGlobe interroga quei feed <strong>ogni 60 secondi</strong> per la finestra temporale che hai
+    scelto, e ogni 10 minuti per lo storico dei 30 giorni. Una scossa compare tipicamente entro pochi minuti:
+    il ritardo è il tempo che le reti sismiche impiegano a localizzarla e stimarne la magnitudo.</p>
+
+    <h2>Come si legge la mappa</h2>
+    <p>Il <strong>colore</strong> indica la severità e segue la legenda in basso a sinistra: verde sotto
+    magnitudo 3, poi giallo, arancione, rosso e magenta per magnitudo 7 e oltre. La <strong>dimensione</strong>
+    del cerchio cresce con il quadrato della magnitudo, così gli eventi forti restano riconoscibili anche in
+    mezzo a migliaia di scosse minori — che sono la stragrande maggioranza. Le <strong>onde animate</strong>
+    circondano i terremoti delle ultime tre ore, e si propagano tanto più velocemente e ampiamente quanto più
+    l'evento è stato forte. Passando il mouse su un cerchio compaiono magnitudo, località, profondità e orario;
+    facendo clic la visuale ci vola sopra.</p>
+
+    <h2>Che cosa significa la magnitudo</h2>
+    <p>La magnitudo è una misura <strong>logaritmica</strong>, e questo la rende poco intuitiva: ogni punto in
+    più corrisponde a circa <strong>32 volte l'energia rilasciata</strong>. Un terremoto di magnitudo 6 non è
+    "un po' più forte" di uno di magnitudo 5: libera circa trenta volte più energia, e circa mille volte quella
+    di un magnitudo 4. È il motivo per cui una giornata con centinaia di scosse leggere può risultare
+    energeticamente insignificante rispetto a un singolo evento importante.</p>
+
+    <h2>L'energia sismica in equivalente TNT</h2>
+    <p>Il riquadro <em>energia 24h</em> in alto somma l'energia di tutti i terremoti delle ultime ventiquattro
+    ore e la converte in <strong>tonnellate equivalenti di TNT</strong>, per dare un'idea più concreta di un
+    numero altrimenti astratto. Il calcolo usa la relazione standard fra magnitudo ed energia in joule
+    (log<sub>10</sub>E = 1,5·M + 4,8), poi divide per l'energia di una tonnellata di tritolo.</p>
+
+    <h2>La profondità conta quanto la magnitudo</h2>
+    <p>Nei dettagli di ogni evento trovi la profondità dell'ipocentro in chilometri. È un'informazione decisiva:
+    a parità di magnitudo, un terremoto <strong>superficiale</strong> (pochi chilometri) è molto più
+    distruttivo in superficie di uno profondo qualche centinaio di chilometri, la cui energia si disperde prima
+    di arrivare in cima. Molti eventi apparentemente forti passano inosservati proprio perché profondi.</p>
+
+    <h2>Statistiche e storico</h2>
+    <p>L'istogramma a sinistra conta i terremoti giorno per giorno negli ultimi 30 giorni (in orario UTC), con
+    il colore della barra che riflette la scossa più forte di quella giornata. Facendo clic su una barra il
+    globo mostra soltanto i sismi di quel giorno. In alto trovi il totale di oggi, quelli dell'ultima ora e la
+    magnitudo massima delle ultime 24 ore.</p>
+
+    <h2>Avvertenza importante</h2>
+    <p>SismoGlobe mostra terremoti <strong>già avvenuti</strong> e rilevati dalle reti sismiche.
+    <strong>Non è un sistema di allerta e non prevede i terremoti</strong>, cosa che allo stato attuale delle
+    conoscenze scientifiche nessuno è in grado di fare. Non sostituisce i canali ufficiali: in Italia i
+    riferimenti sono l'<a href="https://ingv.it" target="_blank" rel="noopener">INGV</a> e il Dipartimento della
+    Protezione Civile. I dati possono essere rivisti dall'USGS nelle ore successive a un evento, quindi la
+    magnitudo di una scossa recente può cambiare leggermente.</p>
+
+    <p class="info-foot">Codice sorgente su <a href="https://github.com/gmy77/sismoglobe" target="_blank" rel="noopener">GitHub</a>
+    · altre app su <a href="https://gimmycloud.net" target="_blank" rel="noopener">gimmycloud.net</a></p>
+  </article>
 </main>
 
 <div id="toasts"></div>
 
 <div id="footer">
-  <span id="app-version"></span> · <a href="https://github.com/gmy77/sismoglobe" target="_blank">GitHub</a> · dati USGS · creato con Claude Code — grazie <a href="https://www.anthropic.com" target="_blank">Anthropic</a> 🤍
+  <span id="app-version"></span> · <a href="https://github.com/gmy77/sismoglobe" target="_blank" rel="noopener">GitHub</a> · dati USGS · creato con Claude Code — grazie <a href="https://www.anthropic.com" target="_blank" rel="noopener">Anthropic</a> 🤍
 </div>
 
 <div id="loading">
@@ -88,6 +244,6 @@
 
 <script src="https://unpkg.com/globe.gl@2.32.5/dist/globe.gl.min.js"></script>
 <script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-<script src="main.js"></script>
+<script src="main.js?v=1.4.0"></script>
 </body>
 </html>

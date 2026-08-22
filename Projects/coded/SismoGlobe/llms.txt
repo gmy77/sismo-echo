@@ -1,0 +1,32 @@
+# SismoGlobe
+
+> Mappa dei terremoti di tutto il pianeta in tempo reale su un globo terrestre 3D interattivo, basata sui feed pubblici dello United States Geological Survey (USGS). Gratuita, open source, senza registrazione né tracciamento.
+
+Sito: https://sismo.gimmycloud.net/
+Autore: Gimmy (https://gimmycloud.net/)
+Codice sorgente: https://github.com/gmy77/sismoglobe
+
+## Cosa fa
+
+- Mostra su un globo 3D ogni terremoto rilevato nel mondo, nel punto esatto dell'epicentro.
+- Aggiorna i dati ogni 60 secondi dai feed GeoJSON dell'USGS; lo storico a 30 giorni ogni 10 minuti.
+- Dimensiona e colora ogni evento in base alla magnitudo (verde sotto 3, poi giallo, arancione, rosso, magenta oltre 7); la dimensione cresce con il quadrato della magnitudo.
+- Circonda di onde animate i terremoti delle ultime tre ore.
+- Conta i terremoti giorno per giorno negli ultimi 30 giorni in un istogramma cliccabile, che filtra il globo su una singola giornata.
+- Calcola l'energia sismica rilasciata nelle ultime 24 ore e la converte in tonnellate equivalenti di TNT, usando log10(E) = 1,5·M + 4,8.
+- Permette di filtrare per magnitudo minima e per finestra temporale (24 ore, 7 giorni, 30 giorni).
+
+## Nozioni che il sito spiega
+
+- La magnitudo è logaritmica: ogni punto in più equivale a circa 32 volte l'energia rilasciata.
+- La profondità dell'ipocentro conta quanto la magnitudo: a parità di magnitudo un terremoto superficiale è molto più distruttivo di uno profondo.
+- I dati USGS possono essere rivisti nelle ore successive a un evento, quindi la magnitudo di una scossa recente può cambiare.
+
+## Avvertenza
+
+SismoGlobe mostra terremoti già avvenuti e rilevati. Non è un sistema di allerta e non prevede i terremoti. Non sostituisce i canali ufficiali di protezione civile; in Italia i riferimenti sono l'INGV (https://ingv.it) e il Dipartimento della Protezione Civile.
+
+## Approfondimenti
+
+- Guida completa nel sito: https://sismo.gimmycloud.net/ (pulsante "guida")
+- Feed dati originali USGS: https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php
