@@ -794,7 +794,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 <div class="panel" id="suite" style="margin-top:28px">
   <div class="panel-header">
     <span>🚀 <span class="acc">ECHO SUITE</span> — app &amp; strumenti</span>
-    <span style="color:#455a64">6 moduli · Cloudflare AI · edge</span>
+    <span style="color:#455a64">7 moduli · Cloudflare AI · edge</span>
   </div>
   <div class="panel-body">
     <div class="suite-grid">
@@ -887,6 +887,17 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-go">SUONA <span>→</span></div>
       </a>
 
+      <a href="https://sismo.gimmycloud.net" target="_blank" class="app-card" style="--app:#f44336"
+         data-tt-title="SISMO GLOBE"
+         data-tt="Monitor globale 3D di terremoti in tempo reale: visualizzazione interattiva della sismicità mondiale con dati da USGS e correlazione con cicli solari. Mappa tecnica e drilldown dettagliato per ogni evento sismico.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🌍</div>
+        <div class="app-name">SISMO GLOBE</div>
+        <div class="app-desc">monitor 3D terremoti</div>
+        <div class="app-tag">Seismic Lab</div>
+        <div class="app-go">GUARDA <span>→</span></div>
+      </a>
+
     </div>
   </div>
 </div>
@@ -926,6 +937,9 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
      data-tt-title="Forza 4" data-tt="Il classico gioco a gettoni, 2 giocatori sullo stesso schermo.">🔴</a>
   <a class="dock-item" href="/othello"
      data-tt-title="Othello" data-tt="Reversi contro un'IA che impara partita dopo partita.">⚫</a>
+  <div class="dock-sep"></div>
+  <a class="dock-item" href="https://sismo.gimmycloud.net" target="_blank"
+     data-tt-title="SISMO GLOBE" data-tt="Monitor globale 3D di terremoti in tempo reale — visualizzazione interattiva con dati USGS.">🌍</a>
 </nav>
 
 <script>
@@ -2888,7 +2902,8 @@ body::after{
   <a class="lc" href="https://claude.ai" target="_blank">🤖 Claude</a>
   <a class="lc" href="https://gimmycloud.net" target="_blank">🌐 GimmyCloud</a>
   <a class="lc" href="https://www.youtube.com" target="_blank"><img src="https://www.youtube.com/favicon.ico" onerror="this.style.display='none'">YouTube</a>
-  <a class="lc" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">🌋 SISMO</a>
+  <a class="lc" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">🌋 SISMO FVG</a>
+  <a class="lc" href="https://sismo.gimmycloud.net" target="_blank">🌍 SISMO GLOBE</a>
 </div>
 
 <!-- CENTER -->
@@ -2906,10 +2921,13 @@ body::after{
   <div class="apps">
     <a class="app" href="/chat" target="_blank" style="--ac:#26c6da"><span class="ai">🧠</span><span class="al">CHAT</span></a>
     <a class="app" href="/code" target="_blank" style="--ac:#66bb6a"><span class="ai">⌨️</span><span class="al">CODE</span></a>
-    <a class="app" href="/traduttore" target="_blank" style="--ac:#ffd600"><span class="ai">🌍</span><span class="al">TRANSLATE</span></a>
+    <a class="app" href="/traduttore" target="_blank" style="--ac:#ffd600"><span class="ai">🌐</span><span class="al">TRANSLATE</span></a>
     <a class="app" href="/pixeldrain" target="_blank" style="--ac:#ab47bc"><span class="ai">📁</span><span class="al">STORAGE</span></a>
     <a class="app" href="/forza4" target="_blank" style="--ac:#ff6d00"><span class="ai">🔴</span><span class="al">FORZA 4</span></a>
     <a class="app" href="/othello" target="_blank" style="--ac:#69f0ae"><span class="ai">⚫</span><span class="al">OTHELLO</span></a>
+    <a class="app" href="https://astro.gimmycloud.net" target="_blank" style="--ac:#7e57c2"><span class="ai">🪐</span><span class="al">ASTRO</span></a>
+    <a class="app" href="https://techno.gimmycloud.net" target="_blank" style="--ac:#ff6a00"><span class="ai">🎛️</span><span class="al">TECHNO</span></a>
+    <a class="app" href="https://sismo.gimmycloud.net" target="_blank" style="--ac:#f44336"><span class="ai">🌍</span><span class="al">SISMO</span></a>
   </div>
 </div>
 
