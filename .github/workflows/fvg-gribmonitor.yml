@@ -1,0 +1,65 @@
+name: FVG-GribMonitor (Windows build)
+
+# Builds the C++ desktop app on a real Windows runner.
+#  - Every push touching the project -> compiles + runs the parser test (CI check).
+#  - A tag like "fvg-v1.0.1" -> also packages the exe and publishes a GitHub
+#    Release, which is exactly what the app's "Controlla aggiornamenti" button
+#    reads (api.github.com/.../releases/latest).
+on:
+  push:
+    # NB: no `paths:` filter here on purpose — combining paths with a tag
+    # filter makes tag pushes fail to trigger (path filtering has no "new"
+    # commits to match against on a tag), so releases would never build.
+    branches: [ main ]
+    tags: [ 'fvg-v*' ]
+  pull_request:
+    paths: [ 'Projects/coded/FVG-GribMonitor/**' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create releases on tag push
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Projects/coded/FVG-GribMonitor
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (CMake + MSVC)
+        run: cmake -B build -A x64
+
+      - name: Build (Release)
+        run: cmake --build build --config Release
+
+      - name: Run parser test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Stage package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/Release/FVG-GribMonitor.exe dist/
+          Copy-Item config.ini dist/
+          Copy-Item test/sample_FVG_CAPE.grib2 dist/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FVG-GribMonitor
+          path: Projects/coded/FVG-GribMonitor/dist/**
+
+      - name: Zip for release
+        if: startsWith(github.ref, 'refs/tags/fvg-v')
+        shell: pwsh
+        run: Compress-Archive -Path dist/* -DestinationPath FVG-GribMonitor.zip -Force
+
+      - name: Publish Release
+        if: startsWith(github.ref, 'refs/tags/fvg-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Projects/coded/FVG-GribMonitor/dist/FVG-GribMonitor.exe
+            Projects/coded/FVG-GribMonitor/FVG-GribMonitor.zip

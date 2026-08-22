@@ -1,0 +1,48 @@
+name: FVG GRIB data (aggiorna il dato)
+
+# Genera automaticamente l'ultimo estratto GRIB del Friuli Venezia Giulia
+# (CAPE + vento + temperatura + umidità) e lo pubblica come asset della Release
+# "fvg-data", da cui il pulsante "Scarica ultimo GRIB" dell'app lo preleva.
+#
+# La Release è marcata prerelease: così NON interferisce con il controllo
+# aggiornamenti dell'app (che legge releases/latest e ignora le prerelease).
+
+on:
+  schedule:
+    # ~4 h dopo i cicli GFS 00/06/12/18 UTC.
+    - cron: '30 5,11,17,23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fvg-grib-data
+  cancel-in-progress: false
+
+jobs:
+  build-grib:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installa eccodes-tools
+        run: sudo apt-get update && sudo apt-get install -y libeccodes-tools
+
+      - name: Scarica il ritaglio FVG dal GFS e ri-codifica in simple packing
+        run: |
+          bash Projects/coded/FVG-GribMonitor/scripts/fetch_fvg_grib.sh FVG_latest.grib2
+          ls -la FVG_latest.grib2
+
+      - name: Pubblica come asset della Release "fvg-data"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: fvg-data
+          name: FVG GRIB — ultimo dato
+          prerelease: true
+          body: |
+            Estratto **solo FVG** (12–14°E / 45–47°N) dal modello GFS:
+            CAPE, CIN, vento a 10 m e 500 hPa, temperatura, umidità.
+            Ri-codificato in *simple packing* per il lettore dell'app.
+            Aggiornato automaticamente ~4 volte al giorno.
+          files: FVG_latest.grib2

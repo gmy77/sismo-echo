@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SismoGlobe — Monitoraggio terremoti in tempo reale</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+</head>
+<body>
+
+<header id="topbar">
+  <div id="brand">
+    <span class="logo">🌍</span>
+    <div>
+      <h1>SismoGlobe</h1>
+      <span class="sub">Monitoraggio sismico globale in tempo reale — dati USGS</span>
+    </div>
+  </div>
+
+  <div id="stats">
+    <div class="stat"><span class="stat-val" id="st-today">–</span><span class="stat-lab">eventi oggi</span></div>
+    <div class="stat"><span class="stat-val" id="st-hour">–</span><span class="stat-lab">ultima ora</span></div>
+    <div class="stat"><span class="stat-val" id="st-max">–</span><span class="stat-lab">mag. max</span></div>
+    <div class="stat"><span class="stat-val" id="st-energy">–</span><span class="stat-lab">energia 24h</span></div>
+  </div>
+
+  <div id="controls">
+    <label>Finestra
+      <select id="sel-window">
+        <option value="day" selected>24 ore</option>
+        <option value="week">7 giorni</option>
+        <option value="month">30 giorni</option>
+      </select>
+    </label>
+    <label>Mag. min <span id="mag-val">0</span>
+      <input type="range" id="sel-mag" min="0" max="6" step="0.5" value="0">
+    </label>
+    <label class="chk"><input type="checkbox" id="chk-sound"> 🔔 audio</label>
+    <label class="chk"><input type="checkbox" id="chk-rotate" checked> 🔄 rotazione</label>
+    <label class="chk"><input type="checkbox" id="chk-fly" checked> 🎯 vola sui nuovi</label>
+  </div>
+
+  <div id="live">
+    <span class="dot" id="live-dot"></span>
+    <span id="live-text">connessione…</span>
+  </div>
+</header>
+
+<main>
+  <aside id="panel">
+    <section id="histo-box">
+      <h2>Terremoti al giorno <small>(30 giorni, UTC)</small></h2>
+      <div id="day-banner" class="hidden">
+        <span id="day-banner-text"></span>
+        <button id="day-reset">✕ tutti</button>
+      </div>
+      <div id="histogram"></div>
+      <div class="legend">
+        <span><i style="background:#68e07f"></i>&lt;3</span>
+        <span><i style="background:#ffe14d"></i>3–4</span>
+        <span><i style="background:#ffb300"></i>4–5</span>
+        <span><i style="background:#ff7a00"></i>5–6</span>
+        <span><i style="background:#ff3b30"></i>6–7</span>
+        <span><i style="background:#ff2d78"></i>7+</span>
+      </div>
+    </section>
+
+    <section id="list-box">
+      <h2>Ultimi eventi <small id="list-count"></small></h2>
+      <ul id="quake-list"></ul>
+    </section>
+  </aside>
+
+  <div id="globe"></div>
+</main>
+
+<div id="toasts"></div>
+
+<div id="footer">
+  <span id="app-version"></span> · <a href="https://github.com/gmy77/sismoglobe" target="_blank">GitHub</a> · dati USGS · creato con Claude Code — grazie <a href="https://www.anthropic.com" target="_blank">Anthropic</a> 🤍
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Caricamento del pianeta…</p>
+</div>
+
+<script src="https://unpkg.com/globe.gl@2.32.5/dist/globe.gl.min.js"></script>
+<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

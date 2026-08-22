@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.8";
+const ECHO_VERSION = "3.9";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -2870,6 +2870,35 @@ body::after{
 .sw-spark path{fill:none;stroke-width:1.2;opacity:.6;}
 .sw-spark circle{r:2;}
 
+/* ── SPACE WEATHER — colonna sinistra ── */
+.spacewx{
+  position:fixed;left:18px;top:50%;transform:translateY(-50%);
+  z-index:10;display:flex;flex-direction:column;gap:10px;width:200px;
+}
+.wx-box{
+  background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));
+  border:1px solid var(--border);border-radius:13px;padding:11px 14px;
+  backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+  box-shadow:0 8px 26px -14px rgba(0,0,0,.6);
+  transition:transform .4s var(--ease-out),border-color .3s var(--ease);
+}
+.wx-box:hover{transform:translateX(3px);border-color:var(--ac,rgba(38,198,218,.3));}
+.wx-box.kp{--ac:var(--cyan);}
+.wx-box.wind{--ac:var(--orange);}
+.wx-box.xray{--ac:var(--yellow);}
+.wx-head{
+  display:flex;align-items:center;gap:6px;margin-bottom:6px;
+  font-family:'Share Tech Mono',monospace;font-size:.6em;
+  color:var(--ac);text-transform:uppercase;letter-spacing:.1em;
+}
+.wx-head .wdot{width:5px;height:5px;border-radius:50%;background:var(--ac);box-shadow:0 0 6px var(--ac);flex-shrink:0;}
+.wx-val{font-family:'Share Tech Mono',monospace;font-size:1.55em;font-weight:700;line-height:1.1;}
+.wx-sub{font-family:'Share Tech Mono',monospace;font-size:.58em;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:2px;}
+.wx-rows{margin-top:7px;border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:3px;}
+.wx-row{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.62em;color:var(--muted);}
+.wx-row b{color:#b0bec5;font-weight:600;}
+@media(max-width:1180px){.spacewx{display:none;}}
+
 /* onda d'urto */
 .shock-ring{
   position:absolute;left:18px;top:18px;width:10px;height:10px;border-radius:50%;
@@ -2893,6 +2922,39 @@ body::after{
 <!-- v0.3000 WATERMARK -->
 <div class="insider-tag"><span class="idot"></span>PREVIEW_INSIDER_2026.22 <b>v0.3000</b> · ring: FUTURE</div>
 <div class="lucewatch-tag">LUCE-WATCH · prossimo check<br><span class="lw-time" id="lwTime">—</span></div>
+
+<!-- SPACE WEATHER — colonna sinistra -->
+<div class="spacewx">
+  <div class="wx-box kp">
+    <div class="wx-head"><span class="wdot"></span>Planetary KP</div>
+    <div class="wx-val" id="wxKp" style="color:var(--cyan)">—</div>
+    <div class="wx-sub">geomagnetic index</div>
+    <div class="wx-rows">
+      <div class="wx-row"><span>Stato</span><b id="wxKpStato">—</b></div>
+      <div class="wx-row"><span>Fonte</span><b>NOAA SWPC</b></div>
+    </div>
+  </div>
+  <div class="wx-box wind">
+    <div class="wx-head"><span class="wdot"></span>Solar Wind</div>
+    <div class="wx-val" id="wxWind" style="color:var(--orange)">—</div>
+    <div class="wx-sub">km/s — vento solare</div>
+    <div class="wx-rows">
+      <div class="wx-row"><span>Densità</span><b id="wxDens">— n/cc</b></div>
+      <div class="wx-row"><span>Bt / Bz</span><b id="wxBtBz">— / — nT</b></div>
+      <div class="wx-row"><span>Fonte</span><b>ACE/DSCOVR</b></div>
+    </div>
+  </div>
+  <div class="wx-box xray">
+    <div class="wx-head"><span class="wdot"></span>X-Ray Flux</div>
+    <div class="wx-val" id="wxXray" style="color:var(--yellow)">—</div>
+    <div class="wx-sub">solar flare class</div>
+    <div class="wx-rows">
+      <div class="wx-row"><span>Flux</span><b id="wxFlux">— W/m²</b></div>
+      <div class="wx-row"><span>Stato</span><b id="wxXStato">—</b></div>
+      <div class="wx-row"><span>Fonte</span><b>GOES-16/18</b></div>
+    </div>
+  </div>
+</div>
 
 <!-- TOP LINKS -->
 <div class="topbar">
@@ -3005,6 +3067,14 @@ setInterval(tick,1000); tick();
 document.getElementById('quote').textContent=QUOTES[Math.floor(Math.random()*QUOTES.length)];
 
 const API='https://sismo-fvg.gimmy077.workers.dev';
+// fetch JSON con timeout 15s (AbortController: compatibile ovunque) e check HTTP
+function FJ(u){
+  const ac=new AbortController();
+  const t=setTimeout(()=>ac.abort(),15000);
+  return fetch(u,{signal:ac.signal})
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status+' '+u);return r.json();})
+    .finally(()=>clearTimeout(t));
+}
 const MC=m=>m>=3?'#ff1744':m>=2?'#ff6d00':m>=1?'#ffd600':'#69f0ae';
 const KC=k=>k>=7?'#ff1744':k>=5?'#ff6d00':k>=4?'#ffd600':k>=2?'#26c6da':'#69f0ae';
 
@@ -3112,9 +3182,9 @@ function setDot(id,m,d){
 async function loadSismo(){
   try{
     const [ev,st,sol]=await Promise.all([
-      fetch(API+'/api/events?giorni=3&mag=0.5').then(r=>r.json()),
-      fetch(API+'/api/stats').then(r=>r.json()),
-      fetch(API+'/api/solar').then(r=>r.json()),
+      FJ(API+'/api/events?giorni=3&mag=0.5'),
+      FJ(API+'/api/stats'),
+      FJ(API+'/api/solar'),
     ]);
     const last=(ev.events||[])[0];
     if(last){
@@ -3147,7 +3217,7 @@ async function loadSismo(){
 
 async function loadCF(){
   try{
-    const cf=await fetch(API+'/api/cf').then(r=>r.json());
+    const cf=await FJ(API+'/api/cf');
     if(cf.error){document.getElementById('cloc').textContent='—';document.getElementById('cdot').className='sdot';return;}
     if(cf.last){
       const m=parseFloat(cf.last.magnitudine)||0,d=new Date(cf.last.data_ora);
@@ -3171,9 +3241,93 @@ async function loadCF(){
   }
 }
 
+/* ── SPACE WEATHER — dati live NOAA SWPC ── */
+const SWPC='https://services.swpc.noaa.gov';
+// rows può essere array-di-array (con header in riga 0) o array di oggetti {campo:valore}
+function lastValid(rows,idx,name){
+  if(!Array.isArray(rows))return null;
+  for(let i=rows.length-1;i>=0;i--){
+    const r=rows[i];
+    let v;
+    if(Array.isArray(r)){
+      if(i===0||idx<0)continue; // riga header o colonna assente
+      v=parseFloat(r[idx]);
+    }else if(r&&name!==undefined){
+      v=parseFloat(r[name]!==undefined?r[name]:r[String(name).toLowerCase()]);
+    }
+    if(!isNaN(v))return v;
+  }
+  return null;
+}
+function colIdx(rows,name,fallback){
+  if(!Array.isArray(rows&&rows[0]))return fallback;
+  const i=rows[0].findIndex(h=>String(h).toLowerCase()===name.toLowerCase());
+  return i>=0?i:fallback;
+}
+function flareClass(f){
+  if(f>=1e-4)return['X'+(f/1e-4).toFixed(1),'#ff1744','X-Flare'];
+  if(f>=1e-5)return['M'+(f/1e-5).toFixed(1),'#ff6d00','M-Flare'];
+  if(f>=1e-6)return['C'+(f/1e-6).toFixed(1),'#ffd600','C-Flare'];
+  if(f>=1e-7)return['B'+(f/1e-7).toFixed(1),'#69f0ae','B-Flare'];
+  return['A'+(f/1e-8).toFixed(1),'#69f0ae','Quiete'];
+}
+async function loadSpaceWx(){
+  try{
+    const kpRows=await FJ(SWPC+'/products/noaa-planetary-k-index.json');
+    const k=lastValid(kpRows,colIdx(kpRows,'Kp',1),'Kp');
+    if(k!==null){
+      const el=document.getElementById('wxKp');
+      el.textContent=k.toFixed(1);el.style.color=KC(k);
+      document.getElementById('wxKpStato').textContent=
+        k<2?'Silenzio cosmico':k<4?'Quiete':k<5?'Attivo':k<6?'Tempesta G1':k<7?'Tempesta G2':'Tempesta forte';
+      const ke=document.getElementById('skp');
+      if(ke){ke.textContent=k.toFixed(1);ke.style.color=KC(k);}
+      applyKpAtmosphere(k);
+    }
+  }catch(e){console.debug('spacewx:',e.message);}
+  try{
+    const plasma=await FJ(SWPC+'/products/solar-wind/plasma-2-hour.json');
+    const speed=lastValid(plasma,colIdx(plasma,'speed',2)),dens=lastValid(plasma,colIdx(plasma,'density',1));
+    if(speed!==null){
+      const el=document.getElementById('wxWind');
+      el.textContent=Math.round(speed);
+      el.style.color=speed<400?'#69f0ae':speed<550?'#ffd600':speed<700?'#ff6d00':'#ff1744';
+    }
+    if(dens!==null)document.getElementById('wxDens').textContent=dens.toFixed(1)+' n/cc';
+  }catch(e){console.debug('spacewx:',e.message);}
+  try{
+    const mag=await FJ(SWPC+'/products/solar-wind/mag-2-hour.json');
+    const bt=lastValid(mag,colIdx(mag,'bt',-1)),bz=lastValid(mag,colIdx(mag,'bz_gsm',3));
+    if(bt!==null||bz!==null)document.getElementById('wxBtBz').textContent=
+      (bt!==null?bt.toFixed(1):'—')+' / '+(bz!==null?bz.toFixed(1):'—')+' nT';
+  }catch(e){console.debug('spacewx:',e.message);}
+  try{
+    const xr=await FJ(SWPC+'/json/goes/primary/xrays-6-hour.json');
+    const long=xr.filter(d=>d.energy==='0.1-0.8nm');
+    const last=long[long.length-1];
+    const f=last?parseFloat(last.flux):NaN;
+    if(Number.isFinite(f)){
+      const [cls,col,stato]=flareClass(f);
+      const el=document.getElementById('wxXray');
+      el.textContent=cls;el.style.color=col;
+      document.getElementById('wxFlux').textContent=f.toExponential(2)+' W/m²';
+      document.getElementById('wxXStato').textContent=stato;
+    }
+  }catch(e){console.debug('spacewx:',e.message);}
+}
+
 applyKpAtmosphere(1); // valore neutro iniziale, in attesa del primo fetch reale
-loadSismo(); loadCF();
-setInterval(function(){loadSismo();loadCF();},5*60*1000);
+// sequenziale: loadSpaceWx per ultimo, così il Kp live SWPC vince su skp/atmosfera
+let refreshBusy=false; // i fetch hanno timeout 15s, quindi il lock si libera sempre
+async function refreshAll(){
+  if(refreshBusy)return;
+  refreshBusy=true;
+  try{await loadSismo();await loadCF();await loadSpaceWx();}
+  catch(e){console.debug('refresh:',e.message);}
+  finally{refreshBusy=false;}
+}
+refreshAll();
+setInterval(refreshAll,5*60*1000);
 </script>
 </body>
 </html>`;
