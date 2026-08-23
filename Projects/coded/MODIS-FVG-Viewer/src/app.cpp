@@ -988,11 +988,19 @@ static void paintCanvas(Graphics& gfx) {
     RectF dst((REAL)g.originX, (REAL)g.originY, (REAL)dw, (REAL)dh);
     gfx.DrawImage(g.image, dst, 0, 0, (REAL)g.imgW, (REAL)g.imgH, UnitPixel);
 
+    // Un tratto bianco sparisce sopra nuvole o neve - cioe' su buona parte delle
+    // scene MODIS. Ogni confine viene disegnato due volte: prima una guaina
+    // scura e piu' spessa, poi il tratto chiaro sopra. Cosi' si legge sia sul
+    // mare scuro sia su un fronte nuvoloso, senza dover indovinare lo sfondo.
     auto drawPoly = [&](const GeoPt* p, int n, Color col, REAL width) {
-        Pen pen(col, width); pen.SetLineJoin(LineJoinRound);
         std::vector<PointF> pts; pts.reserve(n);
         for (int i = 0; i < n; ++i) { double X, Y; geoToCanvas(v, p[i].lon, p[i].lat, X, Y); pts.push_back(PointF((REAL)X, (REAL)Y)); }
-        if (pts.size() >= 2) gfx.DrawLines(&pen, pts.data(), (INT)pts.size());
+        if (pts.size() < 2) return;
+        Pen casing(Color(150, 8, 10, 14), width + 2.4f);
+        casing.SetLineJoin(LineJoinRound);
+        gfx.DrawLines(&casing, pts.data(), (INT)pts.size());
+        Pen pen(col, width); pen.SetLineJoin(LineJoinRound);
+        gfx.DrawLines(&pen, pts.data(), (INT)pts.size());
     };
     if (g.showBorders) {
         Color faint(150, 210, 214, 220);
