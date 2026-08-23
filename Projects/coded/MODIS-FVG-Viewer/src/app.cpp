@@ -582,6 +582,7 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
     const int maxTries = (pr.nativeM <= 30) ? 14 : 4;
     std::string tryDate = date;
     std::wstring lastErr = L"nessuna immagine trovata";
+    int hardFails = 0;   // consecutive request failures (not empty tiles)
 
     for (int attempt = 0; attempt < maxTries; ++attempt, tryDate = dateBack(tryDate, 1)) {
         std::wstring cachePath = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, tryDate, strip);
@@ -610,7 +611,17 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
         }
         SetCursor(prevCur);
 
-        if (!ok || im.empty()) { lastErr = err; continue; }
+        if (!ok || im.empty()) {
+            lastErr = err;
+            // An empty tile is date-specific — another day may well have data.
+            // A transport or HTTP failure is not: a rejected request fails the
+            // same way on every date, so walking back 14 days would just stall
+            // the window for nothing. Give it a couple of chances (a dropped
+            // connection can be transient) and then stop.
+            if (++hardFails >= 3) break;
+            continue;
+        }
+        hardFails = 0;
 
         // An all-transparent tile means "no pass", not a black scene. Don't let
         // it into the cache: it would be served forever as if it were an image.
