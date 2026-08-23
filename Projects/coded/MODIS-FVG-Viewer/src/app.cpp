@@ -81,7 +81,7 @@ enum {
     IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH, IDC_LATEST, IDC_WORKER,
     IDC_BANDLIST, IDC_RGB, IDC_RCOMBO, IDC_GCOMBO, IDC_BCOMBO,
     IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE,
-    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG, IDC_RAWLAYER, IDC_CLOUDGREY
+    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG, IDC_RAWLAYER, IDC_CLOUDGREY, IDC_VIEWMODE
 };
 
 // ----------------------------- theme --------------------------------------
@@ -151,7 +151,7 @@ struct App {
     HWND hwnd = nullptr;
     HWND satCombo=nullptr, prodCombo=nullptr, dateEdit=nullptr, workerChk=nullptr, stripChk=nullptr;
     HWND bandList=nullptr, rgbChk=nullptr, rCombo=nullptr, gCombo=nullptr, bCombo=nullptr;
-    HWND rawChk=nullptr, cloudChk=nullptr, citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr, sharpChk=nullptr;
+    HWND rawChk=nullptr, cloudChk=nullptr, viewCombo=nullptr, citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr, sharpChk=nullptr;
     ULONG_PTR gdip = 0;
     HBRUSH panelBrush = nullptr, cardBrush = nullptr;
 
@@ -168,6 +168,7 @@ struct App {
     bool sharpen   = true;                   // unsharp mask on the shown image
     bool rawOverlay= false;                  // strato "a punti" senza la base sotto
     bool greyClouds= false;                  // nuvole appiattite in grigio neutro
+    int  viewMode  = 0;                      // 0 normale, 1 griglia giorni, 2 riquadri
 
     Bitmap* image = nullptr;
     int imgW = 0, imgH = 0;
@@ -930,7 +931,7 @@ static void doLayout() {
     MoveWindow(g.stripChk,  x, y, w, 22, TRUE); y += 28;
 
     header(L"CANALE / BANDA");
-    row(g.bandList, 78);
+    row(g.bandList, 64);
     row(g.rgbChk, 24);
     MoveWindow(g.rCombo, x, y, w, 200, TRUE); y += 28;
     MoveWindow(g.gCombo, x, y, w, 200, TRUE); y += 28;
@@ -942,6 +943,7 @@ static void doLayout() {
     row(g.sharpChk, 22);
     row(g.rawChk, 22);
     row(g.cloudChk, 22);
+    MoveWindow(g.viewCombo, x, y, w, 200, TRUE); y += 32;
     row(g.diffChk, 22);
     row(GetDlgItem(g.hwnd, IDC_RESET), 28);
     row(GetDlgItem(g.hwnd, IDC_SAVEPNG), 28);
@@ -968,7 +970,93 @@ static void drawCentered(Graphics& gfx, const RECT& r, const std::wstring& text,
     gfx.DrawString(text.c_str(), -1, &font, rf, &sf, &br);
 }
 
+// Griglia di piu' giornate. Confrontare date sfogliandole una per una obbliga
+// a ricordare la precedente; affiancarle rende il confronto immediato - quale
+// giorno e' limpido, dove si e' spostata una nube, quanto e' cambiata la neve.
+static void paintGrid(Graphics& gfx) {
+    const Theme& t = g.theme;
+    const RECT& c = g.rcCanvas;
+    SolidBrush bg(t.canvas);
+    gfx.FillRectangle(&bg, (INT)c.left, (INT)c.top, (INT)(c.right - c.left), (INT)(c.bottom - c.top));
+    int n = (int)g.seq.size();
+    if (n == 0) { drawCentered(gfx, c, L"Nessuna immagine da confrontare.", t, 14); return; }
+    if (n > 9) n = 9;                       // oltre nove le celle diventano illeggibili
+    int first = (int)g.seq.size() - n;      // le piu' recenti
+
+    int cols = (n <= 1) ? 1 : (n <= 4) ? 2 : 3;
+    int rows = (n + cols - 1) / cols;
+    const int pad = 8;
+    REAL cw = (REAL)(c.right - c.left - pad * (cols + 1)) / cols;
+    REAL ch = (REAL)(c.bottom - c.top - pad * (rows + 1)) / rows;
+    FontFamily ff(L"Segoe UI"); Font font(&ff, 11, FontStyleRegular, UnitPixel);
+    gfx.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+
+    for (int k = 0; k < n; ++k) {
+        int i = first + k;
+        REAL x = c.left + pad + (k % cols) * (cw + pad);
+        REAL y = c.top  + pad + (k / cols) * (ch + pad);
+        SolidBrush cell(i == g.cur ? t.cellSel : t.cell);
+        fillRoundRect(gfx, cell, x, y, cw, ch, 8);
+        if (Bitmap* bmp = g.seq[i].thumb) {
+            // "fit" dentro la cella: mai deformare una geografia per riempire.
+            REAL iw = (REAL)bmp->GetWidth(), ih = (REAL)bmp->GetHeight();
+            REAL sc = min((cw - 6) / iw, (ch - 22) / ih);
+            REAL dw = iw * sc, dh = ih * sc;
+            gfx.DrawImage(bmp, RectF(x + (cw - dw) / 2, y + 3 + (ch - 22 - dh) / 2, dw, dh),
+                          0, 0, iw, ih, UnitPixel);
+        }
+        SolidBrush tx(t.text);
+        gfx.DrawString(toW(vTimeText(g.seq[i])).c_str(), -1, &font,
+                       PointF(x + 6, y + ch - 17), &tx);
+    }
+    SolidBrush hint(t.subtext);
+    Font hf(&ff, 11, FontStyleRegular, UnitPixel);
+    gfx.DrawString(L"Clicca una giornata per aprirla a schermo intero", -1, &hf,
+                   PointF((REAL)c.left + 10, (REAL)c.top + 6), &hint);
+}
+
+// La fascia FVG->equatore e' alta il doppio della sua larghezza: a schermo
+// diventa una striscia sottile in cui non si legge nulla. Tagliata in riquadri
+// affiancati usa tutto il canvas, e ogni riquadro dichiara la propria latitudine.
+static void paintSegments(Graphics& gfx) {
+    const Theme& t = g.theme;
+    const RECT& c = g.rcCanvas;
+    SolidBrush bg(t.canvas);
+    gfx.FillRectangle(&bg, (INT)c.left, (INT)c.top, (INT)(c.right - c.left), (INT)(c.bottom - c.top));
+    if (!g.image || g.cur < 0) { drawCentered(gfx, c, L"Nessuna immagine.", t, 14); return; }
+    const GranuleView& v = g.seq[g.cur];
+
+    const int K = 4;
+    const int pad = 8;
+    REAL cw = (REAL)(c.right - c.left - pad * (K + 1)) / K;
+    REAL ch = (REAL)(c.bottom - c.top - 2 * pad);
+    FontFamily ff(L"Segoe UI"); Font font(&ff, 11, FontStyleRegular, UnitPixel);
+    gfx.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+    SolidBrush tx(t.text);
+
+    double latMax = vLatMax(v), latSpan = vLatMax(v) - vLatMin(v);
+    for (int k = 0; k < K; ++k) {
+        REAL x = c.left + pad + k * (cw + pad);
+        REAL y = (REAL)c.top + pad;
+        REAL srcY = (REAL)g.imgH * k / K, srcH = (REAL)g.imgH / K;
+        REAL sc = min(cw / g.imgW, (ch - 20) / srcH);
+        REAL dw = (REAL)g.imgW * sc, dh = srcH * sc;
+        gfx.DrawImage(g.image, RectF(x + (cw - dw) / 2, y, dw, dh),
+                      0, srcY, (REAL)g.imgW, srcH, UnitPixel);
+        wchar_t lab[64];
+        swprintf(lab, 64, L"%.1f\u00b0 \u2192 %.1f\u00b0 N",
+                 latMax - latSpan * k / K, latMax - latSpan * (k + 1) / K);
+        gfx.DrawString(lab, -1, &font, PointF(x + 4, y + dh + 4), &tx);
+    }
+}
+
 static void paintCanvas(Graphics& gfx) {
+    if (g.viewMode == 1) { paintGrid(gfx); return; }
+    if (g.viewMode == 2) {
+        // I riquadri hanno senso solo su una fascia: su un ritaglio del Friuli
+        // taglierebbero in quattro un quadrato, senza guadagno.
+        if (g.cur >= 0 && g.seq[g.cur].remote && g.seq[g.cur].rStrip) { paintSegments(gfx); return; }
+    }
     const Theme& t = g.theme;
     SolidBrush bg(t.canvas);
     gfx.FillRectangle(&bg, (INT)g.rcCanvas.left, (INT)g.rcCanvas.top, (INT)(g.rcCanvas.right - g.rcCanvas.left), (INT)(g.rcCanvas.bottom - g.rcCanvas.top));
@@ -1314,6 +1402,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         g.sharpChk   = mkCheck(hwnd, L"Nitidezza (unsharp)", IDC_SHARP, true);
         g.rawChk     = mkCheck(hwnd, L"Solo strato (senza base)", IDC_RAWLAYER, false);
         g.cloudChk   = mkCheck(hwnd, L"Nuvole in grigio", IDC_CLOUDGREY, false);
+        g.viewCombo  = mkCombo(hwnd, IDC_VIEWMODE);
+        SendMessageW(g.viewCombo, CB_ADDSTRING, 0, (LPARAM)L"Vista: normale");
+        SendMessageW(g.viewCombo, CB_ADDSTRING, 0, (LPARAM)L"Vista: griglia giorni");
+        SendMessageW(g.viewCombo, CB_ADDSTRING, 0, (LPARAM)L"Vista: fascia a riquadri");
+        SendMessageW(g.viewCombo, CB_SETCURSEL, 0, 0);
         g.diffChk    = mkCheck(hwnd, L"Diff vs precedente", IDC_DIFF, false);
         mkButton(hwnd, L"Reset vista (fit)", IDC_RESET);
         mkButton(hwnd, L"Salva vista (PNG)", IDC_SAVEPNG);
@@ -1348,6 +1441,15 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             applySelection(); return 0;
         case IDC_SHARP:
             rebuildImage(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
+        case IDC_VIEWMODE:
+            if (code == CBN_SELCHANGE) {
+                g.viewMode = (int)SendMessageW(g.viewCombo, CB_GETCURSEL, 0, 0);
+                if (g.viewMode == 2 && (g.cur < 0 || !g.seq[g.cur].remote || !g.seq[g.cur].rStrip))
+                    g.statusText = L"I riquadri servono a una fascia: spunta \u201cBlocco: FVG \u2192 equatore\u201d e riscarica.";
+                else buildStatus();
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
         case IDC_SAT: case IDC_PRODUCT:
             // Point of the dashboard: pick a product or a satellite and it is
             // simply there — cached ones instantly, the rest fetched quietly.
@@ -1399,6 +1501,25 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (idx >= 0 && idx < (int)g.seq.size()) {
                 if (inRect(filmCloseRect(idx), x, y)) removeIndex(idx);
                 else selectIndex(idx);
+            }
+            return 0;
+        }
+        if (inRect(g.rcCanvas, x, y) && g.viewMode == 1) {
+            // Clic su una cella della griglia: aprila a schermo intero.
+            SetFocus(hwnd);
+            int n = (int)g.seq.size(); if (n > 9) n = 9;
+            int first = (int)g.seq.size() - n;
+            int cols = (n <= 1) ? 1 : (n <= 4) ? 2 : 3, rows = (n + cols - 1) / cols;
+            const int pad = 8;
+            double cw = (double)(g.rcCanvas.right - g.rcCanvas.left - pad * (cols + 1)) / cols;
+            double chh = (double)(g.rcCanvas.bottom - g.rcCanvas.top - pad * (rows + 1)) / rows;
+            int col = (int)((x - g.rcCanvas.left - pad) / (cw + pad));
+            int row = (int)((y - g.rcCanvas.top - pad) / (chh + pad));
+            int k = row * cols + col;
+            if (col >= 0 && col < cols && k >= 0 && k < n) {
+                g.viewMode = 0;
+                SendMessageW(g.viewCombo, CB_SETCURSEL, 0, 0);
+                selectIndex(first + k);
             }
             return 0;
         }
@@ -1463,7 +1584,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nShow) {
     RegisterClassW(&wc);
 
     g.hwnd = CreateWindowExW(0, wc.lpszClassName, APP_TITLE, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 940, nullptr, nullptr, hInst, nullptr);
+        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 980, nullptr, nullptr, hInst, nullptr);
 
     { BOOL dark = !g.light; DwmSetWindowAttribute(g.hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof dark); }
     { int backdrop = DWMSBT_MAINWINDOW; DwmSetWindowAttribute(g.hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop, sizeof backdrop); }
