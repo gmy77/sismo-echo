@@ -11,6 +11,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # runs the correctness checks even off-Windows.
 # ---------------------------------------------------------------------------
 if(WIN32)
+    # app.rc embeds "app.manifest" by a relative name, which the resource
+    # compiler resolves against its working directory - not against the .rc.
+    # Some windres builds are lenient, newer ones are not, so point both
+    # rc.exe and windres at src/ explicitly.
+    if(MINGW)
+        set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} -I \"${CMAKE_CURRENT_SOURCE_DIR}/src\"")
+    elseif(MSVC)
+        set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /I \"${CMAKE_CURRENT_SOURCE_DIR}/src\"")
+    endif()
+
     add_executable(MODIS-FVG-Viewer WIN32
         src/app.cpp
         src/modis.cpp

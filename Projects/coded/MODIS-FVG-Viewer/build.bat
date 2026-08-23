@@ -79,7 +79,10 @@ exit /b 1
 
 :msvc
 echo [MSVC] Compilazione in corso...
-rc /nologo /fo src\app.res src\app.rc
+REM -I src: il .rc include "app.manifest" con percorso relativo, che il
+REM compilatore di risorse cerca nella cartella corrente, non accanto al .rc.
+rc /nologo /I src /fo src\app.res src\app.rc
+if %errorlevel% neq 0 ( echo Errore nelle risorse ^(rc^). & pause & exit /b 1 )
 cl /nologo /EHsc /O2 /std:c++17 /DUNICODE /D_UNICODE ^
    src\app.cpp src\modis.cpp src\image.cpp src\gibs.cpp src\mf_encoder.cpp src\app.res ^
    /Fe:MODIS-FVG-Viewer.exe ^
@@ -92,7 +95,10 @@ goto :done
 
 :mingw
 echo [MinGW] Compilazione in corso...
-windres src\app.rc -O coff -o src\app.res.o
+REM -I src: vedi sopra. Alcune versioni di windres risolvono il percorso
+REM rispetto al .rc, altre no: passarlo esplicitamente funziona su tutte.
+windres -I src src\app.rc -O coff -o src\app.res.o
+if %errorlevel% neq 0 ( echo Errore nelle risorse ^(windres^). & pause & exit /b 1 )
 g++ -std=c++17 -O2 -municode -mwindows -static -static-libgcc -static-libstdc++ ^
     src\app.cpp src\modis.cpp src\image.cpp src\gibs.cpp src\mf_encoder.cpp src\app.res.o ^
     -o MODIS-FVG-Viewer.exe ^
