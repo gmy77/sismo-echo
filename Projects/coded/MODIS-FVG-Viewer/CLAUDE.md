@@ -77,10 +77,42 @@ a memoria e **non verificabili da questo ambiente**. Se uno fallisce, correggere
 il nome in `src/gibs.h` **e** in `sismo-worker/index.js` (due posti, sempre).
 Lo stesso vale per i due HLS a 30 m, provati solo parzialmente.
 
-### Idee proposte all'utente
-- Confronto **affiancato** di due date.
+### Chiesto dall'utente (prossima sessione)
+
+**Stack MODIS su mezzo pianeta, navigabile.** Una vista che parte da
+un'inquadratura molto ampia — indicativamente lat -60..80, lon -180..180 — e
+permette di scendere col mouse fino al Friuli: trascinare per spostarsi,
+rotellina per zoomare, e un modo per **tornare indietro** ai livelli
+precedenti.
+
+Note di progetto per chi lo affronta:
+- GIBS accetta qualunque bbox, quindi il mondo intero è una sola richiesta. Ma
+  a 4096 px su 360° di longitudine si è a ~10 km/pixel: va bene come vista
+  d'insieme, non per il dettaglio.
+- Serve quindi **ri-scaricare la finestra visibile alla risoluzione giusta**
+  quando si zooma, non ingrandire i pixel che si hanno. È la stessa logica di
+  `requestWidthFor()`, ma applicata al riquadro visibile invece che a uno
+  fisso: il bbox diventa una variabile di stato, non una costante.
+- Il "tornare indietro" è una **pila di inquadrature** (bbox + zoom): ogni
+  discesa impila, un tasto o il tasto destro disimpila. Da valutare se
+  scorciatoia da tastiera (`Backspace`) o pulsante.
+- La cache su disco va ripensata: oggi il nome file codifica satellite,
+  prodotto e data perché il bbox è fisso. Con un bbox libero serve un'impronta
+  del riquadro nel nome, altrimenti immagini di zone diverse si sovrascrivono.
+- Attenzione a non ri-scaricare a ogni pixel di trascinamento: scaricare
+  **quando il mouse si ferma**, non durante.
+
+**Altro** — spazio per le prossime idee dell'utente.
+
+### Idee gia' proposte, non ancora scelte
+- Confronto **affiancato** di due date (la vista a griglia lo copre in parte).
 - **Serie storica** di un punto: clic su una città → andamento nei mesi.
 - **Timelapse** con immagini reali (finora provato solo sui granuli sintetici).
+- Pulsante **"giornata più limpida"**: sonde da 256 px sugli ultimi 10-15
+  giorni, misura della nuvolosità, carica solo la migliore.
+
+> Nota: "mettere una X sulle miniature per cancellarle" era in lista ed **è
+> già fatto** in v1.0.0 — cancella anche il PNG dalla cache.
 
 ### Aperto
 - PR #15 è ancora in **bozza**: l'utente deciderà quando renderla pronta e
