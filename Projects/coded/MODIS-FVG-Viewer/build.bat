@@ -79,10 +79,14 @@ exit /b 1
 
 :msvc
 echo [MSVC] Compilazione in corso...
-REM -I src: il .rc include "app.manifest" con percorso relativo, che il
-REM compilatore di risorse cerca nella cartella corrente, non accanto al .rc.
-rc /nologo /I src /fo src\app.res src\app.rc
-if %errorlevel% neq 0 ( echo Errore nelle risorse ^(rc^). & pause & exit /b 1 )
+REM Il .rc incorpora "app.manifest" con un nome nudo, che il compilatore di
+REM risorse risolve rispetto alla cartella di lavoro. -I non basta: alcune
+REM versioni non lo consultano per i file di dati. Entriamo in src, dove il
+REM nome nudo non puo' sbagliare.
+pushd src
+rc /nologo /fo app.res app.rc
+if %errorlevel% neq 0 ( popd & echo Errore nelle risorse ^(rc^). & pause & exit /b 1 )
+popd
 cl /nologo /EHsc /O2 /std:c++17 /DUNICODE /D_UNICODE ^
    src\app.cpp src\modis.cpp src\image.cpp src\gibs.cpp src\mf_encoder.cpp src\app.res ^
    /Fe:MODIS-FVG-Viewer.exe ^
@@ -95,10 +99,12 @@ goto :done
 
 :mingw
 echo [MinGW] Compilazione in corso...
-REM -I src: vedi sopra. Alcune versioni di windres risolvono il percorso
-REM rispetto al .rc, altre no: passarlo esplicitamente funziona su tutte.
-windres -I src src\app.rc -O coff -o src\app.res.o
-if %errorlevel% neq 0 ( echo Errore nelle risorse ^(windres^). & pause & exit /b 1 )
+REM Vedi il commento in :msvc. windres 15.x ignora -I per i file di dati
+REM referenziati dal .rc, quindi ci spostiamo in src invece di indicarglielo.
+pushd src
+windres -O coff app.rc -o app.res.o
+if %errorlevel% neq 0 ( popd & echo Errore nelle risorse ^(windres^). & pause & exit /b 1 )
+popd
 g++ -std=c++17 -O2 -municode -mwindows -static -static-libgcc -static-libstdc++ ^
     src\app.cpp src\modis.cpp src\image.cpp src\gibs.cpp src\mf_encoder.cpp src\app.res.o ^
     -o MODIS-FVG-Viewer.exe ^

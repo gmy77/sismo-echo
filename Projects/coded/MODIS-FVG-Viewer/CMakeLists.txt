@@ -11,15 +11,33 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # runs the correctness checks even off-Windows.
 # ---------------------------------------------------------------------------
 if(WIN32)
-    # app.rc embeds "app.manifest" by a relative name, which the resource
-    # compiler resolves against its working directory - not against the .rc.
-    # Some windres builds are lenient, newer ones are not, so point both
-    # rc.exe and windres at src/ explicitly.
+    enable_language(RC)
+
+    # app.rc embeds "app.manifest" by a bare name, which the resource compiler
+    # resolves against its working directory - not against the .rc. Letting
+    # CMake compile the .rc leaves that directory up to the generator, and
+    # --include-dir is not a dependable substitute: the option is documented to
+    # cover files named in the .rc, but windres 15.x does not honour it for
+    # them (and it has a long-standing parsing bug with spaces). So compile the
+    # resource ourselves, from src/, where the bare name cannot miss.
     if(MINGW)
-        set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} -I \"${CMAKE_CURRENT_SOURCE_DIR}/src\"")
-    elseif(MSVC)
-        set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /I \"${CMAKE_CURRENT_SOURCE_DIR}/src\"")
+        set(APP_RES ${CMAKE_CURRENT_BINARY_DIR}/app_rc.o)
+        set(RES_CMD ${CMAKE_RC_COMPILER} -O coff app.rc -o ${APP_RES})
+    else()
+        set(APP_RES ${CMAKE_CURRENT_BINARY_DIR}/app_rc.res)
+        set(RES_CMD ${CMAKE_RC_COMPILER} /nologo /fo ${APP_RES} app.rc)
     endif()
+    add_custom_command(
+        OUTPUT  ${APP_RES}
+        COMMAND ${RES_CMD}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/app.rc
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/app.manifest
+        COMMENT "Compilo le risorse (manifest + versione) da src/"
+        VERBATIM)
+    # Gia' compilato: CMake deve linkarlo, non provare a compilarlo.
+    set_source_files_properties(${APP_RES} PROPERTIES
+        GENERATED TRUE EXTERNAL_OBJECT TRUE)
 
     add_executable(MODIS-FVG-Viewer WIN32
         src/app.cpp
@@ -27,7 +45,7 @@ if(WIN32)
         src/image.cpp
         src/gibs.cpp
         src/mf_encoder.cpp
-        src/app.rc
+        ${APP_RES}
     )
     target_link_libraries(MODIS-FVG-Viewer PRIVATE
         gdiplus comctl32 comdlg32 dwmapi
