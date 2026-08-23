@@ -66,9 +66,10 @@ using namespace Gdiplus;
 #endif
 
 // ----------------------------- constants ----------------------------------
-static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer";
-static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG";
-static const wchar_t* APP_CREDIT_2 = L"Costruito da PIGNOLO GIMMY con Claude Code (Anthropic)";
+static const wchar_t* APP_VERSION = L"1.0.0";
+static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.0";
+static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.0";
+static const wchar_t* APP_CREDIT_2 = L"Anthropic  \u00b7  PIGNOLO GIMMY";
 static const int PANEL_W  = 304;
 static const int FILM_H   = 116;
 static const int STATUS_H = 28;

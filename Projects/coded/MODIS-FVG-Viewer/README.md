@@ -269,4 +269,4 @@ docs/              MFVG-FORMAT.md, preview.png
 
 ---
 
-**MODIS-FVG** — Costruito da **PIGNOLO GIMMY** con **Claude Code** (Anthropic).
+**MODIS-FVG v1.0.0** — **Anthropic** · **PIGNOLO GIMMY**
