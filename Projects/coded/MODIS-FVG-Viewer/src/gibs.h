@@ -58,10 +58,18 @@ inline const Product* products(int& count) {
           "HLS_L30_Nadir_BRDF_Adjusted_Reflectance",
           "HLS_L30_Nadir_BRDF_Adjusted_Reflectance", "hls_l30", false, 30, true, nullptr },
         // Incendi: il layer da solo e' quasi tutto trasparente (sono punti di
-        // calore), quindi va sovrapposto al true-color per essere leggibile.
+        // calore), quindi va sovrapposto a una base per essere leggibile.
+        //
+        // La base e' il composito 7-2-1, non il true-color, e non per gusto: la
+        // banda 7 e' infrarosso a onde corte (2105-2155 nm), che attraversa il
+        // fumo invece di fermarcisi sopra. Cosi' le cicatrici da incendio e il
+        // suolo appena bruciato risaltano in rosso-arancio, la vegetazione viva
+        // resta verde brillante e l'acqua nera. In true-color un incendio si
+        // vedrebbe soprattutto come una macchia grigia di fumo, che nasconde
+        // proprio la cosa che si vuole guardare.
         { L"\U0001F525 Incendi / anomalie termiche",
           "MODIS_Terra_Thermal_Anomalies_All",
-          "MODIS_Aqua_Thermal_Anomalies_All", "fires", false, 1000, false, "truecolor" },
+          "MODIS_Aqua_Thermal_Anomalies_All", "fires", false, 250, false, "bands721" },
         { L"Aerosol (fumo, polveri, foschia)",
           "MODIS_Terra_Aerosol", "MODIS_Aqua_Aerosol", "aerosol", false, 1000, false, nullptr },
         { L"Neve / ghiaccio (NDSI)",

@@ -77,7 +77,7 @@ enum {
     IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH, IDC_LATEST, IDC_WORKER,
     IDC_BANDLIST, IDC_RGB, IDC_RCOMBO, IDC_GCOMBO, IDC_BCOMBO,
     IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE,
-    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG
+    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG, IDC_RAWLAYER
 };
 
 // ----------------------------- theme --------------------------------------
@@ -147,7 +147,7 @@ struct App {
     HWND hwnd = nullptr;
     HWND satCombo=nullptr, prodCombo=nullptr, dateEdit=nullptr, workerChk=nullptr, stripChk=nullptr;
     HWND bandList=nullptr, rgbChk=nullptr, rCombo=nullptr, gCombo=nullptr, bCombo=nullptr;
-    HWND citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr, sharpChk=nullptr;
+    HWND rawChk=nullptr, citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr, sharpChk=nullptr;
     ULONG_PTR gdip = 0;
     HBRUSH panelBrush = nullptr, cardBrush = nullptr;
 
@@ -162,6 +162,7 @@ struct App {
     bool viaWorker = true;                   // fetch through the Cloudflare cache
     bool stripMode = false;                  // "blocco": tall swath FVG -> equator
     bool sharpen   = true;                   // unsharp mask on the shown image
+    bool rawOverlay= false;                  // strato "a punti" senza la base sotto
 
     Bitmap* image = nullptr;
     int imgW = 0, imgH = 0;
@@ -640,7 +641,7 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
                 : gibs::download(gibsLayer, d, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, dst, &err, saveTo);
         };
         bool ok;
-        if (pr.overlayOn) {
+        if (pr.overlayOn && (probe || !g.rawOverlay)) {
             // La base porta la copertura (e quindi decide se la data e' buona);
             // lo strato sopra aggiunge i punti di calore.
             const gibs::Product* base = nullptr;
@@ -669,7 +670,9 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
     // For the 30 m products the first date is very unlikely to have data, so
     // scout with probes from the start; MODIS usually hits on day one, and
     // paying for a probe there would only add a round trip.
-    const bool probeFirst = (pr.nativeM <= 30);
+    // Anche per i prodotti sovrapposti: la base e' densa e sa dire se la data
+    // ha dati, mentre lo strato di punti da solo non lo direbbe mai.
+    const bool probeFirst = (pr.nativeM <= 30) || (pr.overlayOn != nullptr);
     std::string tryDate = date, foundDate;
     std::wstring lastErr = L"nessuna immagine trovata";
     int hardFails = 0;   // consecutive request failures (not empty tiles)
@@ -727,7 +730,8 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
         flashStatus(L"Trovati dati il " + toW(foundDate) + L" — scarico a piena risoluzione ("
                     + std::to_wstring(W) + L"x" + std::to_wstring(H) + L")…");
         img::Image im; std::wstring err;
-        if (attemptFetch(foundDate, /*probe=*/false, im, err) && img::coverage(im) >= MIN_COVERAGE) {
+        const bool sparseOk = (pr.overlayOn && g.rawOverlay);
+        if (attemptFetch(foundDate, /*probe=*/false, im, err) && (sparseOk || img::coverage(im) >= MIN_COVERAGE)) {
             logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": "
                     + toW(layer) + L" " + toW(foundDate) + L" " + std::to_wstring(W) + L"x" + std::to_wstring(H));
             SetWindowTextW(g.dateEdit, toW(foundDate).c_str());
@@ -918,7 +922,7 @@ static void doLayout() {
     MoveWindow(g.stripChk,  x, y, w, 22, TRUE); y += 28;
 
     header(L"CANALE / BANDA");
-    row(g.bandList, 96);
+    row(g.bandList, 78);
     row(g.rgbChk, 24);
     MoveWindow(g.rCombo, x, y, w, 200, TRUE); y += 28;
     MoveWindow(g.gCombo, x, y, w, 200, TRUE); y += 28;
@@ -928,6 +932,7 @@ static void doLayout() {
     row(g.citiesChk, 22);
     row(g.bordersChk, 22);
     row(g.sharpChk, 22);
+    row(g.rawChk, 22);
     row(g.diffChk, 22);
     row(GetDlgItem(g.hwnd, IDC_RESET), 28);
     row(GetDlgItem(g.hwnd, IDC_SAVEPNG), 28);
@@ -1289,6 +1294,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         g.citiesChk  = mkCheck(hwnd, L"Mostra città", IDC_CITIES, true);
         g.bordersChk = mkCheck(hwnd, L"Mostra confini FVG", IDC_BORDERS, true);
         g.sharpChk   = mkCheck(hwnd, L"Nitidezza (unsharp)", IDC_SHARP, true);
+        g.rawChk     = mkCheck(hwnd, L"Solo strato (senza base)", IDC_RAWLAYER, false);
         g.diffChk    = mkCheck(hwnd, L"Diff vs precedente", IDC_DIFF, false);
         mkButton(hwnd, L"Reset vista (fit)", IDC_RESET);
         mkButton(hwnd, L"Salva vista (PNG)", IDC_SAVEPNG);
@@ -1458,6 +1464,29 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nShow) {
         if (GetFileAttributesW(arg.c_str()) != INVALID_FILE_ATTRIBUTES) openFilePath(arg); }
 
     ShowWindow(g.hwnd, nShow); UpdateWindow(g.hwnd);
+
+    // Immagine di apertura: se la cache e' vuota (primo avvio) scarichiamo una
+    // vera immagine MODIS, invece di lasciare il canvas spoglio.
+    //
+    // Terra in true-color, e non a caso. True-color perche' e' l'unica resa in
+    // cui il Friuli si riconosce a colpo d'occhio: verde la pianura, scuro
+    // l'Adriatico, bianche le Alpi. Terra perche' passa verso le 10:30 locali,
+    // prima che il riscaldamento diurno monti i cumuli del pomeriggio: le sue
+    // immagini sono mediamente piu' limpide di quelle di Aqua.
+    //
+    // Va fatto dopo ShowWindow: la finestra e' gia' a schermo e la barra di
+    // stato racconta cosa sta succedendo, invece di sembrare bloccata.
+    if (g.seq.empty()) {
+        flashStatus(L"Primo avvio: scarico un'immagine MODIS recente\u2026");
+        SendMessageW(g.satCombo,  CB_SETCURSEL, 0, 0);   // Terra
+        SendMessageW(g.prodCombo, CB_SETCURSEL, 0, 0);   // True Color
+        fetchGibsCore(0, 0, toU8(defaultDate()), /*quiet=*/true);
+        if (g.seq.empty()) {
+            g.statusText = L"Nessuna connessione o nessun dato: usa \u201cUltima (al volo)\u201d quando sei online.";
+            InvalidateRect(g.hwnd, &g.rcStatus, FALSE);
+        }
+    }
+
     MSG m; while (GetMessageW(&m, nullptr, 0, 0)) { TranslateMessage(&m); DispatchMessageW(&m); }
 
     for (auto& gv : g.seq) if (gv.thumb) delete gv.thumb;
