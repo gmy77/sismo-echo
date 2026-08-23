@@ -83,6 +83,25 @@ MP4** (Media Foundation).
     **`Ctrl+S`** salva la vista corrente in **PNG** (immagine, confini, città e
     barra di scala), come il pulsante *Salva vista (PNG)*.
 
+11. **Nuvole in grigio** — spunta omonima: riconosce la nuvola dal fatto che è
+    **chiara *e* priva di dominante** (terra e mare hanno sempre un colore, il
+    vapore no) e la appiattisce in un grigio uniforme. Non nasconde e non
+    inventa cosa c'è sotto — quel dato non esiste: toglie contrasto alla nuvola
+    perché il terreno ancora visibile risalti, e perché il confine fra "qui
+    osservo" e "qui sono cieco" sia immediato.
+
+12. **Viste multiple** — menu *Vista*, tre modalità che si escludono a vicenda:
+    - **normale** — una immagine, con pan e zoom;
+    - **griglia giorni** — fino a **9 giornate affiancate**, per confrontarle a
+      colpo d'occhio invece che a memoria. Clic su una cella per aprirla;
+    - **fascia a riquadri** — la colonna FVG→equatore, alta il doppio della sua
+      larghezza, tagliata in **4 riquadri affiancati** con la latitudine
+      indicata su ciascuno. Richiede la modalità blocco.
+
+13. **Gestione della cache** — ogni miniatura ha una **×**: un clic rimuove il
+    granulo dalla sequenza **e** cancella il suo PNG dal disco. Toglierlo solo
+    dalla lista sarebbe una bugia: riapparirebbe al riavvio.
+
 Gestione errori esplicita: se un granulo **non copre il FVG** o il file HDF non è
 leggibile, l'app **avvisa** invece di crashare; il download GIBS di un giorno
 senza copertura viene segnalato con un suggerimento (prova un'altra data).
