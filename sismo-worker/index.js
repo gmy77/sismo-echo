@@ -3349,15 +3349,19 @@ export default {
       const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
+      // hls_* sono Landsat/Sentinel-2 armonizzati a 30 m: ~8x piu' nitidi di
+      // MODIS, ma non sono prodotti Terra/Aqua (stesso layer per entrambi).
+      const HLS = { hls_s30:"HLS_S30_Nadir_BRDF_Adjusted_Reflectance",
+                    hls_l30:"HLS_L30_Nadir_BRDF_Adjusted_Reflectance" };
       const LAYERS = {
         terra: { truecolor:"MODIS_Terra_CorrectedReflectance_TrueColor",
                  bands721:"MODIS_Terra_CorrectedReflectance_Bands721",
                  bands367:"MODIS_Terra_CorrectedReflectance_Bands367",
-                 lst:"MODIS_Terra_Land_Surface_Temp_Day" },
+                 lst:"MODIS_Terra_Land_Surface_Temp_Day", ...HLS },
         aqua:  { truecolor:"MODIS_Aqua_CorrectedReflectance_TrueColor",
                  bands721:"MODIS_Aqua_CorrectedReflectance_Bands721",
                  bands367:"MODIS_Aqua_CorrectedReflectance_Bands367",
-                 lst:"MODIS_Aqua_Land_Surface_Temp_Day" },
+                 lst:"MODIS_Aqua_Land_Surface_Temp_Day", ...HLS },
       };
       const sat     = (url.searchParams.get("sat") || "terra").toLowerCase();
       const product = (url.searchParams.get("product") || "truecolor").toLowerCase();
@@ -3368,8 +3372,10 @@ export default {
         date = new Date(Date.now() - 24*3600*1000).toISOString().slice(0,10);
       }
       const bbox = url.searchParams.get("bbox") || "45.5,12.3,46.7,13.9"; // lat,lon (WMS 1.3.0)
-      const w = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("w")||"1024") || 1024));
-      const h = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("h")||"768")  || 768));
+      // Fino a 4096 px: serve ai layer a 30 m, dove chiedere meno pixel
+      // butterebbe via proprio il dettaglio per cui li si usa.
+      const w = Math.max(64, Math.min(4096, parseInt(url.searchParams.get("w")||"1024") || 1024));
+      const h = Math.max(64, Math.min(4096, parseInt(url.searchParams.get("h")||"768")  || 768));
 
       const gibs = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
         + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + layer

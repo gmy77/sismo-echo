@@ -15,9 +15,13 @@ if %errorlevel%==0 goto :mingw
 
 echo.
 echo  Nessun compilatore trovato.
-echo  Installa UNA di queste opzioni:
+echo.
+echo  ==^> Doppio-click su  setup-compiler.bat  : installa MinGW-w64 con winget
+echo      e poi compila da solo. E' la via piu' rapida.
+echo.
+echo  In alternativa, a mano:
 echo    - Visual Studio (Desktop C++)  ->  apri "x64 Native Tools Command Prompt" e rilancia build.bat
-echo    - MSYS2/MinGW-w64              ->  pacman -S mingw-w64-x86_64-gcc, poi rilancia
+echo    - MSYS2/MinGW-w64              ->  pacman -S mingw-w64-ucrt-x86_64-gcc, poi rilancia
 echo.
 pause
 exit /b 1

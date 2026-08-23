@@ -124,4 +124,56 @@ Image difference(const Image& a, const Image& b) {
     return im;
 }
 
+Image sharpen(const Image& src, double amount, int radius) {
+    Image im = src;
+    if (src.empty() || amount <= 0.0 || radius < 1) return im;
+
+    // Box blur, separable, skipping NODATA so swath gaps don't bleed inwards.
+    const int w = src.w, h = src.h;
+    std::vector<float> br((size_t)w * h * 3, 0.f);
+    std::vector<float> tmp((size_t)w * h * 3, 0.f);
+    auto chan = [](uint32_t p, int c) { return (float)((p >> (16 - 8 * c)) & 0xff); };
+
+    for (int y = 0; y < h; ++y) {                       // horizontal pass
+        for (int x = 0; x < w; ++x) {
+            float acc[3] = {0, 0, 0}; int n = 0;
+            for (int d = -radius; d <= radius; ++d) {
+                int sx = x + d; if (sx < 0 || sx >= w) continue;
+                uint32_t p = src.px[(size_t)y * w + sx];
+                if (p == NODATA) continue;
+                for (int c = 0; c < 3; ++c) acc[c] += chan(p, c);
+                ++n;
+            }
+            size_t o = ((size_t)y * w + x) * 3;
+            for (int c = 0; c < 3; ++c) tmp[o + c] = n ? acc[c] / n : 0.f;
+        }
+    }
+    for (int y = 0; y < h; ++y) {                       // vertical pass
+        for (int x = 0; x < w; ++x) {
+            float acc[3] = {0, 0, 0}; int n = 0;
+            for (int d = -radius; d <= radius; ++d) {
+                int sy = y + d; if (sy < 0 || sy >= h) continue;
+                if (src.px[(size_t)sy * w + x] == NODATA) continue;
+                size_t o = ((size_t)sy * w + x) * 3;
+                for (int c = 0; c < 3; ++c) acc[c] += tmp[o + c];
+                ++n;
+            }
+            size_t o = ((size_t)y * w + x) * 3;
+            for (int c = 0; c < 3; ++c) br[o + c] = n ? acc[c] / n : 0.f;
+        }
+    }
+
+    for (size_t i = 0; i < im.px.size(); ++i) {
+        uint32_t p = src.px[i];
+        if (p == NODATA) continue;
+        uint8_t out[3];
+        for (int c = 0; c < 3; ++c) {
+            double v = chan(p, c) + amount * (chan(p, c) - br[i * 3 + c]);
+            out[c] = (uint8_t)std::lround(std::max(0.0, std::min(255.0, v)));
+        }
+        im.px[i] = packARGB(out[0], out[1], out[2]);
+    }
+    return im;
+}
+
 } // namespace img

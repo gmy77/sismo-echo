@@ -71,7 +71,8 @@ static const int STATUS_H = 28;
 enum {
     IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH, IDC_LATEST, IDC_WORKER,
     IDC_BANDLIST, IDC_RGB, IDC_RCOMBO, IDC_GCOMBO, IDC_BCOMBO,
-    IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE
+    IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE,
+    IDC_STRIP, IDC_SHARP
 };
 
 // ----------------------------- theme --------------------------------------
@@ -131,15 +132,16 @@ struct GranuleView {
     img::Image  rimg;
     std::string rSat, rProduct, rTimeText, rSortKey;
     double rLatMin = 0, rLatMax = 0, rLonMin = 0, rLonMax = 0;
+    bool   rStrip = false;   // "blocco" swath (FVG parallel down to the equator)
 
     Bitmap* thumb = nullptr;
 };
 
 struct App {
     HWND hwnd = nullptr;
-    HWND satCombo=nullptr, prodCombo=nullptr, dateEdit=nullptr, workerChk=nullptr;
+    HWND satCombo=nullptr, prodCombo=nullptr, dateEdit=nullptr, workerChk=nullptr, stripChk=nullptr;
     HWND bandList=nullptr, rgbChk=nullptr, rCombo=nullptr, gCombo=nullptr, bCombo=nullptr;
-    HWND citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr;
+    HWND citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr, sharpChk=nullptr;
     ULONG_PTR gdip = 0;
     HBRUSH panelBrush = nullptr, cardBrush = nullptr;
 
@@ -152,6 +154,8 @@ struct App {
     bool showCities = true, showBorders = true;
     bool diffMode = false;                   // show |current - previous|
     bool viaWorker = true;                   // fetch through the Cloudflare cache
+    bool stripMode = false;                  // "blocco": tall swath FVG -> equator
+    bool sharpen   = true;                   // unsharp mask on the shown image
 
     Bitmap* image = nullptr;
     int imgW = 0, imgH = 0;
@@ -228,9 +232,15 @@ static cmap::Ramp rampFor(const modis::Granule& gr, int band) {
     return cmap::Ramp::Gray;
 }
 static img::Image vRender(const GranuleView& v) {
-    if (v.remote) return v.rimg;
-    if (g.rgbMode) return img::renderRGB(v.g, g.rBand, g.gBand, g.bBand);
-    return img::renderSingle(v.g, g.singleBand, rampFor(v.g, g.singleBand));
+    img::Image im;
+    if (v.remote)        im = v.rimg;
+    else if (g.rgbMode)  im = img::renderRGB(v.g, g.rBand, g.gBand, g.bBand);
+    else                 im = img::renderSingle(v.g, g.singleBand, rampFor(v.g, g.singleBand));
+    // GIBS interpolates whenever we ask for more pixels than the sensor
+    // resolves, so a MODIS crop of an area this small always arrives soft.
+    // The unsharp mask restores edge contrast without inventing detail.
+    if (g.sharpen && !im.empty()) im = img::sharpen(im, 0.9, 1);
+    return im;
 }
 
 // ----------------------------- view maths ---------------------------------
@@ -428,55 +438,81 @@ static std::wstring cacheDir() {
     CreateDirectoryW(d.c_str(), nullptr);
     return d;
 }
+// The requested box. Normally the FVG crop; in "blocco" mode a tall swath from
+// the FVG parallel straight down to the equator, on the same overpass — the
+// column of Earth the satellite flew over on its way to us.
+struct Box { double latMin, latMax, lonMin, lonMax; };
+static const double STRIP_LON_HALF = 12.0;   // ~2300 km wide: a full MODIS swath
+
+static Box boxFor(bool strip) {
+    if (!strip)
+        return { modis::FVG_LAT_MIN, modis::FVG_LAT_MAX, modis::FVG_LON_MIN, modis::FVG_LON_MAX };
+    double midLon = (modis::FVG_LON_MIN + modis::FVG_LON_MAX) / 2;
+    double lo = midLon - STRIP_LON_HALF, hi = midLon + STRIP_LON_HALF;
+    if (lo < -180) lo = -180;
+    if (hi >  180) hi =  180;
+    return { 0.0, modis::FVG_LAT_MAX, lo, hi };
+}
+
 // Cache filename encodes everything needed to rebuild the granule metadata:
-//   gibs_<T|A>_<prodIdx>_<YYYY-MM-DD>.png
-static std::wstring cacheName(int satIdx, int prodIdx, const std::string& date) {
+//   gibs_<T|A>_<prodIdx>_<YYYY-MM-DD>.png          (FVG crop)
+//   strip_<T|A>_<prodIdx>_<YYYY-MM-DD>.png         ("blocco" swath)
+static std::wstring cacheName(int satIdx, int prodIdx, const std::string& date, bool strip) {
     wchar_t b[128];
-    swprintf(b, 128, L"gibs_%c_%d_%s.png", satIdx == 1 ? L'A' : L'T', prodIdx, toW(date).c_str());
+    swprintf(b, 128, L"%s_%c_%d_%s.png", strip ? L"strip" : L"gibs",
+             satIdx == 1 ? L'A' : L'T', prodIdx, toW(date).c_str());
     return b;
 }
 
 // Build and add a REMOTE granule from an already-decoded image + metadata.
-static void addRemote(img::Image&& im, int satIdx, int prodIdx, const std::string& date) {
+static void addRemote(img::Image&& im, int satIdx, int prodIdx, const std::string& date, bool strip) {
     int nProd; const gibs::Product* P = gibs::products(nProd);
     const gibs::Product& pr = P[prodIdx < nProd ? prodIdx : 0];
-    GranuleView gv; gv.remote = true; gv.rimg = std::move(im);
-    gv.rSat = (satIdx == 1) ? "Aqua" : "Terra";
+    Box bx = boxFor(strip);
+    GranuleView gv; gv.remote = true; gv.rimg = std::move(im); gv.rStrip = strip;
+    // HLS is Landsat/Sentinel-2, not a Terra/Aqua product — don't mislabel it.
+    gv.rSat = pr.ignoresSat ? "HLS" : ((satIdx == 1) ? "Aqua" : "Terra");
     gv.rProduct = toU8(pr.label);
-    gv.rTimeText = date + " (GIBS)";
-    gv.rLatMin = modis::FVG_LAT_MIN; gv.rLatMax = modis::FVG_LAT_MAX;
-    gv.rLonMin = modis::FVG_LON_MIN; gv.rLonMax = modis::FVG_LON_MAX;
+    gv.rTimeText = date + (strip ? " (blocco)" : " (GIBS)");
+    gv.rLatMin = bx.latMin; gv.rLatMax = bx.latMax;
+    gv.rLonMin = bx.lonMin; gv.rLonMax = bx.lonMax;
     std::string ymd = date; ymd.erase(std::remove(ymd.begin(), ymd.end(), '-'), ymd.end());
-    gv.rSortKey = ymd + "T" + (satIdx == 1 ? "A" : "T") + std::to_string(prodIdx);
-    // Skip if an identical granule (same key) is already loaded.
-    for (auto& e : g.seq) if (vSortKey(e) == gv.rSortKey) return;
+    gv.rSortKey = ymd + "T" + (satIdx == 1 ? "A" : "T") + std::to_string(prodIdx) + (strip ? "S" : "F");
+    // Already loaded? Just bring it to the front instead of duplicating it.
+    for (int i = 0; i < (int)g.seq.size(); ++i)
+        if (vSortKey(g.seq[i]) == gv.rSortKey) { selectIndex(i); return; }
     addAndSelect(std::move(gv), gv.rSortKey);
 }
 
 // Load every cached PNG next to the exe into the sequence (persistent library).
 static void loadCache() {
     std::wstring dir = cacheDir();
-    WIN32_FIND_DATAW fd; HANDLE h = FindFirstFileW((dir + L"\\gibs_*.png").c_str(), &fd);
-    if (h == INVALID_HANDLE_VALUE) return;
     int loaded = 0;
-    do {
-        std::wstring fn = fd.cFileName;                       // gibs_T_0_2024-08-15.png
-        // Parse: gibs_ <S> _ <prod> _ <date>.png
-        if (fn.size() < 20) continue;
-        wchar_t sc = fn[5];
-        int satIdx = (sc == L'A') ? 1 : 0;
-        size_t p2 = fn.find(L'_', 7);
-        if (p2 == std::wstring::npos) continue;
-        int prodIdx = _wtoi(fn.substr(7, p2 - 7).c_str());
-        std::wstring rest = fn.substr(p2 + 1);               // YYYY-MM-DD.png
-        std::wstring date = rest.substr(0, rest.size() >= 4 ? rest.size() - 4 : rest.size());
-        img::Image im; std::wstring err;
-        if (gibs::decodeFile(dir + L"\\" + fn, im, &err) && !im.empty()) {
-            addRemote(std::move(im), satIdx, prodIdx, toU8(date));
-            ++loaded;
-        }
-    } while (FindNextFileW(h, &fd));
-    FindClose(h);
+    // Two families of cached files: the FVG crop and the "blocco" swath.
+    for (bool strip : { false, true }) {
+        std::wstring prefix = strip ? L"strip_" : L"gibs_";
+        WIN32_FIND_DATAW fd; HANDLE h = FindFirstFileW((dir + L"\\" + prefix + L"*.png").c_str(), &fd);
+        if (h == INVALID_HANDLE_VALUE) continue;
+        do {
+            std::wstring fn = fd.cFileName;              // <prefix><S>_<prod>_<date>.png
+            std::wstring rest = fn.substr(prefix.size());  // T_0_2026-08-22.png
+            if (rest.size() < 15) continue;
+            int satIdx = (rest[0] == L'A') ? 1 : 0;
+            size_t p1 = rest.find(L'_');                 // after the satellite letter
+            if (p1 == std::wstring::npos) continue;
+            size_t p2 = rest.find(L'_', p1 + 1);         // after the product index
+            if (p2 == std::wstring::npos) continue;
+            int prodIdx = _wtoi(rest.substr(p1 + 1, p2 - p1 - 1).c_str());
+            std::wstring tail = rest.substr(p2 + 1);     // YYYY-MM-DD.png
+            std::wstring date = tail.substr(0, tail.size() >= 4 ? tail.size() - 4 : tail.size());
+            img::Image im; std::wstring err;
+            if (gibs::decodeFile(dir + L"\\" + fn, im, &err) && !im.empty()) {
+                addRemote(std::move(im), satIdx, prodIdx, toU8(date), strip);
+                ++loaded;
+            }
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
     if (loaded) logLine(L"CACHE: caricate " + std::to_wstring(loaded) + L" immagini reali");
 }
 
@@ -490,54 +526,84 @@ static std::wstring dateMinusDays(int days) {
 
 // Core: fetch one granule for (satIdx, prodIdx, date). Uses the disk cache, then
 // the Cloudflare Worker (if enabled) or NASA GIBS directly. Reports errors.
-static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date) {
+// `quiet` suppresses the error popup: the automatic fetches (switching product
+// or satellite) must never interrupt with a dialog, they just report in the
+// status bar. The explicit buttons stay loud.
+static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool quiet = false) {
     int nProd; const gibs::Product* P = gibs::products(nProd);
     const gibs::Product& pr = P[prodIdx < nProd ? prodIdx : 0];
     std::string layer = (satIdx == 1) ? pr.aquaLayer : pr.terraLayer;
+    const bool strip = g.stripMode;
 
     // Disk cache hit? Load, no network.
-    std::wstring cachePath = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, date);
+    std::wstring cachePath = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, date, strip);
     if (GetFileAttributesW(cachePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
         img::Image cim; std::wstring cerr;
         if (gibs::decodeFile(cachePath, cim, &cerr) && !cim.empty()) {
             logLine(L"cache-hit: " + cachePath);
-            addRemote(std::move(cim), satIdx, prodIdx, date);
+            addRemote(std::move(cim), satIdx, prodIdx, date, strip);
             return;
         }
     }
 
-    const double LATMIN = modis::FVG_LAT_MIN, LATMAX = modis::FVG_LAT_MAX;
-    const double LONMIN = modis::FVG_LON_MIN, LONMAX = modis::FVG_LON_MAX;
-    int W = 1024, H = (int)std::lround(1024.0 * (LATMAX - LATMIN) / (LONMAX - LONMIN));
+    Box bx = boxFor(strip);
+    // Ask for as many pixels as the product actually resolves — no more (that
+    // would only interpolate), no fewer (that would throw detail away).
+    int W = gibs::requestWidthFor(pr, bx.lonMax - bx.lonMin, (bx.latMin + bx.latMax) / 2);
+    int H = (int)std::lround(W * (bx.latMax - bx.latMin) / (bx.lonMax - bx.lonMin));
+    if (H < 64) H = 64;
+    if (H > 4096) { H = 4096; W = (int)std::lround(H * (bx.lonMax - bx.lonMin) / (bx.latMax - bx.latMin)); }
 
     HCURSOR prev = SetCursor(LoadCursor(nullptr, IDC_WAIT));
     img::Image im; std::wstring err; bool ok;
     if (g.viaWorker) {
         ok = gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
-                pr.id, date, LATMIN, LATMAX, LONMIN, LONMAX, W, H, im, &err, cachePath);
+                pr.id, date, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
     } else {
-        ok = gibs::download(layer, date, LATMIN, LATMAX, LONMIN, LONMAX, W, H, im, &err, cachePath);
+        ok = gibs::download(layer, date, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
     }
     SetCursor(prev);
 
     if (!ok || im.empty()) {
         logLine(L"FETCH FAIL: " + toW(layer) + L" " + toW(date) + L" — " + err);
-        MessageBoxW(g.hwnd, (L"Download non riuscito:\n" + err +
-            L"\n\nSuggerimento: prova una data diversa (alcuni giorni non hanno "
-            L"copertura MODIS sul FVG), o controlla la connessione."
-            + (g.viaWorker ? L"\n(Sorgente: Cloudflare Worker)" : L"\n(Sorgente: NASA GIBS diretto)")).c_str(),
-            APP_TITLE, MB_OK | MB_ICONWARNING);
+        std::wstring hint = pr.nativeM <= 30
+            ? L"\n\nI layer a 30 m (Sentinel-2 / Landsat) passano ogni 2-3 giorni: "
+              L"se questa data non ha un passaggio, prova un giorno vicino."
+            : L"\n\nSuggerimento: prova una data diversa (alcuni giorni non hanno "
+              L"copertura MODIS sul FVG), o controlla la connessione.";
+        g.statusText = L"Download non riuscito — " + err;
+        InvalidateRect(g.hwnd, &g.rcStatus, FALSE);
+        if (!quiet)
+            MessageBoxW(g.hwnd, (L"Download non riuscito:\n" + err + hint
+                + (g.viaWorker ? L"\n(Sorgente: Cloudflare Worker)" : L"\n(Sorgente: NASA GIBS diretto)")).c_str(),
+                APP_TITLE, MB_OK | MB_ICONWARNING);
         return;
     }
-    logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": " + toW(layer) + L" " + toW(date));
-    addRemote(std::move(im), satIdx, prodIdx, date);
+    logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": "
+            + toW(layer) + L" " + toW(date) + L" " + std::to_wstring(W) + L"x" + std::to_wstring(H));
+    addRemote(std::move(im), satIdx, prodIdx, date, strip);
+}
+
+// Current UI selection, shared by every fetch entry point.
+static void currentSelection(int& satIdx, int& prodIdx) {
+    satIdx  = (int)SendMessageW(g.satCombo,  CB_GETCURSEL, 0, 0);
+    prodIdx = (int)SendMessageW(g.prodCombo, CB_GETCURSEL, 0, 0);
+    if (satIdx  < 0) satIdx  = 0;
+    if (prodIdx < 0) prodIdx = 0;
+}
+
+// Switching product / satellite / blocco applies immediately: show the granule
+// if we already have it, otherwise fetch it silently.
+static void applySelection() {
+    int satIdx, prodIdx; currentSelection(satIdx, prodIdx);
+    wchar_t dbuf[32] = L""; GetWindowTextW(g.dateEdit, dbuf, 32);
+    std::string date = toU8(dbuf);
+    if (date.size() != 10) date = toU8(defaultDate());
+    fetchGibsCore(satIdx, prodIdx, date, /*quiet=*/true);
 }
 
 static void doFetchGibs() {
-    int satIdx  = (int)SendMessageW(g.satCombo, CB_GETCURSEL, 0, 0);
-    int prodIdx = (int)SendMessageW(g.prodCombo, CB_GETCURSEL, 0, 0);
-    if (satIdx < 0) satIdx = 0;
-    if (prodIdx < 0) prodIdx = 0;
+    int satIdx, prodIdx; currentSelection(satIdx, prodIdx);
     wchar_t dbuf[32] = L""; GetWindowTextW(g.dateEdit, dbuf, 32);
     std::string date = toU8(dbuf);
     if (date.size() != 10) { MessageBoxW(g.hwnd, L"Data non valida. Usa il formato AAAA-MM-GG.", APP_TITLE, MB_OK | MB_ICONWARNING); return; }
@@ -547,10 +613,7 @@ static void doFetchGibs() {
 // "Al volo": grab the most recent likely-available day (yesterday UTC) for the
 // selected satellite/product, straight from the Cloudflare cache.
 static void doFetchLatest() {
-    int satIdx  = (int)SendMessageW(g.satCombo, CB_GETCURSEL, 0, 0);
-    int prodIdx = (int)SendMessageW(g.prodCombo, CB_GETCURSEL, 0, 0);
-    if (satIdx < 0) satIdx = 0;
-    if (prodIdx < 0) prodIdx = 0;
+    int satIdx, prodIdx; currentSelection(satIdx, prodIdx);
     std::string date = toU8(dateMinusDays(1));
     SetWindowTextW(g.dateEdit, toW(date).c_str());
     fetchGibsCore(satIdx, prodIdx, date);
@@ -612,10 +675,11 @@ static void doLayout() {
     MoveWindow(g.dateEdit, x, y, 110, 26, TRUE);
     MoveWindow(GetDlgItem(g.hwnd, IDC_FETCH), x + 118, y, w - 118, 28, TRUE); y += 34;
     MoveWindow(GetDlgItem(g.hwnd, IDC_LATEST), x, y, w, 28, TRUE); y += 32;
-    MoveWindow(g.workerChk, x, y, w, 22, TRUE); y += 30;
+    MoveWindow(g.workerChk, x, y, w, 22, TRUE); y += 24;
+    MoveWindow(g.stripChk,  x, y, w, 22, TRUE); y += 30;
 
     header(L"CANALE / BANDA");
-    row(g.bandList, 122);
+    row(g.bandList, 108);
     row(g.rgbChk, 24);
     MoveWindow(g.rCombo, x, y, w, 200, TRUE); y += 30;
     MoveWindow(g.gCombo, x, y, w, 200, TRUE); y += 30;
@@ -624,6 +688,7 @@ static void doLayout() {
     header(L"OVERLAY / CONFRONTO");
     row(g.citiesChk, 22);
     row(g.bordersChk, 22);
+    row(g.sharpChk, 22);
     row(g.diffChk, 22);
     row(GetDlgItem(g.hwnd, IDC_RESET), 28);
     y += 6;
@@ -662,7 +727,11 @@ static void paintCanvas(Graphics& gfx) {
     }
     const GranuleView& v = g.seq[g.cur];
     double dw = g.imgW * g.scale, dh = g.imgH * g.scale;
-    gfx.SetInterpolationMode(g.scale >= 1.0 ? InterpolationModeNearestNeighbor : InterpolationModeHighQualityBicubic);
+    // Nearest-neighbour straight above 1x turns a soft source into visible
+    // blocks. Stay smooth through the useful zoom range and only expose raw
+    // pixels far in, where seeing them is the point.
+    gfx.SetInterpolationMode(g.scale >= 4.0 ? InterpolationModeNearestNeighbor
+                                            : InterpolationModeHighQualityBicubic);
     gfx.SetPixelOffsetMode(PixelOffsetModeHalf);
     RectF dst((REAL)g.originX, (REAL)g.originY, (REAL)dw, (REAL)dh);
     gfx.DrawImage(g.image, dst, 0, 0, (REAL)g.imgW, (REAL)g.imgH, UnitPixel);
@@ -680,16 +749,21 @@ static void paintCanvas(Graphics& gfx) {
         drawPoly(FVG_REGION, FVG_REGION_N, Color(235, 255, 255, 255), 2.0f);
     }
     if (g.showCities) {
+        // A 1px halo disappears over bright cloud, which is most of a MODIS
+        // scene. A solid dark plate behind the name keeps it readable over
+        // anything the satellite happens to be looking at.
         FontFamily ff(L"Segoe UI"); Font font(&ff, 12, FontStyleBold, UnitPixel);
-        SolidBrush dot(Color(255, 255, 208, 64)), ring(Color(220, 15, 15, 15)), label(Color(255, 255, 255, 255));
+        SolidBrush dot(Color(255, 255, 208, 64)), ring(Color(230, 10, 12, 16));
+        SolidBrush plate(Color(190, 10, 12, 16)), label(Color(255, 255, 255, 255));
         for (int i = 0; i < FVG_CITIES_N; ++i) {
             double X, Y; geoToCanvas(v, FVG_CITIES[i].lon, FVG_CITIES[i].lat, X, Y);
             gfx.FillEllipse(&ring, (REAL)X - 5, (REAL)Y - 5, (REAL)10, (REAL)10);
-            gfx.FillEllipse(&dot, (REAL)X - 3, (REAL)Y - 3, (REAL)6, (REAL)6);
-            std::wstring nm = toW(FVG_CITIES[i].name); PointF tp((REAL)X + 7, (REAL)Y - 8);
-            for (int dx = -1; dx <= 1; ++dx) for (int dy = -1; dy <= 1; ++dy)
-                gfx.DrawString(nm.c_str(), -1, &font, PointF(tp.X + dx, tp.Y + dy), &ring);
-            gfx.DrawString(nm.c_str(), -1, &font, tp, &label);
+            gfx.FillEllipse(&dot,  (REAL)X - 3, (REAL)Y - 3, (REAL)6,  (REAL)6);
+            std::wstring nm = toW(FVG_CITIES[i].name);
+            RectF meas; gfx.MeasureString(nm.c_str(), -1, &font, PointF(0, 0), &meas);
+            REAL tx = (REAL)X + 8, ty = (REAL)Y - 9;
+            fillRoundRect(gfx, plate, tx - 4, ty - 2, meas.Width + 8, meas.Height + 3, 7);
+            gfx.DrawString(nm.c_str(), -1, &font, PointF(tx, ty), &label);
         }
     }
     gfx.ResetClip();
@@ -808,6 +882,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         mkButton(hwnd, L"Scarica reale", IDC_FETCH);
         mkButton(hwnd, L"⤓ Ultima (al volo)", IDC_LATEST);
         g.workerChk = mkCheck(hwnd, L"Via Cloudflare (cache edge)", IDC_WORKER, true);
+        g.stripChk  = mkCheck(hwnd, L"Blocco: FVG → equatore", IDC_STRIP, false);
 
         g.bandList = CreateWindowExW(0, L"LISTBOX", nullptr,
             WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | LBS_NOTIFY, 0,0,10,10, hwnd, (HMENU)IDC_BANDLIST, nullptr, nullptr);
@@ -815,6 +890,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         g.rCombo = mkCombo(hwnd, IDC_RCOMBO); g.gCombo = mkCombo(hwnd, IDC_GCOMBO); g.bCombo = mkCombo(hwnd, IDC_BCOMBO);
         g.citiesChk  = mkCheck(hwnd, L"Mostra città", IDC_CITIES, true);
         g.bordersChk = mkCheck(hwnd, L"Mostra confini FVG", IDC_BORDERS, true);
+        g.sharpChk   = mkCheck(hwnd, L"Nitidezza (unsharp)", IDC_SHARP, true);
         g.diffChk    = mkCheck(hwnd, L"Diff vs precedente", IDC_DIFF, false);
         mkButton(hwnd, L"Reset vista (fit)", IDC_RESET);
         g.fpsEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"6",
@@ -836,6 +912,17 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case IDC_FETCH: doFetchGibs(); return 0;
         case IDC_LATEST: doFetchLatest(); return 0;
         case IDC_WORKER: g.viaWorker = SendMessageW(g.workerChk, BM_GETCHECK, 0, 0) == BST_CHECKED; return 0;
+        case IDC_STRIP:
+            g.stripMode = SendMessageW(g.stripChk, BM_GETCHECK, 0, 0) == BST_CHECKED;
+            applySelection(); return 0;
+        case IDC_SHARP:
+            g.sharpen = SendMessageW(g.sharpChk, BM_GETCHECK, 0, 0) == BST_CHECKED;
+            rebuildImage(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
+        case IDC_SAT: case IDC_PRODUCT:
+            // Point of the dashboard: pick a product or a satellite and it is
+            // simply there — cached ones instantly, the rest fetched quietly.
+            if (code == CBN_SELCHANGE) applySelection();
+            return 0;
         case IDC_RESET: fitView(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
         case IDC_MOVIE: doTimelapse(); return 0;
         case IDC_RGB:
@@ -851,8 +938,18 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case IDC_BANDLIST:
             if (code == LBN_SELCHANGE && g.cur >= 0 && vHasBands(g.seq[g.cur])) {
                 int i = (int)SendMessageW(g.bandList, LB_GETCURSEL, 0, 0);
-                if (i >= 0) { g.singleBand = (int)SendMessageW(g.bandList, LB_GETITEMDATA, i, 0);
-                    if (!g.rgbMode) { rebuildImage(); fitView(); } buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); }
+                if (i >= 0) {
+                    g.singleBand = (int)SendMessageW(g.bandList, LB_GETITEMDATA, i, 0);
+                    // Clicking a band means "show me this band": leave the RGB
+                    // composite rather than selecting into a view that ignores it.
+                    if (g.rgbMode) {
+                        g.rgbMode = false;
+                        SendMessageW(g.rgbChk, BM_SETCHECK, BST_UNCHECKED, 0);
+                        EnableWindow(g.rCombo, FALSE); EnableWindow(g.gCombo, FALSE); EnableWindow(g.bCombo, FALSE);
+                    }
+                    rebuildImage(); fitView(); buildStatus();
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
             }
             return 0;
         case IDC_RCOMBO: case IDC_GCOMBO: case IDC_BCOMBO:

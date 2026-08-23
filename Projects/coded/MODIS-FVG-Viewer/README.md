@@ -34,6 +34,13 @@ Adriatico, lo "swath gap" no-data a sinistra, confini e città FVG.*
    con tre menu. Il colore usa la curva di enhancement **NASA Rapid Response** su
    **riflettanza assoluta**, così l'immagine è naturale e **ben calibrata** e le
    immagini di date diverse sono confrontabili. Default = naturale (1-4-3).
+   **Tutto si applica da solo**: clicchi una banda e compare (uscendo
+   dall'RGB), cambi prodotto o satellite e l'immagine si aggiorna subito —
+   istantanea se è già in cache, scaricata in silenzio altrimenti.
+
+3b. **Nitidezza** — spunta **"Nitidezza (unsharp)"** (attiva di default): una
+   maschera di contrasto che restituisce il dettaglio di bordo perso
+   nell'interpolazione. Per immagini davvero fini, vedi *Risoluzione* più sotto.
 
 4. **Interazione mappa** — **pan** con trascinamento del mouse, **zoom** con la
    rotellina **centrato sul cursore**, **Reset vista** (fit-to-window). Overlay
@@ -42,6 +49,13 @@ Adriatico, lo "swath gap" no-data a sinistra, confini e città FVG.*
 
 5. **Confronto differenze** — spunta **"Diff vs precedente"** per vedere in canvas
    il `|corrente − precedente|` (amplificato) tra due granuli della sequenza.
+
+5b. **Modalità blocco** — spunta **"Blocco: FVG → equatore"** per chiedere, sullo
+   stesso passaggio che sorvola il FVG, una **fascia verticale** dal parallelo
+   del FVG giù fino all'**equatore** (≈24° di longitudine, quanto uno swath
+   MODIS). Vale per Terra e Aqua; i confini FVG restano disegnati, così si vede
+   a colpo d'occhio dove siamo nella colonna. Le immagini "blocco" hanno una loro
+   cache separata (`strip_*.png`).
 
 6. **Sequenza + timelapse** — filmstrip in basso con le miniature ordinate per
    data/ora, cliccabili. **"Genera filmato"** monta la sequenza in **MP4 H.264**
@@ -63,6 +77,12 @@ senza copertura viene segnalato con un suggerimento (prova un'altra data).
 ## Compilare (Windows)
 
 Ti serve **uno** tra Visual Studio (Desktop C++) o MinGW-w64.
+
+### Non hai nessun compilatore?
+Doppio-click su **`setup-compiler.bat`**: installa **MinGW-w64** via `winget`
+(~500 MB, contro i ~6 GB dei Build Tools di Visual Studio; non tocca nulla di
+quello che hai già) e poi compila da solo. Se dopo l'installazione dice che
+`g++` non è nel PATH, chiudi la finestra, aprine una nuova e lancia `build.bat`.
 
 ### Modo più facile
 Doppio-click su **`build.bat`**. Rileva il compilatore, crea
@@ -96,12 +116,33 @@ Il pannello **SORGENTE → Scarica reale** interroga il servizio WMS di
 [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/) (Global Imagery Browse
 Services). I prodotti offerti:
 
-| Prodotto (UI)                     | Layer GIBS (Terra / Aqua) |
-|-----------------------------------|---------------------------|
-| True Color (riflettanza reale)    | `MODIS_{Terra,Aqua}_CorrectedReflectance_TrueColor` |
-| Bande 7-2-1 (naturale-migliorato) | `MODIS_{Terra,Aqua}_CorrectedReflectance_Bands721` |
-| Bande 3-6-7 (neve / ghiaccio)     | `MODIS_{Terra,Aqua}_CorrectedReflectance_Bands367` |
-| Temp. superficie giorno (LST)     | `MODIS_{Terra,Aqua}_Land_Surface_Temp_Day` |
+| Prodotto (UI)                     | Layer GIBS (Terra / Aqua) | Risoluzione |
+|-----------------------------------|---------------------------|-------------|
+| True Color (riflettanza reale)    | `MODIS_{Terra,Aqua}_CorrectedReflectance_TrueColor` | 250 m |
+| Bande 7-2-1 (naturale-migliorato) | `MODIS_{Terra,Aqua}_CorrectedReflectance_Bands721` | 250 m |
+| Bande 3-6-7 (neve / ghiaccio)     | `MODIS_{Terra,Aqua}_CorrectedReflectance_Bands367` | 250 m |
+| Temp. superficie giorno (LST)     | `MODIS_{Terra,Aqua}_Land_Surface_Temp_Day` | 1 km |
+| ★ Sentinel-2 30 m (nitido)        | `HLS_S30_Nadir_BRDF_Adjusted_Reflectance` | **30 m** |
+| ★ Landsat 30 m (nitido)           | `HLS_L30_Nadir_BRDF_Adjusted_Reflectance` | **30 m** |
+
+### Risoluzione: perché MODIS sembra sfocato, e come averlo nitido
+
+Non è un difetto del viewer: è fisica del sensore. MODIS vede **250 m per pixel**,
+e il FVG è largo ~124 km — cioè **~500 pixel MODIS in tutto**. Chiedere
+un'immagine da 1024 px non aggiunge informazione, la **interpola** soltanto: da
+qui l'aspetto morbido.
+
+Il viewer fa due cose:
+
+1. **Chiede esattamente i pixel che il sensore risolve** (`requestWidthFor()` in
+   `gibs.h`) — né meno (butterebbe dettaglio) né di più (interpolerebbe e basta) —
+   e applica la **maschera di contrasto sui pixel nativi**, l'ordine corretto:
+   prima nitidezza, poi ingrandimento a schermo.
+2. Offre i prodotti **★ a 30 m** (HLS: Landsat + Sentinel-2 armonizzati). Sullo
+   stesso riquadro FVG sono **~4100 px**: ~8× più fini, davvero nitidi.
+   Il prezzo è la frequenza — MODIS passa **2 volte al giorno**, HLS ogni
+   **2-3 giorni** — quindi per il timelapse quotidiano resta migliore MODIS, e
+   per guardare il territorio nel dettaglio si usa HLS.
 
 Il download usa **WinHTTP**; l'immagine (PNG) è decodificata da **GDI+**. Non
 serve GDAL né HDF: GIBS restituisce già il prodotto proiettato in EPSG:4326 sul

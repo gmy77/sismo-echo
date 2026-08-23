@@ -60,6 +60,28 @@ int main(int argc, char** argv) {
     img::Image none = img::renderSingle(g, 99, cmap::Ramp::Gray);
     check(none.empty(), "banda inesistente -> immagine vuota");
 
+    // Unsharp mask: same geometry, amount 0 is a no-op, NODATA survives, and a
+    // real amount raises local contrast rather than just shifting brightness.
+    img::Image sh = img::sharpen(nat, 0.9, 1);
+    check(sh.w == nat.w && sh.h == nat.h, "sharpen conserva le dimensioni");
+    img::Image noop = img::sharpen(nat, 0.0, 1);
+    check(noop.px == nat.px, "sharpen(amount=0) non altera l'immagine");
+    bool nodataKept = true;
+    for (size_t i = 0; i < nat.px.size(); ++i)
+        if ((nat.px[i] == img::NODATA) != (sh.px[i] == img::NODATA)) { nodataKept = false; break; }
+    check(nodataKept, "sharpen preserva esattamente i pixel no-data");
+    auto spread = [](const img::Image& im) {           // mean |neighbour delta|
+        double acc = 0; size_t n = 0;
+        for (int y = 0; y < im.h; ++y)
+            for (int x = 1; x < im.w; ++x) {
+                uint32_t a = im.at(x - 1, y), b = im.at(x, y);
+                if (a == img::NODATA || b == img::NODATA) continue;
+                acc += std::abs((int)(a & 0xff) - (int)(b & 0xff)); ++n;
+            }
+        return n ? acc / n : 0.0;
+    };
+    check(spread(sh) > spread(nat), "sharpen aumenta il contrasto di bordo");
+
     std::printf(fails ? "\nRESULT: %d FAIL\n" : "\nRESULT: all tests passed\n", fails);
     return fails ? 1 : 0;
 }

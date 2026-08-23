@@ -46,4 +46,11 @@ Image renderTrueColor(const modis::Granule& g);
 // Used to "see the differences" between two cached granules.
 Image difference(const Image& a, const Image& b);
 
+// Unsharp mask: subtract a blurred copy to restore the edge contrast that
+// resampling and the sensor's point-spread function take away. MODIS imagery
+// served above its native ground resolution is interpolated, so it arrives
+// soft; this puts the perceived detail back without inventing any.
+// `amount` 0 = untouched, ~0.6 = gentle, ~1.5 = strong. NODATA is preserved.
+Image sharpen(const Image& src, double amount = 0.9, int radius = 1);
+
 } // namespace img

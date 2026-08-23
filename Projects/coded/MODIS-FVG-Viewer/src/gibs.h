@@ -22,28 +22,54 @@ struct Product {
     const wchar_t* label;
     const char*    terraLayer;
     const char*    aquaLayer;
-    const char*    id;          // worker product id: truecolor/bands721/bands367/lst
+    const char*    id;          // worker product id: truecolor/bands721/…/hls_s30
     bool           temperature; // true => already a colorized LST layer
+    int            nativeM;     // native ground resolution, metres per pixel
+    bool           ignoresSat;  // true => not a Terra/Aqua product (HLS)
 };
 
 // The products offered in the UI.
+//
+// `nativeM` drives how many pixels we ask GIBS for: requesting more pixels than
+// the sensor resolves only interpolates, which is exactly what makes MODIS look
+// soft over an area as small as the FVG (~124 km wide = ~500 MODIS pixels).
+// The HLS entries are Landsat/Sentinel-2 harmonised surface reflectance at 30 m
+// — ~8x finer, so the same box resolves to ~4100 px and is genuinely sharp.
+// The trade-off is revisit time: MODIS is twice daily, HLS every 2-3 days.
 inline const Product* products(int& count) {
     static const Product P[] = {
         { L"True Color (riflettanza reale)",
           "MODIS_Terra_CorrectedReflectance_TrueColor",
-          "MODIS_Aqua_CorrectedReflectance_TrueColor", "truecolor", false },
+          "MODIS_Aqua_CorrectedReflectance_TrueColor", "truecolor", false, 250, false },
         { L"Bande 7-2-1 (naturale-migliorato)",
           "MODIS_Terra_CorrectedReflectance_Bands721",
-          "MODIS_Aqua_CorrectedReflectance_Bands721", "bands721", false },
+          "MODIS_Aqua_CorrectedReflectance_Bands721", "bands721", false, 250, false },
         { L"Bande 3-6-7 (neve / ghiaccio)",
           "MODIS_Terra_CorrectedReflectance_Bands367",
-          "MODIS_Aqua_CorrectedReflectance_Bands367", "bands367", false },
+          "MODIS_Aqua_CorrectedReflectance_Bands367", "bands367", false, 250, false },
         { L"Temp. superficie giorno (LST)",
           "MODIS_Terra_Land_Surface_Temp_Day",
-          "MODIS_Aqua_Land_Surface_Temp_Day", "lst", true },
+          "MODIS_Aqua_Land_Surface_Temp_Day", "lst", true, 1000, false },
+        { L"★ Sentinel-2 30 m (nitido)",
+          "HLS_S30_Nadir_BRDF_Adjusted_Reflectance",
+          "HLS_S30_Nadir_BRDF_Adjusted_Reflectance", "hls_s30", false, 30, true },
+        { L"★ Landsat 30 m (nitido)",
+          "HLS_L30_Nadir_BRDF_Adjusted_Reflectance",
+          "HLS_L30_Nadir_BRDF_Adjusted_Reflectance", "hls_l30", false, 30, true },
     };
     count = (int)(sizeof P / sizeof P[0]);
     return P;
+}
+
+// How many pixels wide to request so the image is resolved at (but not beyond)
+// the product's native ground resolution, capped to what GIBS/the Worker allow.
+inline int requestWidthFor(const Product& p, double lonSpanDeg, double midLat) {
+    const double kmPerDeg = 111.32 * (midLat > 0 ? 0.7 : 1.0); // cos(~46 deg)
+    double km = lonSpanDeg * kmPerDeg;
+    int px = (int)(km * 1000.0 / (p.nativeM > 0 ? p.nativeM : 250));
+    if (px < 256)  px = 256;
+    if (px > 4096) px = 4096;
+    return px;
 }
 
 // Download and decode a GIBS WMS GetMap into `out` (top-down 0xAARRGGBB).
