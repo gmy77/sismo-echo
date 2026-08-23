@@ -134,9 +134,6 @@ del /q src\app.res.o 2>nul
 goto :done
 
 :done
-copy /y test\sample_MODIS_FVG.mgr      sample_MODIS_FVG.mgr      >nul 2>nul
-copy /y test\sample_MODIS_FVG_1200.mgr sample_MODIS_FVG_1200.mgr >nul 2>nul
-copy /y test\sample_MODIS_FVG_1345.mgr sample_MODIS_FVG_1345.mgr >nul 2>nul
 REM L'eseguibile e' davvero un eseguibile? Il linker puo' riuscire e lasciare
 REM comunque un file rotto: e' bastata una riga di echo con un '>' non protetto
 REM per sovrascriverlo con 11 byte di testo. Meglio accorgersene qui che
@@ -166,6 +163,6 @@ REM batch legge '>' come redirezione e scrive "Fatto!  -" DENTRO
 REM MODIS-FVG-Viewer.exe, distruggendo l'eseguibile appena compilato
 REM e lasciandolo di 11 byte.
 echo  Fatto!  -^> MODIS-FVG-Viewer.exe  ^(!EXESZ! byte^)
-echo  (i 3 granuli di esempio .mgr sono accanto all'eseguibile)
+echo  I granuli di prova restano in test\ e si aprono con "Apri file".
 echo.
 pause

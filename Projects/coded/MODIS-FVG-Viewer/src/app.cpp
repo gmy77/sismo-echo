@@ -66,6 +66,8 @@ using namespace Gdiplus;
 
 // ----------------------------- constants ----------------------------------
 static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer";
+static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG";
+static const wchar_t* APP_CREDIT_2 = L"Costruito da PIGNOLO GIMMY con Claude Code (Anthropic)";
 static const int PANEL_W  = 304;
 static const int FILM_H   = 116;
 static const int STATUS_H = 28;
@@ -74,7 +76,7 @@ enum {
     IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH, IDC_LATEST, IDC_WORKER,
     IDC_BANDLIST, IDC_RGB, IDC_RCOMBO, IDC_GCOMBO, IDC_BCOMBO,
     IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE,
-    IDC_STRIP, IDC_SHARP
+    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG
 };
 
 // ----------------------------- theme --------------------------------------
@@ -166,6 +168,7 @@ struct App {
 
     RECT rcCanvas{}, rcPanel{}, rcFilm{}, rcStatus{};
     std::vector<std::pair<std::wstring,int>> sections; // (label, y) for headings
+    int panelContentBottom = 0;                        // dove finiscono i controlli
 
     bool dragging = false;
     int  lastX = 0, lastY = 0;
@@ -334,7 +337,10 @@ static void refreshBandUI() {
 }
 
 static void buildStatus(int mx = -1, int my = -1) {
-    if (g.cur < 0) { g.statusText = L"Nessun granulo — apri un .mgr o scarica da NASA GIBS."; return; }
+    if (g.cur < 0) {
+        g.statusText = L"Pronto  \u00b7  \u2190 \u2192 scorre la sequenza  \u00b7  F adatta  \u00b7  +/- zoom  \u00b7  Ctrl+S salva la vista";
+        return;
+    }
     const GranuleView& v = g.seq[g.cur];
     std::wstring where = L"lat —, lon —";
     if (mx >= 0) {
@@ -764,6 +770,72 @@ static void doTimelapse() {
         MessageBoxW(g.hwnd, (L"Errore nella creazione del filmato:\n" + err).c_str(), APP_TITLE, MB_OK | MB_ICONERROR); }
 }
 
+// ----------------------------- export -------------------------------------
+// GDI+ needs the encoder's CLSID by MIME type; there is no shorter way.
+static bool encoderClsid(const wchar_t* mime, CLSID* out) {
+    UINT num = 0, size = 0;
+    GetImageEncodersSize(&num, &size);
+    if (!size) return false;
+    std::vector<BYTE> buf(size);
+    ImageCodecInfo* info = (ImageCodecInfo*)buf.data();
+    GetImageEncoders(num, size, info);
+    for (UINT i = 0; i < num; ++i)
+        if (wcscmp(info[i].MimeType, mime) == 0) { *out = info[i].Clsid; return true; }
+    return false;
+}
+
+static void paintCanvas(Graphics& gfx);   // defined below
+
+// Save exactly what the canvas is showing - image, overlays, scale bar - so a
+// view worth keeping can leave the app without a screenshot tool.
+static void doSavePng() {
+    if (!g.image) {
+        MessageBoxW(g.hwnd, L"Non c'e' nessuna immagine da salvare.", APP_TITLE, MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+    int w = g.rcCanvas.right - g.rcCanvas.left, h = g.rcCanvas.bottom - g.rcCanvas.top;
+    if (w < 8 || h < 8) return;
+
+    wchar_t file[MAX_PATH];
+    std::wstring suggested = L"modis_fvg";
+    if (g.cur >= 0) {
+        std::string tt = vTimeText(g.seq[g.cur]);
+        for (char& c : tt) if (c == ' ' || c == ':' || c == '(' || c == ')') c = '_';
+        suggested += L"_" + toW(tt);
+    }
+    suggested += L".png";
+    wcsncpy(file, suggested.c_str(), MAX_PATH - 1); file[MAX_PATH - 1] = 0;
+
+    OPENFILENAMEW ofn{}; ofn.lStructSize = sizeof ofn; ofn.hwndOwner = g.hwnd;
+    ofn.lpstrFilter = L"Immagine PNG (*.png)\0*.png\0\0";
+    ofn.lpstrFile = file; ofn.nMaxFile = MAX_PATH; ofn.lpstrDefExt = L"png";
+    ofn.lpstrTitle = L"Salva la vista corrente";
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_EXPLORER;
+    if (!GetSaveFileNameW(&ofn)) return;
+
+    Bitmap bmp(w, h, PixelFormat32bppARGB);
+    Graphics gfx(&bmp);
+    gfx.SetSmoothingMode(SmoothingModeAntiAlias);
+    gfx.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+    // paintCanvas works in window coordinates; shift the origin so the canvas
+    // rectangle lands at (0,0) of the bitmap.
+    gfx.TranslateTransform(-(REAL)g.rcCanvas.left, -(REAL)g.rcCanvas.top);
+    paintCanvas(gfx);
+
+    CLSID png;
+    if (!encoderClsid(L"image/png", &png)) {
+        MessageBoxW(g.hwnd, L"Codificatore PNG non disponibile.", APP_TITLE, MB_OK | MB_ICONERROR);
+        return;
+    }
+    if (bmp.Save(file, &png, nullptr) == Ok) {
+        logLine(std::wstring(L"PNG salvato: ") + file);
+        g.statusText = std::wstring(L"Vista salvata: ") + file;
+        InvalidateRect(g.hwnd, &g.rcStatus, FALSE);
+    } else {
+        MessageBoxW(g.hwnd, L"Salvataggio non riuscito.", APP_TITLE, MB_OK | MB_ICONERROR);
+    }
+}
+
 // ----------------------------- layout -------------------------------------
 static void doLayout() {
     RECT rc; GetClientRect(g.hwnd, &rc);
@@ -773,27 +845,29 @@ static void doLayout() {
     g.rcCanvas = { rc.left + PANEL_W, rc.top, rc.right, rc.bottom - STATUS_H - FILM_H };
 
     g.sections.clear();
+    // Spaziature strette: il pannello deve stare tutto sopra la firma anche su
+    // una finestra non massimizzata, senza barra di scorrimento.
     int x = 16, w = PANEL_W - 32, y = 74; // below header band
-    auto header = [&](const wchar_t* label) { g.sections.push_back({ label, y }); y += 22; };
-    auto row = [&](HWND h, int hh) { MoveWindow(h, x, y, w, hh, TRUE); y += hh + 8; };
+    auto header = [&](const wchar_t* label) { g.sections.push_back({ label, y }); y += 20; };
+    auto row = [&](HWND h, int hh) { MoveWindow(h, x, y, w, hh, TRUE); y += hh + 6; };
 
     header(L"SORGENTE");
     row(GetDlgItem(g.hwnd, IDC_OPEN), 30);
     // GIBS: satellite + product, then date + fetch on one row.
     MoveWindow(g.satCombo,  x, y, 96, 200, TRUE);
-    MoveWindow(g.prodCombo, x + 104, y, w - 104, 200, TRUE); y += 32;
+    MoveWindow(g.prodCombo, x + 104, y, w - 104, 200, TRUE); y += 30;
     MoveWindow(g.dateEdit, x, y, 110, 26, TRUE);
-    MoveWindow(GetDlgItem(g.hwnd, IDC_FETCH), x + 118, y, w - 118, 28, TRUE); y += 34;
-    MoveWindow(GetDlgItem(g.hwnd, IDC_LATEST), x, y, w, 28, TRUE); y += 32;
-    MoveWindow(g.workerChk, x, y, w, 22, TRUE); y += 24;
-    MoveWindow(g.stripChk,  x, y, w, 22, TRUE); y += 30;
+    MoveWindow(GetDlgItem(g.hwnd, IDC_FETCH), x + 118, y, w - 118, 28, TRUE); y += 32;
+    MoveWindow(GetDlgItem(g.hwnd, IDC_LATEST), x, y, w, 28, TRUE); y += 30;
+    MoveWindow(g.workerChk, x, y, w, 22, TRUE); y += 22;
+    MoveWindow(g.stripChk,  x, y, w, 22, TRUE); y += 28;
 
     header(L"CANALE / BANDA");
-    row(g.bandList, 108);
+    row(g.bandList, 96);
     row(g.rgbChk, 24);
-    MoveWindow(g.rCombo, x, y, w, 200, TRUE); y += 30;
-    MoveWindow(g.gCombo, x, y, w, 200, TRUE); y += 30;
-    MoveWindow(g.bCombo, x, y, w, 200, TRUE); y += 38;
+    MoveWindow(g.rCombo, x, y, w, 200, TRUE); y += 28;
+    MoveWindow(g.gCombo, x, y, w, 200, TRUE); y += 28;
+    MoveWindow(g.bCombo, x, y, w, 200, TRUE); y += 34;
 
     header(L"OVERLAY / CONFRONTO");
     row(g.citiesChk, 22);
@@ -801,11 +875,13 @@ static void doLayout() {
     row(g.sharpChk, 22);
     row(g.diffChk, 22);
     row(GetDlgItem(g.hwnd, IDC_RESET), 28);
-    y += 6;
+    row(GetDlgItem(g.hwnd, IDC_SAVEPNG), 28);
+    y += 4;
 
     header(L"TIMELAPSE");
     MoveWindow(g.fpsEdit, x, y, 56, 26, TRUE);
     MoveWindow(GetDlgItem(g.hwnd, IDC_MOVIE), x + 64, y, w - 64, 28, TRUE);
+    g.panelContentBottom = y + 28;
 
     InvalidateRect(g.hwnd, nullptr, FALSE);
 }
@@ -831,8 +907,10 @@ static void paintCanvas(Graphics& gfx) {
 
     if (g.cur < 0 || !g.image) {
         drawCentered(gfx, g.rcCanvas,
-            L"Apri un granulo .mgr, oppure scarica un'immagine MODIS reale da NASA GIBS.\n"
-            L"Trascina per spostare · rotellina per zoomare sul cursore.", t, 14);
+            L"Nessuna immagine caricata.\n\n"
+            L"SORGENTE \u2192 \u201cUltima (al volo)\u201d per scaricare l'ultimo passaggio disponibile,\n"
+            L"oppure scegli satellite, prodotto e data e premi \u201cScarica reale\u201d.\n\n"
+            L"Trascina per spostare \u00b7 rotellina per zoomare \u00b7 F per adattare \u00b7 \u2190 \u2192 per scorrere.", t, 14);
         gfx.ResetClip(); return;
     }
     const GranuleView& v = g.seq[g.cur];
@@ -877,6 +955,41 @@ static void paintCanvas(Graphics& gfx) {
         }
     }
     gfx.ResetClip();
+
+    // Scale bar. A satellite view without one leaves the reader guessing how
+    // big anything is, and the answer changes with zoom and with latitude: a
+    // degree of longitude is only ~70 km up here, not 111.
+    {
+        double lonSpan = vLonMax(v) - vLonMin(v);
+        double midLat  = (vLatMin(v) + vLatMax(v)) / 2.0;
+        double kmPerImgPx = lonSpan / g.imgW * 111.32 * std::cos(midLat * 3.14159265358979 / 180.0);
+        double kmPerScreenPx = kmPerImgPx / (g.scale > 0 ? g.scale : 1);
+        if (kmPerScreenPx > 0 && std::isfinite(kmPerScreenPx)) {
+            // Pick a round distance (1/2/5 x 10^n) closest to ~150 px wide.
+            double target = 150.0 * kmPerScreenPx;
+            double mag = std::pow(10.0, std::floor(std::log10(target)));
+            double norm = target / mag;
+            double nice = (norm < 1.5) ? 1 : (norm < 3.5) ? 2 : (norm < 7.5) ? 5 : 10;
+            double km = nice * mag;
+            REAL barPx = (REAL)(km / kmPerScreenPx);
+            if (barPx > 24 && barPx < (REAL)(g.rcCanvas.right - g.rcCanvas.left) * 0.6f) {
+                REAL x0 = (REAL)g.rcCanvas.left + 16, y0 = (REAL)g.rcCanvas.bottom - 26;
+                wchar_t lab[48];
+                if (km >= 1) swprintf(lab, 48, L"%.0f km", km);
+                else         swprintf(lab, 48, L"%.0f m", km * 1000);
+                FontFamily sf(L"Segoe UI"); Font sfont(&sf, 11, FontStyleRegular, UnitPixel);
+                RectF lm; gfx.MeasureString(lab, -1, &sfont, PointF(0, 0), &lm);
+                SolidBrush plate(t.chip);
+                fillRoundRect(gfx, plate, x0 - 8, y0 - 14, barPx + lm.Width + 22, 28, 8);
+                Pen bar(t.text, 2.0f);
+                gfx.DrawLine(&bar, x0, y0, x0 + barPx, y0);
+                gfx.DrawLine(&bar, x0, y0 - 4, x0, y0 + 4);
+                gfx.DrawLine(&bar, x0 + barPx, y0 - 4, x0 + barPx, y0 + 4);
+                SolidBrush lt(t.text);
+                gfx.DrawString(lab, -1, &sfont, PointF(x0 + barPx + 8, y0 - 8), &lt);
+            }
+        }
+    }
 
     // Info chip (top-left of canvas).
     std::wstring chip = toW(vProduct(v)) + L"  ·  " + toW(vSat(v)) + L"  ·  " + toW(vTimeText(v));
@@ -924,6 +1037,14 @@ static void paintPanel(Graphics& gfx) {
     for (auto& s : g.sections) gfx.DrawString(s.first.c_str(), -1, &sh, PointF(16, (REAL)s.second), &sub);
     // Divider to canvas.
     Pen border(t.border, 1); gfx.DrawLine(&border, (INT)(PANEL_W - 1), (INT)g.rcPanel.top, (INT)(PANEL_W - 1), (INT)g.rcPanel.bottom);
+    // Signature, pinned to the bottom of the panel.
+    Font cred(&ff, 10, FontStyleRegular, UnitPixel);
+    REAL cy = (REAL)g.rcPanel.bottom - 34;
+    if (cy - 12 > (REAL)g.panelContentBottom) {   // solo se non copre i controlli
+        gfx.DrawLine(&border, (INT)16, (INT)(cy - 10), (INT)(PANEL_W - 16), (INT)(cy - 10));
+        gfx.DrawString(APP_CREDIT_1, -1, &cred, PointF(16, cy), &sub);
+        gfx.DrawString(APP_CREDIT_2, -1, &cred, PointF(16, cy + 14), &sub);
+    }
 }
 
 static void paintStatus(Graphics& gfx) {
@@ -964,12 +1085,99 @@ static void onWheel(int mx, int my, int delta) {
 }
 
 // ----------------------------- controls -----------------------------------
+// Buttons and checkboxes are owner-drawn. A themed BUTTON control paints its
+// own label with the *system* theme's text colour and ignores the colour we
+// hand back from WM_CTLCOLORSTATIC, so on a dark panel the labels come out
+// near-black on near-black. Drawing them ourselves is the only way to keep the
+// panel readable, and it also lets the controls match the rest of the UI.
 static HWND mkButton(HWND p, const wchar_t* text, int id) {
-    return CreateWindowExW(0, L"BUTTON", text, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0,0,10,10, p, (HMENU)(INT_PTR)id, nullptr, nullptr);
+    return CreateWindowExW(0, L"BUTTON", text, WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
+                           0,0,10,10, p, (HMENU)(INT_PTR)id, nullptr, nullptr);
 }
 static HWND mkCheck(HWND p, const wchar_t* text, int id, bool on) {
-    HWND h = CreateWindowExW(0, L"BUTTON", text, WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 0,0,10,10, p, (HMENU)(INT_PTR)id, nullptr, nullptr);
-    SendMessageW(h, BM_SETCHECK, on ? BST_CHECKED : BST_UNCHECKED, 0); return h;
+    // Owner-drawn buttons keep no check state of their own; ours lives in the
+    // app state that the rest of the code already reads (see checkStateFor).
+    (void)on;
+    return CreateWindowExW(0, L"BUTTON", text, WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
+                           0,0,10,10, p, (HMENU)(INT_PTR)id, nullptr, nullptr);
+}
+
+// The single source of truth for each checkbox, so the drawing code and the
+// click handler can never disagree about what is ticked.
+static bool* checkStateFor(int id) {
+    switch (id) {
+    case IDC_WORKER:  return &g.viaWorker;
+    case IDC_STRIP:   return &g.stripMode;
+    case IDC_RGB:     return &g.rgbMode;
+    case IDC_CITIES:  return &g.showCities;
+    case IDC_BORDERS: return &g.showBorders;
+    case IDC_SHARP:   return &g.sharpen;
+    case IDC_DIFF:    return &g.diffMode;
+    default:          return nullptr;
+    }
+}
+
+static void drawControl(const DRAWITEMSTRUCT* di) {
+    const Theme& t = g.theme;
+    Graphics gfx(di->hDC);
+    gfx.SetSmoothingMode(SmoothingModeAntiAlias);
+    gfx.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+
+    RECT r = di->rcItem;
+    REAL w = (REAL)(r.right - r.left), h = (REAL)(r.bottom - r.top);
+    const bool disabled = (di->itemState & ODS_DISABLED) != 0;
+    const bool pressed  = (di->itemState & ODS_SELECTED) != 0;
+
+    SolidBrush panelBg(t.panel);
+    gfx.FillRectangle(&panelBg, 0, 0, (INT)w, (INT)h);
+
+    FontFamily ff(L"Segoe UI");
+    Font font(&ff, 12, FontStyleRegular, UnitPixel);
+    wchar_t text[256] = L"";
+    GetWindowTextW(di->hwndItem, text, 256);
+
+    Color fg = disabled ? t.subtext : t.text;
+    bool* state = checkStateFor((int)di->CtlID);
+
+    if (state) {                              // ---- checkbox ----
+        const REAL box = 15, bx = 1, by = (h - box) / 2;
+        SolidBrush fill(*state ? t.accent : t.card);
+        fillRoundRect(gfx, fill, bx, by, box, box, 5);
+        Pen edge(*state ? t.accent : t.border, 1.2f);
+        gfx.DrawRectangle(&edge, bx, by, box, box);
+        if (*state) {                         // tick, drawn as two strokes
+            Pen mark(t.panel, 2.0f);
+            mark.SetStartCap(LineCapRound); mark.SetEndCap(LineCapRound);
+            gfx.DrawLine(&mark, bx + 3.5f, by + 7.5f, bx + 6.2f, by + 10.5f);
+            gfx.DrawLine(&mark, bx + 6.2f, by + 10.5f, bx + 11.5f, by + 4.5f);
+        }
+        SolidBrush tx(fg);
+        StringFormat sf; sf.SetLineAlignment(StringAlignmentCenter);
+        gfx.DrawString(text, -1, &font, RectF(bx + box + 9, 0, w - box - 12, h), &sf, &tx);
+    } else {                                  // ---- push button ----
+        Color face = pressed ? t.accent : t.card;
+        SolidBrush fill(face);
+        fillRoundRect(gfx, fill, 0.5f, 0.5f, w - 1, h - 1, 8);
+        Pen edge(t.border, 1.0f);
+        edge.SetAlignment(PenAlignmentInset);
+        GraphicsPath outline;
+        outline.AddArc(0.5f, 0.5f, (REAL)8, (REAL)8, (REAL)180, (REAL)90);
+        outline.AddArc(w - 8.5f, 0.5f, (REAL)8, (REAL)8, (REAL)270, (REAL)90);
+        outline.AddArc(w - 8.5f, h - 8.5f, (REAL)8, (REAL)8, (REAL)0, (REAL)90);
+        outline.AddArc(0.5f, h - 8.5f, (REAL)8, (REAL)8, (REAL)90, (REAL)90);
+        outline.CloseFigure();
+        gfx.DrawPath(&edge, &outline);
+        SolidBrush tx(pressed ? t.panel : fg);
+        StringFormat sf;
+        sf.SetAlignment(StringAlignmentCenter); sf.SetLineAlignment(StringAlignmentCenter);
+        gfx.DrawString(text, -1, &font, RectF(0, 0, w, h), &sf, &tx);
+    }
+
+    if (di->itemState & ODS_FOCUS) {          // keyboard focus stays visible
+        Pen ring(t.accent, 1.0f);
+        ring.SetDashStyle(DashStyleDot);
+        gfx.DrawRectangle(&ring, 0.5f, 0.5f, w - 2, h - 2);
+    }
 }
 static HWND mkCombo(HWND p, int id) {
     return CreateWindowExW(0, L"COMBOBOX", nullptr, WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL, 0,0,10,10, p, (HMENU)(INT_PTR)id, nullptr, nullptr);
@@ -1003,6 +1211,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         g.sharpChk   = mkCheck(hwnd, L"Nitidezza (unsharp)", IDC_SHARP, true);
         g.diffChk    = mkCheck(hwnd, L"Diff vs precedente", IDC_DIFF, false);
         mkButton(hwnd, L"Reset vista (fit)", IDC_RESET);
+        mkButton(hwnd, L"Salva vista (PNG)", IDC_SAVEPNG);
         g.fpsEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"6",
             WS_CHILD | WS_VISIBLE | ES_NUMBER | ES_CENTER, 0,0,10,10, hwnd, (HMENU)IDC_FPS, nullptr, nullptr);
         mkButton(hwnd, L"Genera filmato (MP4)", IDC_MOVIE);
@@ -1017,16 +1226,22 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_COMMAND: {
         int id = LOWORD(wp), code = HIWORD(wp);
+        // Owner-drawn checkboxes do not toggle themselves: flip our state first,
+        // then let the per-control case react to the new value.
+        if (code == BN_CLICKED) {
+            if (bool* st = checkStateFor(id)) {
+                *st = !*st;
+                InvalidateRect((HWND)lp, nullptr, TRUE);
+            }
+        }
         switch (id) {
         case IDC_OPEN:  doOpenDialog(); return 0;
         case IDC_FETCH: doFetchGibs(); return 0;
         case IDC_LATEST: doFetchLatest(); return 0;
-        case IDC_WORKER: g.viaWorker = SendMessageW(g.workerChk, BM_GETCHECK, 0, 0) == BST_CHECKED; return 0;
+        case IDC_WORKER: return 0;   // stato gia' invertito in WM_COMMAND, sopra
         case IDC_STRIP:
-            g.stripMode = SendMessageW(g.stripChk, BM_GETCHECK, 0, 0) == BST_CHECKED;
             applySelection(); return 0;
         case IDC_SHARP:
-            g.sharpen = SendMessageW(g.sharpChk, BM_GETCHECK, 0, 0) == BST_CHECKED;
             rebuildImage(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
         case IDC_SAT: case IDC_PRODUCT:
             // Point of the dashboard: pick a product or a satellite and it is
@@ -1035,15 +1250,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case IDC_RESET: fitView(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
         case IDC_MOVIE: doTimelapse(); return 0;
+        case IDC_SAVEPNG: doSavePng(); return 0;
         case IDC_RGB:
-            g.rgbMode = SendMessageW(g.rgbChk, BM_GETCHECK, 0, 0) == BST_CHECKED;
             { bool bands = g.cur >= 0 && vHasBands(g.seq[g.cur]);
               EnableWindow(g.rCombo, bands && g.rgbMode); EnableWindow(g.gCombo, bands && g.rgbMode); EnableWindow(g.bCombo, bands && g.rgbMode); }
             rebuildImage(); fitView(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
-        case IDC_CITIES:  g.showCities  = SendMessageW(g.citiesChk, BM_GETCHECK, 0, 0) == BST_CHECKED; InvalidateRect(hwnd, &g.rcCanvas, FALSE); return 0;
-        case IDC_BORDERS: g.showBorders = SendMessageW(g.bordersChk, BM_GETCHECK, 0, 0) == BST_CHECKED; InvalidateRect(hwnd, &g.rcCanvas, FALSE); return 0;
+        case IDC_CITIES:  InvalidateRect(hwnd, &g.rcCanvas, FALSE); return 0;
+        case IDC_BORDERS: InvalidateRect(hwnd, &g.rcCanvas, FALSE); return 0;
         case IDC_DIFF:
-            g.diffMode = SendMessageW(g.diffChk, BM_GETCHECK, 0, 0) == BST_CHECKED;
             rebuildImage(); fitView(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
         case IDC_BANDLIST:
             if (code == LBN_SELCHANGE && g.cur >= 0 && vHasBands(g.seq[g.cur])) {
@@ -1054,7 +1268,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     // composite rather than selecting into a view that ignores it.
                     if (g.rgbMode) {
                         g.rgbMode = false;
-                        SendMessageW(g.rgbChk, BM_SETCHECK, BST_UNCHECKED, 0);
+                        InvalidateRect(g.rgbChk, nullptr, TRUE);
                         EnableWindow(g.rCombo, FALSE); EnableWindow(g.gCombo, FALSE); EnableWindow(g.bCombo, FALSE);
                     }
                     rebuildImage(); fitView(); buildStatus();
@@ -1078,7 +1292,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (inRect(g.rcFilm, x, y)) { int pad = 10, cellW = 132, idx = (x - (g.rcFilm.left + pad)) / (cellW + pad);
             if (idx >= 0 && idx < (int)g.seq.size()) selectIndex(idx);
             return 0; }
-        if (inRect(g.rcCanvas, x, y) && g.image) { g.dragging = true; g.lastX = x; g.lastY = y; SetCapture(hwnd); }
+        if (inRect(g.rcCanvas, x, y)) {
+            SetFocus(hwnd);   // senza questo le frecce restano ai controlli del pannello
+            if (g.image) { g.dragging = true; g.lastX = x; g.lastY = y; SetCapture(hwnd); }
+        }
         return 0;
     }
     case WM_MOUSEMOVE: {
@@ -1094,6 +1311,30 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (g.cardBrush) { DeleteObject(g.cardBrush); g.cardBrush = nullptr; }
         { BOOL dark = !g.light; DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof dark); }
         InvalidateRect(hwnd, nullptr, FALSE); return 0;
+    case WM_KEYDOWN: {
+        const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+        switch (wp) {
+        case VK_LEFT:  if (g.cur > 0) selectIndex(g.cur - 1); return 0;
+        case VK_RIGHT: if (g.cur >= 0 && g.cur + 1 < (int)g.seq.size()) selectIndex(g.cur + 1); return 0;
+        case VK_HOME:  if (!g.seq.empty()) selectIndex(0); return 0;
+        case VK_END:   if (!g.seq.empty()) selectIndex((int)g.seq.size() - 1); return 0;
+        case 'F':      fitView(); buildStatus(); InvalidateRect(hwnd, nullptr, FALSE); return 0;
+        case 'S':      if (ctrl) { doSavePng(); return 0; } break;
+        case VK_OEM_PLUS: case VK_ADD: case VK_OEM_MINUS: case VK_SUBTRACT: {
+            // Zoom from the centre of the canvas, the keyboard's equivalent of
+            // pointing the wheel at it.
+            bool in = (wp == VK_OEM_PLUS || wp == VK_ADD);
+            int cx = (g.rcCanvas.left + g.rcCanvas.right) / 2;
+            int cy = (g.rcCanvas.top + g.rcCanvas.bottom) / 2;
+            onWheel(cx, cy, in ? 120 : -120);
+            return 0;
+        }
+        }
+        return 0;
+    }
+    case WM_DRAWITEM:
+        drawControl((const DRAWITEMSTRUCT*)lp);
+        return TRUE;
     case WM_ERASEBKGND: return 1;
     case WM_PAINT: onPaint(); return 0;
     case WM_DESTROY: PostQuitMessage(0); return 0;
@@ -1112,7 +1353,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nShow) {
     RegisterClassW(&wc);
 
     g.hwnd = CreateWindowExW(0, wc.lpszClassName, APP_TITLE, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1240, 820, nullptr, nullptr, hInst, nullptr);
+        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 900, nullptr, nullptr, hInst, nullptr);
 
     { BOOL dark = !g.light; DwmSetWindowAttribute(g.hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof dark); }
     { int backdrop = DWMSBT_MAINWINDOW; DwmSetWindowAttribute(g.hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop, sizeof backdrop); }
@@ -1120,10 +1361,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nShow) {
     doLayout();
     logLine(L"MODIS FVG Viewer avviato");
 
-    const wchar_t* seeds[] = { L"\\sample_MODIS_FVG.mgr", L"\\sample_MODIS_FVG_1200.mgr", L"\\sample_MODIS_FVG_1345.mgr" };
-    for (auto s : seeds) { std::wstring p = exeDir() + s;
-        if (GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES) openFilePath(p); }
-    loadCache(); // reload any previously downloaded real MODIS images
+    // Only real imagery is loaded at startup: the cache of MODIS/HLS granules
+    // downloaded in earlier sessions. The synthetic .mgr samples stay in test/
+    // and can still be opened by hand - they exist to exercise the reader and
+    // the compositing offline, not to greet the user with a drawn cartoon.
+    loadCache();
     if (!g.seq.empty()) selectIndex(0);
 
     if (cmdLine && cmdLine[0]) { std::wstring arg(cmdLine);

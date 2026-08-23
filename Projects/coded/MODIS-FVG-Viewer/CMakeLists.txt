@@ -64,13 +64,9 @@ if(WIN32)
         target_link_options(MODIS-FVG-Viewer PRIVATE /MANIFEST:NO)
     endif()
 
-    # Copy the bundled sample granules next to the built exe for a ready-to-run
-    # demo (the viewer seeds its sequence from these on first launch).
-    foreach(s sample_MODIS_FVG.mgr sample_MODIS_FVG_1200.mgr sample_MODIS_FVG_1345.mgr)
-        add_custom_command(TARGET MODIS-FVG-Viewer POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_SOURCE_DIR}/test/${s} $<TARGET_FILE_DIR:MODIS-FVG-Viewer>/${s})
-    endforeach()
+    # The synthetic .mgr samples are test fixtures, not demo content: they stay
+    # in test/ and are opened by hand when wanted. The viewer starts from the
+    # cache of real granules instead.
 endif()
 
 # ---------------------------------------------------------------------------

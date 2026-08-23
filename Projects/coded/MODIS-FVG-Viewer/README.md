@@ -66,7 +66,20 @@ Adriatico, lo "swath gap" no-data a sinistra, confini e città FVG.*
 
 8. **UI** — finestra ridimensionabile, canvas ampio (≥70%), **Mica** backdrop e
    **dark/light** automatico dal tema di sistema (Windows 11 22H2+; sui sistemi
-   più vecchi gli attributi DWM vengono ignorati senza errori).
+   più vecchi gli attributi DWM vengono ignorati senza errori). Pulsanti e
+   caselle sono **disegnati dall'app**: un controllo `BUTTON` con stile visivo
+   scrive la propria etichetta con il colore del tema *di sistema* e ignora
+   quello che gli passiamo, quindi su pannello scuro le scritte uscivano
+   quasi nere su quasi nero.
+
+9. **Barra di scala** — in basso a sinistra, in km, ricalcolata a ogni zoom e
+   **corretta per la latitudine**: quassù un grado di longitudine vale ~70 km,
+   non 111.
+
+10. **Scorciatoie** — `←` `→` scorrono la sequenza, `Home`/`Fine` vanno agli
+    estremi, `F` adatta alla finestra, `+`/`−` zoomano dal centro,
+    **`Ctrl+S`** salva la vista corrente in **PNG** (immagine, confini, città e
+    barra di scala), come il pulsante *Salva vista (PNG)*.
 
 Gestione errori esplicita: se un granulo **non copre il FVG** o il file HDF non è
 leggibile, l'app **avvisa** invece di crashare; il download GIBS di un giorno
@@ -214,9 +227,14 @@ maggior parte degli usi, il percorso **GIBS** dà già l'immagine reale.
 ## Il granulo di esempio `.mgr`
 
 Sono inclusi **3 granuli sintetici** ma realistici sul FVG (`test/*.mgr`), con
-orari diversi per popolare subito timeline e timelapse. Sono **sintetici**
-(generati da `tools/make_sample.cpp`): servono a far girare e testare tutto
-offline, non sono ripresi da satellite — per l'immagine vera usa GIBS.
+orari diversi. Sono **sintetici** (generati da `tools/make_sample.cpp`): servono
+a esercitare reader e compositing offline, non sono ripresi da satellite.
+
+Per questo **non vengono più caricati all'avvio** né copiati accanto
+all'eseguibile: un'immagine disegnata che si presenta come la schermata
+iniziale di un visualizzatore satellitare dice la cosa sbagliata su cosa il
+programma sta mostrando. L'app parte dalla **cache di granuli reali**; i
+campioni si aprono a mano con *Apri file*.
 
 Rigenerarli / creare il preview:
 ```sh
@@ -248,3 +266,7 @@ docs/              MFVG-FORMAT.md, preview.png
   (senza Mica). Compilatore: Visual Studio Desktop C++ **oppure** MinGW-w64.
 - Solo librerie **di sistema** (GDI+, WinHTTP, Media Foundation, DWM): nessun
   pacchetto vcpkg da compilare.
+
+---
+
+**MODIS-FVG** — Costruito da **PIGNOLO GIMMY** con **Claude Code** (Anthropic).
