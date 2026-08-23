@@ -580,14 +580,42 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
     // no image on most dates; MODIS flies daily but still misses the FVG. So
     // the requested day is a starting point: walk back until real data shows up.
     const int maxTries = (pr.nativeM <= 30) ? 14 : 4;
-    std::string tryDate = date;
+
+    // One fetch attempt. `probe` asks for a thumbnail instead of the real
+    // image and keeps it out of the cache: at 30 m a full tile is several MB,
+    // so scouting a fortnight of dates at full size would mean downloading
+    // tens of MB to answer a yes/no question. A 256 px probe costs kilobytes
+    // and tells us exactly the same thing — whether that day has data.
+    auto attemptFetch = [&](const std::string& d, bool probe,
+                            img::Image& out, std::wstring& err) -> bool {
+        int fw = probe ? 256 : W;
+        int fh = probe ? std::max(64, (int)std::lround(256.0 * H / W)) : H;
+        std::wstring saveTo = probe ? L"" : (cacheDir() + L"\\" + cacheName(satIdx, prodIdx, d, strip));
+        HCURSOR prevCur = SetCursor(LoadCursor(nullptr, IDC_WAIT));
+        bool ok = g.viaWorker
+            ? gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
+                  pr.id, d, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, out, &err, saveTo)
+            : gibs::download(layer, d, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, out, &err, saveTo);
+        SetCursor(prevCur);
+        if (ok && !probe && img::coverage(out) < MIN_COVERAGE)
+            DeleteFileW(saveTo.c_str());   // never cache an empty tile
+        return ok;
+    };
+
+    // A product that revisits every 2-3 days (and is processed days later) has
+    // no image on most dates; MODIS flies daily but still misses the FVG. So
+    // the requested day is a starting point: walk back until real data shows up.
+    // For the 30 m products the first date is very unlikely to have data, so
+    // scout with probes from the start; MODIS usually hits on day one, and
+    // paying for a probe there would only add a round trip.
+    const bool probeFirst = (pr.nativeM <= 30);
+    std::string tryDate = date, foundDate;
     std::wstring lastErr = L"nessuna immagine trovata";
     int hardFails = 0;   // consecutive request failures (not empty tiles)
 
-    for (int attempt = 0; attempt < maxTries; ++attempt, tryDate = dateBack(tryDate, 1)) {
+    for (int attempt = 0; attempt < maxTries && foundDate.empty(); ++attempt, tryDate = dateBack(tryDate, 1)) {
+        // Disk cache hit? Load, no network at all.
         std::wstring cachePath = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, tryDate, strip);
-
-        // Disk cache hit? Load, no network.
         if (GetFileAttributesW(cachePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
             img::Image cim; std::wstring cerr;
             if (gibs::decodeFile(cachePath, cim, &cerr) && !cim.empty()) {
@@ -601,17 +629,9 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
         if (attempt > 0)
             flashStatus(L"Nessun dato fino al " + toW(tryDate) + L" — continuo a cercare indietro…");
 
-        HCURSOR prevCur = SetCursor(LoadCursor(nullptr, IDC_WAIT));
-        img::Image im; std::wstring err; bool ok;
-        if (g.viaWorker) {
-            ok = gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
-                    pr.id, tryDate, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
-        } else {
-            ok = gibs::download(layer, tryDate, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
-        }
-        SetCursor(prevCur);
-
-        if (!ok || im.empty()) {
+        const bool probe = probeFirst || attempt > 0;
+        img::Image im; std::wstring err;
+        if (!attemptFetch(tryDate, probe, im, err)) {
             lastErr = err;
             // An empty tile is date-specific — another day may well have data.
             // A transport or HTTP failure is not: a rejected request fails the
@@ -623,15 +643,15 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
         }
         hardFails = 0;
 
-        // An all-transparent tile means "no pass", not a black scene. Don't let
-        // it into the cache: it would be served forever as if it were an image.
+        // An all-transparent tile means "no pass", not a black scene.
         double cov = img::coverage(im);
         if (cov < MIN_COVERAGE) {
-            DeleteFileW(cachePath.c_str());
             logLine(L"FETCH VUOTO: " + toW(layer) + L" " + toW(tryDate));
             lastErr = L"nessun passaggio del satellite in questa data";
             continue;
         }
+
+        if (probe) { foundDate = tryDate; break; }   // now go get it for real
 
         logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": "
                 + toW(layer) + L" " + toW(tryDate) + L" " + std::to_wstring(W) + L"x" + std::to_wstring(H)
@@ -639,6 +659,21 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
         SetWindowTextW(g.dateEdit, toW(tryDate).c_str());
         addRemote(std::move(im), satIdx, prodIdx, tryDate, strip);
         return;
+    }
+
+    // A probe found the date; fetch that one day at full resolution.
+    if (!foundDate.empty()) {
+        flashStatus(L"Trovati dati il " + toW(foundDate) + L" — scarico a piena risoluzione ("
+                    + std::to_wstring(W) + L"x" + std::to_wstring(H) + L")…");
+        img::Image im; std::wstring err;
+        if (attemptFetch(foundDate, /*probe=*/false, im, err) && img::coverage(im) >= MIN_COVERAGE) {
+            logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": "
+                    + toW(layer) + L" " + toW(foundDate) + L" " + std::to_wstring(W) + L"x" + std::to_wstring(H));
+            SetWindowTextW(g.dateEdit, toW(foundDate).c_str());
+            addRemote(std::move(im), satIdx, prodIdx, foundDate, strip);
+            return;
+        }
+        lastErr = err.empty() ? L"immagine a piena risoluzione non disponibile" : err;
     }
 
     logLine(L"FETCH FAIL: " + toW(layer) + L" da " + toW(date) + L" — " + lastErr);
