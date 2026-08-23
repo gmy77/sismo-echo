@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+// MODIS-FVG Viewer 1.0.0 - vedi LICENSE nella radice del repository.
 // modis.cpp — decoder for the MFVG simplified granule container.
 // Portable C++17, no OS headers. See modis.h and docs/MFVG-FORMAT.md.
 #include "modis.h"

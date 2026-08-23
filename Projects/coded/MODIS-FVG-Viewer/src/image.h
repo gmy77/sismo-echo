@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+// MODIS-FVG Viewer 1.0.0 - vedi LICENSE nella radice del repository.
 // image.h — portable pixel compositing for MODIS bands.
 //
 // Produces a top-down 32-bit image (pixel = 0xAARRGGBB, stored little-endian so

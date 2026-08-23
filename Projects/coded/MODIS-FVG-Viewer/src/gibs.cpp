@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+// MODIS-FVG Viewer 1.0.0 - vedi LICENSE nella radice del repository.
 // gibs.cpp — WinHTTP download + GDI+ decode for NASA GIBS WMS. See gibs.h.
 #ifndef UNICODE
 #define UNICODE

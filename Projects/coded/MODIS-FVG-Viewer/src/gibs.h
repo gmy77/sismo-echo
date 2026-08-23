@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+// MODIS-FVG Viewer 1.0.0 - vedi LICENSE nella radice del repository.
 // gibs.h — fetch *real* MODIS imagery from NASA GIBS (Global Imagery Browse
 // Services) over WMS, cropped to a lat/lon box. Windows-only: downloads with
 // WinHTTP and decodes the PNG/JPEG with GDI+ (no GDAL, no HDF, no ffmpeg).

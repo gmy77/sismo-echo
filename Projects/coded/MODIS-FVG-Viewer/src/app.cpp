@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+// MODIS-FVG Viewer 1.0.0 - vedi LICENSE nella radice del repository.
 // app.cpp — MODIS FVG Viewer. Win32 + GDI+ desktop dashboard.
 //
 // Layout:  [ control panel | image canvas ]  +  [ filmstrip ]  +  [ status bar ]
@@ -70,6 +72,7 @@ static const wchar_t* APP_VERSION = L"1.0.0";
 static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.0";
 static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.0";
 static const wchar_t* APP_CREDIT_2 = L"Anthropic  \u00b7  PIGNOLO GIMMY";
+static const wchar_t* APP_CREDIT_3 = L"\u00a9 2026 Gimmy Pignolo \u00b7 Tutti i diritti riservati";
 static const int PANEL_W  = 304;
 static const int FILM_H   = 116;
 static const int STATUS_H = 28;
@@ -1125,11 +1128,12 @@ static void paintPanel(Graphics& gfx) {
     Pen border(t.border, 1); gfx.DrawLine(&border, (INT)(PANEL_W - 1), (INT)g.rcPanel.top, (INT)(PANEL_W - 1), (INT)g.rcPanel.bottom);
     // Signature, pinned to the bottom of the panel.
     Font cred(&ff, 10, FontStyleRegular, UnitPixel);
-    REAL cy = (REAL)g.rcPanel.bottom - 34;
+    REAL cy = (REAL)g.rcPanel.bottom - 48;
     if (cy - 12 > (REAL)g.panelContentBottom) {   // solo se non copre i controlli
         gfx.DrawLine(&border, (INT)16, (INT)(cy - 10), (INT)(PANEL_W - 16), (INT)(cy - 10));
         gfx.DrawString(APP_CREDIT_1, -1, &cred, PointF(16, cy), &sub);
         gfx.DrawString(APP_CREDIT_2, -1, &cred, PointF(16, cy + 14), &sub);
+        gfx.DrawString(APP_CREDIT_3, -1, &cred, PointF(16, cy + 28), &sub);
     }
 }
 

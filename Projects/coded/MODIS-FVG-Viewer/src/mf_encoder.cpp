@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+// MODIS-FVG Viewer 1.0.0 - vedi LICENSE nella radice del repository.
 // mf_encoder.cpp — Media Foundation Sink Writer H.264 encoder.
 // Follows the canonical MSDN "Using the Sink Writer to Encode Video" pattern.
 #include "mf_encoder.h"

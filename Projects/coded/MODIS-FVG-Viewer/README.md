@@ -269,4 +269,19 @@ docs/              MFVG-FORMAT.md, preview.png
 
 ---
 
+## Licenza
+
+**Copyright © 2026 Gimmy Pignolo. Tutti i diritti riservati.**
+
+Vedi [LICENSE](../../../LICENSE) nella radice del repository. Il codice non è
+rilasciato con una licenza open source: ogni riuso, redistribuzione o opera
+derivata richiede il permesso dell'autore.
+
+I dati satellitari provengono da **NASA GIBS / EOSDIS** e restano soggetti alle
+[politiche di utilizzo NASA](https://www.earthdata.nasa.gov/engage/open-data-services-software-policies)
+(dati di pubblico dominio, attribuzione gradita). Il copyright qui sopra
+riguarda il codice di questo visualizzatore, non le immagini.
+
+---
+
 **MODIS-FVG v1.0.0** — **Anthropic** · **PIGNOLO GIMMY**
