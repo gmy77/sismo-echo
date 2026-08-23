@@ -78,18 +78,31 @@ senza copertura viene segnalato con un suggerimento (prova un'altra data).
 
 Ti serve **uno** tra Visual Studio (Desktop C++) o MinGW-w64.
 
-### Non hai nessun compilatore?
-Doppio-click su **`setup-compiler.bat`**: installa **MinGW-w64** via `winget`
-(~500 MB, contro i ~6 GB dei Build Tools di Visual Studio; non tocca nulla di
-quello che hai già) e poi compila da solo. Se dopo l'installazione dice che
-`g++` non è nel PATH, chiudi la finestra, aprine una nuova e lancia `build.bat`.
-
 ### Modo più facile
-Doppio-click su **`build.bat`**. Rileva il compilatore, crea
+Doppio-click su **`build.bat`**, da un prompt qualsiasi. Crea
 `MODIS-FVG-Viewer.exe` e ci mette accanto i 3 granuli di esempio.
 
-> Con Visual Studio: apri prima il *"x64 Native Tools Command Prompt for VS"* e
-> lancia `build.bat` da lì (così `cl.exe` è nel PATH).
+**Non serve** aprire il *"x64 Native Tools Command Prompt"*: lo script cerca il
+compilatore da solo, in quest'ordine —
+
+1. `cl.exe` / `g++.exe` già nel `PATH`;
+2. **Visual Studio** individuato con `vswhere` (installato con qualsiasi VS
+   2017+), di cui carica `vcvars64.bat`. È il caso più comune di "nessun
+   compilatore trovato": VS c'è, ma `cl.exe` entra nel `PATH` solo dentro il
+   suo prompt dedicato;
+3. **MinGW-w64** nelle posizioni note (MSYS2 `C:\msys64`, chocolatey, i
+   pacchetti portabili di winget, `C:\mingw64`).
+
+### Non hai nessun compilatore?
+Doppio-click su **`setup-compiler.bat`**: installa **MSYS2 + MinGW-w64** via
+`winget` e compila. Va in `C:\msys64`, un percorso noto — così non dipende dal
+`PATH`, che winget aggiorna per le finestre nuove ma non per quella in corso.
+Non tocca un'eventuale installazione di Visual Studio.
+
+### Se ancora non compila
+Doppio-click su **`check-compiler.bat`**: non installa e non modifica nulla,
+elenca cosa c'è sulla macchina (compilatori nel `PATH`, installazioni VS e se
+hanno il workload C++, MinGW nelle posizioni note) e dice cosa manca.
 
 ### Con CMake
 ```bat

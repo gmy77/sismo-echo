@@ -1,27 +1,77 @@
 @echo off
 REM ===========================================================================
 REM  MODIS FVG Viewer - build su Windows.
-REM  Doppio-click, oppure eseguilo da un prompt dei comandi.
-REM  Prova prima MSVC (cl.exe, se hai Visual Studio), poi MinGW (g++).
+REM  Doppio-click, oppure eseguilo da un prompt qualsiasi.
+REM
+REM  Trova il compilatore da solo, in quest'ordine:
+REM    1. cl.exe / g++.exe gia' nel PATH
+REM    2. Visual Studio via vswhere -> carica vcvars64.bat  (NON serve aprire
+REM       il "x64 Native Tools Command Prompt": ci pensa lo script)
+REM    3. MinGW-w64 nelle posizioni note (MSYS2, chocolatey, winget, C:\mingw64)
+REM  Se non trova nulla, rimanda a setup-compiler.bat che lo installa.
 REM ===========================================================================
-setlocal
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
-where cl >nul 2>nul
-if %errorlevel%==0 goto :msvc
+REM --- 1. gia' nel PATH? -----------------------------------------------------
+where cl  >nul 2>nul && goto :msvc
+where g++ >nul 2>nul && goto :mingw
 
-where g++ >nul 2>nul
-if %errorlevel%==0 goto :mingw
+REM --- 2. Visual Studio installato ma ambiente non caricato -------------------
+REM vswhere e' installato con qualsiasi VS 2017+ e sta sempre in questo percorso.
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
+if exist "%VSWHERE%" (
+  echo  Cerco Visual Studio...
+  set "VSPATH="
+  REM Una riga sola: dentro un for /f la continuazione con ^ e' inaffidabile.
+  for /f "usebackq tokens=*" %%i in (`"!VSWHERE!" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do set "VSPATH=%%i"
+  if defined VSPATH (
+    if exist "!VSPATH!\VC\Auxiliary\Build\vcvars64.bat" (
+      echo  Trovato: !VSPATH!
+      echo  Carico l'ambiente C++ x64...
+      call "!VSPATH!\VC\Auxiliary\Build\vcvars64.bat" >nul
+      where cl >nul 2>nul && goto :msvc
+    )
+  )
+)
+
+REM --- 3. MinGW-w64 nelle posizioni note -------------------------------------
+for %%D in (
+  "C:\msys64\ucrt64\bin"
+  "C:\msys64\mingw64\bin"
+  "C:\mingw64\bin"
+  "C:\ProgramData\chocolatey\bin"
+  "%ProgramFiles%\mingw64\bin"
+) do (
+  if exist "%%~D\g++.exe" (
+    echo  Trovato MinGW in %%~D
+    set "PATH=%%~D;!PATH!"
+    goto :mingw
+  )
+)
+REM winget installa i pacchetti portabili qui sotto, in sottocartelle variabili.
+if exist "%LOCALAPPDATA%\Microsoft\WinGet\Packages" (
+  for /d %%P in ("%LOCALAPPDATA%\Microsoft\WinGet\Packages\*") do (
+    for %%S in ("mingw64\bin" "ucrt64\bin" "bin") do (
+      if exist "%%~P\%%~S\g++.exe" (
+        echo  Trovato MinGW in %%~P\%%~S
+        set "PATH=%%~P\%%~S;!PATH!"
+        goto :mingw
+      )
+    )
+  )
+)
 
 echo.
 echo  Nessun compilatore trovato.
 echo.
-echo  ==^> Doppio-click su  setup-compiler.bat  : installa MinGW-w64 con winget
-echo      e poi compila da solo. E' la via piu' rapida.
+echo  ==^> Doppio-click su  setup-compiler.bat  : installa MinGW-w64 e compila.
 echo.
 echo  In alternativa, a mano:
-echo    - Visual Studio (Desktop C++)  ->  apri "x64 Native Tools Command Prompt" e rilancia build.bat
-echo    - MSYS2/MinGW-w64              ->  pacman -S mingw-w64-ucrt-x86_64-gcc, poi rilancia
+echo    - Visual Studio: Programmi ^> Visual Studio Installer ^> Modifica ^>
+echo      spunta "Sviluppo di applicazioni desktop con C++", poi rilancia questo file.
+echo    - MSYS2 (https://www.msys2.org/): pacman -S mingw-w64-ucrt-x86_64-gcc
 echo.
 pause
 exit /b 1
