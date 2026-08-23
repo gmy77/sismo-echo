@@ -60,4 +60,9 @@ Image sharpen(const Image& src, double amount = 0.9, int radius = 1);
 // scene" and can step back to the last day with real data.
 double coverage(const Image& im);
 
+// Sovrappone `over` a `base`: dove `over` ha un'osservazione la usa, altrove
+// lascia passare la base. Serve ai prodotti "a punti" come gli incendi, che da
+// soli sarebbero quasi tutti trasparenti e illeggibili senza un riferimento.
+Image composite(const Image& base, const Image& over);
+
 } // namespace img

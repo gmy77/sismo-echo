@@ -26,6 +26,7 @@ struct Product {
     bool           temperature; // true => already a colorized LST layer
     int            nativeM;     // native ground resolution, metres per pixel
     bool           ignoresSat;  // true => not a Terra/Aqua product (HLS)
+    const char*    overlayOn;   // id del prodotto di base su cui sovrapporlo
 };
 
 // The products offered in the UI.
@@ -40,22 +41,35 @@ inline const Product* products(int& count) {
     static const Product P[] = {
         { L"True Color (riflettanza reale)",
           "MODIS_Terra_CorrectedReflectance_TrueColor",
-          "MODIS_Aqua_CorrectedReflectance_TrueColor", "truecolor", false, 250, false },
+          "MODIS_Aqua_CorrectedReflectance_TrueColor", "truecolor", false, 250, false, nullptr },
         { L"Bande 7-2-1 (naturale-migliorato)",
           "MODIS_Terra_CorrectedReflectance_Bands721",
-          "MODIS_Aqua_CorrectedReflectance_Bands721", "bands721", false, 250, false },
+          "MODIS_Aqua_CorrectedReflectance_Bands721", "bands721", false, 250, false, nullptr },
         { L"Bande 3-6-7 (neve / ghiaccio)",
           "MODIS_Terra_CorrectedReflectance_Bands367",
-          "MODIS_Aqua_CorrectedReflectance_Bands367", "bands367", false, 250, false },
+          "MODIS_Aqua_CorrectedReflectance_Bands367", "bands367", false, 250, false, nullptr },
         { L"Temp. superficie giorno (LST)",
           "MODIS_Terra_Land_Surface_Temp_Day",
-          "MODIS_Aqua_Land_Surface_Temp_Day", "lst", true, 1000, false },
+          "MODIS_Aqua_Land_Surface_Temp_Day", "lst", true, 1000, false, nullptr },
         { L"★ Sentinel-2 30 m (nitido)",
           "HLS_S30_Nadir_BRDF_Adjusted_Reflectance",
-          "HLS_S30_Nadir_BRDF_Adjusted_Reflectance", "hls_s30", false, 30, true },
+          "HLS_S30_Nadir_BRDF_Adjusted_Reflectance", "hls_s30", false, 30, true, nullptr },
         { L"★ Landsat 30 m (nitido)",
           "HLS_L30_Nadir_BRDF_Adjusted_Reflectance",
-          "HLS_L30_Nadir_BRDF_Adjusted_Reflectance", "hls_l30", false, 30, true },
+          "HLS_L30_Nadir_BRDF_Adjusted_Reflectance", "hls_l30", false, 30, true, nullptr },
+        // Incendi: il layer da solo e' quasi tutto trasparente (sono punti di
+        // calore), quindi va sovrapposto al true-color per essere leggibile.
+        { L"\U0001F525 Incendi / anomalie termiche",
+          "MODIS_Terra_Thermal_Anomalies_All",
+          "MODIS_Aqua_Thermal_Anomalies_All", "fires", false, 1000, false, "truecolor" },
+        { L"Aerosol (fumo, polveri, foschia)",
+          "MODIS_Terra_Aerosol", "MODIS_Aqua_Aerosol", "aerosol", false, 1000, false, nullptr },
+        { L"Neve / ghiaccio (NDSI)",
+          "MODIS_Terra_NDSI_Snow_Cover", "MODIS_Aqua_NDSI_Snow_Cover", "snow", false, 500, false, nullptr },
+        { L"Vegetazione (NDVI, 8 giorni)",
+          "MODIS_Terra_NDVI_8Day", "MODIS_Aqua_NDVI_8Day", "ndvi", false, 250, false, nullptr },
+        { L"Clorofilla del mare",
+          "MODIS_Terra_Chlorophyll_A", "MODIS_Aqua_Chlorophyll_A", "chlor", false, 1000, false, nullptr },
     };
     count = (int)(sizeof P / sizeof P[0]);
     return P;

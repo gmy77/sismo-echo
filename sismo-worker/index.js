@@ -3357,11 +3357,21 @@ export default {
         terra: { truecolor:"MODIS_Terra_CorrectedReflectance_TrueColor",
                  bands721:"MODIS_Terra_CorrectedReflectance_Bands721",
                  bands367:"MODIS_Terra_CorrectedReflectance_Bands367",
-                 lst:"MODIS_Terra_Land_Surface_Temp_Day", ...HLS },
+                 lst:"MODIS_Terra_Land_Surface_Temp_Day",
+                 fires:"MODIS_Terra_Thermal_Anomalies_All",
+                 aerosol:"MODIS_Terra_Aerosol",
+                 snow:"MODIS_Terra_NDSI_Snow_Cover",
+                 ndvi:"MODIS_Terra_NDVI_8Day",
+                 chlor:"MODIS_Terra_Chlorophyll_A", ...HLS },
         aqua:  { truecolor:"MODIS_Aqua_CorrectedReflectance_TrueColor",
                  bands721:"MODIS_Aqua_CorrectedReflectance_Bands721",
                  bands367:"MODIS_Aqua_CorrectedReflectance_Bands367",
-                 lst:"MODIS_Aqua_Land_Surface_Temp_Day", ...HLS },
+                 lst:"MODIS_Aqua_Land_Surface_Temp_Day",
+                 fires:"MODIS_Aqua_Thermal_Anomalies_All",
+                 aerosol:"MODIS_Aqua_Aerosol",
+                 snow:"MODIS_Aqua_NDSI_Snow_Cover",
+                 ndvi:"MODIS_Aqua_NDVI_8Day",
+                 chlor:"MODIS_Aqua_Chlorophyll_A", ...HLS },
       };
       const sat     = (url.searchParams.get("sat") || "terra").toLowerCase();
       const product = (url.searchParams.get("product") || "truecolor").toLowerCase();

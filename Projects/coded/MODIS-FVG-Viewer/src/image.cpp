@@ -176,6 +176,15 @@ Image sharpen(const Image& src, double amount, int radius) {
     return im;
 }
 
+Image composite(const Image& base, const Image& over) {
+    if (base.empty()) return over;
+    if (over.empty() || over.w != base.w || over.h != base.h) return base;
+    Image im = base;
+    for (size_t i = 0; i < im.px.size(); ++i)
+        if (over.px[i] != NODATA) im.px[i] = over.px[i];
+    return im;
+}
+
 double coverage(const Image& im) {
     if (im.empty()) return 0.0;
     size_t seen = 0;

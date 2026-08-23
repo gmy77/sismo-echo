@@ -34,6 +34,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 using std::min;
@@ -137,6 +138,7 @@ struct GranuleView {
     std::string rSat, rProduct, rTimeText, rSortKey;
     double rLatMin = 0, rLatMax = 0, rLonMin = 0, rLonMax = 0;
     bool   rStrip = false;   // "blocco" swath (FVG parallel down to the equator)
+    std::wstring cacheFile;  // PNG su disco da rimuovere se l'utente lo cestina
 
     Bitmap* thumb = nullptr;
 };
@@ -261,7 +263,9 @@ static double minScale() {
     if (!g.image) return 0.01;
     RECT& c = g.rcCanvas;
     double cw = max(1L, c.right - c.left), ch = max(1L, c.bottom - c.top);
-    return min(cw / g.imgW, ch / g.imgH) * 0.25;
+    // Meta' del limite precedente: si puo' rimpicciolire fino a un ottavo
+    // dell'inquadratura, utile per vedere il granulo nel suo contesto.
+    return min(cw / g.imgW, ch / g.imgH) * 0.125;
 }
 static void geoToCanvas(const GranuleView& v, double lon, double lat, double& X, double& Y) {
     double fx = (lon - vLonMin(v)) / (vLonMax(v) - vLonMin(v));
@@ -394,6 +398,33 @@ static void selectIndex(int i) {
     InvalidateRect(g.hwnd, nullptr, FALSE);
 }
 
+// Cestina un elemento della sequenza. Per un granulo scaricato cancella anche
+// il PNG in cache: la miniatura e' l'unico posto da cui l'utente vede quella
+// libreria, quindi toglierla di li' e lasciare il file sul disco sarebbe una
+// bugia - riapparirebbe al prossimo avvio.
+static void removeIndex(int i) {
+    if (i < 0 || i >= (int)g.seq.size()) return;
+    GranuleView& gv = g.seq[i];
+    if (!gv.cacheFile.empty()) {
+        if (DeleteFileW(gv.cacheFile.c_str())) logLine(L"cache rimossa: " + gv.cacheFile);
+        else logLine(L"cache NON rimossa: " + gv.cacheFile);
+    }
+    if (gv.thumb) { delete gv.thumb; gv.thumb = nullptr; }
+    g.seq.erase(g.seq.begin() + i);
+
+    if (g.seq.empty()) {
+        g.cur = -1;
+        if (g.image) { delete g.image; g.image = nullptr; }
+        g.imgW = g.imgH = 0;
+        refreshBandUI(); buildStatus();
+        InvalidateRect(g.hwnd, nullptr, FALSE);
+        return;
+    }
+    if (g.cur >= (int)g.seq.size()) g.cur = (int)g.seq.size() - 1;
+    else if (g.cur > i) --g.cur;
+    selectIndex(g.cur);
+}
+
 static void openFilePath(const std::wstring& path) {
     std::string p = toU8(path), err;
     modis::Granule gr = modis::parseFile(p, &err);
@@ -486,6 +517,7 @@ static void addRemote(img::Image&& im, int satIdx, int prodIdx, const std::strin
     gv.rLonMin = bx.lonMin; gv.rLonMax = bx.lonMax;
     std::string ymd = date; ymd.erase(std::remove(ymd.begin(), ymd.end(), '-'), ymd.end());
     gv.rSortKey = ymd + "T" + (satIdx == 1 ? "A" : "T") + std::to_string(prodIdx) + (strip ? "S" : "F");
+    gv.cacheFile = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, date, strip);
     // Already loaded? Just bring it to the front instead of duplicating it.
     for (int i = 0; i < (int)g.seq.size(); ++i)
         if (vSortKey(g.seq[i]) == gv.rSortKey) { selectIndex(i); return; }
@@ -596,12 +628,35 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
                             img::Image& out, std::wstring& err) -> bool {
         int fw = probe ? 256 : W;
         int fh = probe ? std::max(64, (int)std::lround(256.0 * H / W)) : H;
-        std::wstring saveTo = probe ? L"" : (cacheDir() + L"\\" + cacheName(satIdx, prodIdx, d, strip));
+        // Un prodotto "a punti" non va in cache come immagine finita: il file su
+        // disco resterebbe il solo strato trasparente, illeggibile al riavvio.
+        std::wstring saveTo = (probe || pr.overlayOn)
+            ? L"" : (cacheDir() + L"\\" + cacheName(satIdx, prodIdx, d, strip));
         HCURSOR prevCur = SetCursor(LoadCursor(nullptr, IDC_WAIT));
-        bool ok = g.viaWorker
-            ? gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
-                  pr.id, d, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, out, &err, saveTo)
-            : gibs::download(layer, d, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, out, &err, saveTo);
+        auto fetchOne = [&](const std::string& prodId, const std::string& gibsLayer, img::Image& dst) {
+            return g.viaWorker
+                ? gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
+                      prodId, d, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, dst, &err, saveTo)
+                : gibs::download(gibsLayer, d, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, dst, &err, saveTo);
+        };
+        bool ok;
+        if (pr.overlayOn) {
+            // La base porta la copertura (e quindi decide se la data e' buona);
+            // lo strato sopra aggiunge i punti di calore.
+            const gibs::Product* base = nullptr;
+            for (int k = 0; k < nProd; ++k) if (std::strcmp(P[k].id, pr.overlayOn) == 0) base = &P[k];
+            img::Image baseImg;
+            ok = base && fetchOne(base->id, (satIdx == 1) ? base->aquaLayer : base->terraLayer, baseImg);
+            if (ok) {
+                img::Image over; std::wstring overErr;
+                std::wstring keep = err; err = overErr;
+                if (fetchOne(pr.id, layer, over)) out = img::composite(baseImg, over);
+                else                              out = baseImg;   // niente incendi quel giorno
+                err = keep;
+            }
+        } else {
+            ok = fetchOne(pr.id, layer, out);
+        }
         SetCursor(prevCur);
         if (ok && !probe && img::coverage(out) < MIN_COVERAGE)
             DeleteFileW(saveTo.c_str());   // never cache an empty tile
@@ -1000,26 +1055,51 @@ static void paintCanvas(Graphics& gfx) {
     gfx.DrawString(chip.c_str(), -1, &font, PointF((REAL)g.rcCanvas.left + 22, (REAL)g.rcCanvas.top + 17), &chtx);
 }
 
+// Geometria della filmstrip, usata sia dal disegno sia dal clic: tenerla in un
+// posto solo evita che il bersaglio del mouse si scosti da cio' che si vede.
+static const int FILM_PAD = 10, FILM_CELLW = 132, FILM_XBTN = 18;
+static RECT filmCellRect(int i) {
+    int cellH = FILM_H - 2 * FILM_PAD;
+    int x = g.rcFilm.left + FILM_PAD + i * (FILM_CELLW + FILM_PAD);
+    int y = g.rcFilm.top + FILM_PAD;
+    return RECT{ (LONG)x, (LONG)y, (LONG)(x + FILM_CELLW), (LONG)(y + cellH) };
+}
+static RECT filmCloseRect(int i) {
+    RECT c = filmCellRect(i);
+    return RECT{ c.right - FILM_XBTN - 3, c.top + 3, c.right - 3, c.top + 3 + FILM_XBTN };
+}
+
 static void paintFilm(Graphics& gfx) {
     const Theme& t = g.theme;
     SolidBrush bg(t.filmBg);
     gfx.FillRectangle(&bg, (INT)g.rcFilm.left, (INT)g.rcFilm.top, (INT)(g.rcFilm.right - g.rcFilm.left), (INT)(g.rcFilm.bottom - g.rcFilm.top));
     if (g.seq.empty()) { drawCentered(gfx, g.rcFilm, L"Sequenza vuota — apri o scarica granuli e appariranno qui.", t); return; }
-    int pad = 10, cellW = 132, cellH = FILM_H - 2 * pad, x = g.rcFilm.left + pad, y = g.rcFilm.top + pad;
+    int cellH = FILM_H - 2 * FILM_PAD;
     FontFamily ff(L"Segoe UI"); Font font(&ff, 10, FontStyleRegular, UnitPixel);
     SolidBrush txt(t.text);
     gfx.SetInterpolationMode(InterpolationModeHighQualityBicubic);
     for (int i = 0; i < (int)g.seq.size(); ++i) {
+        RECT c = filmCellRect(i);
+        if (c.right > g.rcFilm.right) break;
         SolidBrush cb(i == g.cur ? t.cellSel : t.cell);
-        fillRoundRect(gfx, cb, (REAL)x, (REAL)y, (REAL)cellW, (REAL)cellH, 10);
-        if (g.seq[i].thumb) {
-            int tw = cellW - 8, th = cellH - 22;
-            gfx.DrawImage(g.seq[i].thumb, x + 4, y + 4, tw, th);
-        }
+        fillRoundRect(gfx, cb, (REAL)c.left, (REAL)c.top, (REAL)FILM_CELLW, (REAL)cellH, 10);
+        if (g.seq[i].thumb)
+            gfx.DrawImage(g.seq[i].thumb, (INT)(c.left + 4), (INT)(c.top + 4),
+                          (INT)(FILM_CELLW - 8), (INT)(cellH - 22));
         std::wstring lab = toW(vTimeText(g.seq[i]));
-        gfx.DrawString(lab.c_str(), -1, &font, PointF((REAL)(x + 6), (REAL)(y + cellH - 16)), &txt);
-        x += cellW + pad;
-        if (x + cellW > g.rcFilm.right) break;
+        gfx.DrawString(lab.c_str(), -1, &font, PointF((REAL)(c.left + 6), (REAL)(c.top + cellH - 16)), &txt);
+
+        // Pulsante di rimozione: pastiglia scura con una x, in alto a destra.
+        RECT xb = filmCloseRect(i);
+        SolidBrush xbg(Color(190, 12, 14, 18));
+        gfx.FillEllipse(&xbg, (REAL)xb.left, (REAL)xb.top, (REAL)FILM_XBTN, (REAL)FILM_XBTN);
+        Pen xp(Color(235, 255, 255, 255), 1.6f);
+        xp.SetStartCap(LineCapRound); xp.SetEndCap(LineCapRound);
+        REAL m = 5.5f;
+        gfx.DrawLine(&xp, (REAL)xb.left + m, (REAL)xb.top + m,
+                          (REAL)xb.left + FILM_XBTN - m, (REAL)xb.top + FILM_XBTN - m);
+        gfx.DrawLine(&xp, (REAL)xb.left + FILM_XBTN - m, (REAL)xb.top + m,
+                          (REAL)xb.left + m, (REAL)xb.top + FILM_XBTN - m);
     }
 }
 
@@ -1289,9 +1369,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_MOUSEWHEEL: { POINT pt{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) }; ScreenToClient(hwnd, &pt); onWheel(pt.x, pt.y, GET_WHEEL_DELTA_WPARAM(wp)); return 0; }
     case WM_LBUTTONDOWN: {
         int x = GET_X_LPARAM(lp), y = GET_Y_LPARAM(lp);
-        if (inRect(g.rcFilm, x, y)) { int pad = 10, cellW = 132, idx = (x - (g.rcFilm.left + pad)) / (cellW + pad);
-            if (idx >= 0 && idx < (int)g.seq.size()) selectIndex(idx);
-            return 0; }
+        if (inRect(g.rcFilm, x, y)) {
+            int idx = (x - (g.rcFilm.left + FILM_PAD)) / (FILM_CELLW + FILM_PAD);
+            if (idx >= 0 && idx < (int)g.seq.size()) {
+                if (inRect(filmCloseRect(idx), x, y)) removeIndex(idx);
+                else selectIndex(idx);
+            }
+            return 0;
+        }
         if (inRect(g.rcCanvas, x, y)) {
             SetFocus(hwnd);   // senza questo le frecce restano ai controlli del pannello
             if (g.image) { g.dragging = true; g.lastX = x; g.lastY = y; SetCapture(hwnd); }
