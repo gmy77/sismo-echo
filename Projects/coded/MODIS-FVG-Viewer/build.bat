@@ -32,6 +32,22 @@ for %%F in (src\app.cpp src\app.rc src\app.manifest src\modis.cpp src\image.cpp 
   )
 )
 
+REM --- 0b. l'eseguibile e' in esecuzione? ------------------------------------
+REM Windows tiene bloccato un exe mentre gira, e il linker fallisce con
+REM "cannot open output file: Permission denied" - un messaggio che sembra un
+REM problema di permessi del disco. Meglio dirlo chiaramente adesso.
+if exist MODIS-FVG-Viewer.exe (
+  2>nul (>>MODIS-FVG-Viewer.exe echo.) || (
+    echo.
+    echo  MODIS-FVG-Viewer.exe e' in uso: l'app e' aperta.
+    echo  Chiudila e rilancia questo file. Per forzare:
+    echo     Get-Process MODIS-FVG-Viewer ^| Stop-Process -Force
+    echo.
+    pause
+    exit /b 1
+  )
+)
+
 REM --- 1. gia' nel PATH? -----------------------------------------------------
 where cl  >nul 2>nul && goto :msvc
 where g++ >nul 2>nul && goto :mingw
