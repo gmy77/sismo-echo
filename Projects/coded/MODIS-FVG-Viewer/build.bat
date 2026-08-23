@@ -21,20 +21,21 @@ REM --- 2. Visual Studio installato ma ambiente non caricato -------------------
 REM vswhere e' installato con qualsiasi VS 2017+ e sta sempre in questo percorso.
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
-if exist "%VSWHERE%" (
-  echo  Cerco Visual Studio...
-  set "VSPATH="
-  REM Una riga sola: dentro un for /f la continuazione con ^ e' inaffidabile.
-  for /f "usebackq tokens=*" %%i in (`"!VSWHERE!" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do set "VSPATH=%%i"
-  if defined VSPATH (
-    if exist "!VSPATH!\VC\Auxiliary\Build\vcvars64.bat" (
-      echo  Trovato: !VSPATH!
-      echo  Carico l'ambiente C++ x64...
-      call "!VSPATH!\VC\Auxiliary\Build\vcvars64.bat" >nul
-      where cl >nul 2>nul && goto :msvc
-    )
-  )
-)
+REM Struttura piatta, senza blocchi fra parentesi: vcvars64.bat manipola
+REM l'ambiente e chiamarlo dentro un blocco e' una fonte nota di guai.
+if not exist "%VSWHERE%" goto :trymingw
+echo  Cerco Visual Studio...
+set "VSPATH="
+REM Una riga sola: dentro un for /f la continuazione con ^ e' inaffidabile.
+for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do set "VSPATH=%%i"
+if not defined VSPATH goto :trymingw
+if not exist "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" goto :trymingw
+echo  Trovato: %VSPATH%
+echo  Carico l'ambiente C++ x64...
+call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" >nul
+where cl >nul 2>nul && goto :msvc
+
+:trymingw
 
 REM --- 3. MinGW-w64 nelle posizioni note -------------------------------------
 for %%D in (
