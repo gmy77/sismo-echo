@@ -3365,7 +3365,18 @@ export default {
       };
       const sat     = (url.searchParams.get("sat") || "terra").toLowerCase();
       const product = (url.searchParams.get("product") || "truecolor").toLowerCase();
-      const layer   = (LAYERS[sat] || LAYERS.terra)[product] || LAYERS.terra.truecolor;
+      // Un prodotto sconosciuto NON deve ripiegare in silenzio sul true-color:
+      // il client etichetterebbe l'immagine con il prodotto che ha chiesto, e si
+      // ritroverebbe MODIS spacciato per Sentinel-2. Meglio un errore parlante.
+      const layer = (LAYERS[sat] || LAYERS.terra)[product];
+      if (!layer) {
+        return new Response(JSON.stringify({
+          error: "prodotto sconosciuto",
+          product,
+          disponibili: Object.keys(LAYERS.terra),
+          hint: "Worker non aggiornato? I prodotti hls_* richiedono l'ultima versione."
+        }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
+      }
 
       let date = url.searchParams.get("date");
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {           // default: ieri (UTC)
