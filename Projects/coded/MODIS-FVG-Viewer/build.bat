@@ -124,7 +124,9 @@ pushd src
 windres -O coff app.rc -o app.res.o
 if %errorlevel% neq 0 ( popd & echo Errore nelle risorse ^(windres^). & pause & exit /b 1 )
 popd
-g++ -std=c++17 -O2 -municode -mwindows -static -static-libgcc -static-libstdc++ ^
+REM -s toglie i simboli di debug: con le librerie statiche di GCC 15 la
+REM differenza e' di parecchi MB, e in una build di rilascio non servono.
+g++ -std=c++17 -O2 -s -municode -mwindows -static -static-libgcc -static-libstdc++ ^
     src\app.cpp src\modis.cpp src\image.cpp src\gibs.cpp src\mf_encoder.cpp src\app.res.o ^
     -o MODIS-FVG-Viewer.exe ^
     -lgdiplus -lcomctl32 -lcomdlg32 -ldwmapi -lwinhttp -lshlwapi ^
