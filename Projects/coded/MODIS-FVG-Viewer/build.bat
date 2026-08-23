@@ -137,8 +137,35 @@ goto :done
 copy /y test\sample_MODIS_FVG.mgr      sample_MODIS_FVG.mgr      >nul 2>nul
 copy /y test\sample_MODIS_FVG_1200.mgr sample_MODIS_FVG_1200.mgr >nul 2>nul
 copy /y test\sample_MODIS_FVG_1345.mgr sample_MODIS_FVG_1345.mgr >nul 2>nul
+REM L'eseguibile e' davvero un eseguibile? Il linker puo' riuscire e lasciare
+REM comunque un file rotto: e' bastata una riga di echo con un '>' non protetto
+REM per sovrascriverlo con 11 byte di testo. Meglio accorgersene qui che
+REM davanti a "Impossibile eseguire questa app nel tuo PC".
+if not exist MODIS-FVG-Viewer.exe (
+  echo.
+  echo  ERRORE: la compilazione e' finita ma MODIS-FVG-Viewer.exe non c'e'.
+  echo.
+  pause
+  exit /b 1
+)
+set "EXESZ=0"
+for %%A in (MODIS-FVG-Viewer.exe) do set "EXESZ=%%~zA"
+if !EXESZ! LSS 100000 (
+  echo.
+  echo  ERRORE: MODIS-FVG-Viewer.exe e' di soli !EXESZ! byte: non e' un eseguibile.
+  echo  Qualcosa l'ha sovrascritto dopo il link ^(tipicamente una redirezione
+  echo  accidentale in questo script^). Non lanciarlo: Windows lo rifiuterebbe.
+  echo.
+  pause
+  exit /b 1
+)
+
 echo.
-echo  Fatto!  ->  MODIS-FVG-Viewer.exe
+REM ATTENZIONE: la freccia va scritta -^^> . Senza l'accento circonflesso
+REM batch legge '>' come redirezione e scrive "Fatto!  -" DENTRO
+REM MODIS-FVG-Viewer.exe, distruggendo l'eseguibile appena compilato
+REM e lasciandolo di 11 byte.
+echo  Fatto!  -^> MODIS-FVG-Viewer.exe  ^(!EXESZ! byte^)
 echo  (i 3 granuli di esempio .mgr sono accanto all'eseguibile)
 echo.
 pause
