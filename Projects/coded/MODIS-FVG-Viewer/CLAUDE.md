@@ -55,6 +55,14 @@ Deploy: `cd sismo-worker && npx wrangler deploy` (se il token OAuth è scaduto:
   `+` `−` `Ctrl+S`).
 - Filmstrip con **×** che cancella il granulo *e* il suo file di cache.
 - Apertura su una vera immagine MODIS (Terra true-color) se la cache è vuota.
+- **Nuvole in grigio** (`img::mutedClouds`): riconosce la nuvola perché è
+  chiara *e* senza dominante, e la appiattisce. Non nasconde e non inventa: fa
+  risaltare il terreno ancora visibile e rende evidente dove il sensore è cieco.
+- **Vista a griglia** (fino a 9 giornate affiancate, clic per aprirne una) e
+  **fascia a riquadri** (la colonna FVG→equatore tagliata in 4 sezioni con la
+  latitudine indicata). Sono un menu, non spunte: si escludono a vicenda.
+- Confini disegnati con **guaina scura** sotto il tratto chiaro: un bianco pieno
+  spariva sopra le nuvole, cioè su gran parte delle scene MODIS.
 - `build.bat` trova da solo Visual Studio (vswhere + vcvars64) o MinGW;
   `setup-compiler.bat` installa MSYS2; `check-compiler.bat` diagnostica.
 
@@ -116,6 +124,15 @@ più *interpola soltanto*, ed è quello che lo faceva sembrare sfocato. Vedi
 **GIBS segnala "nessun passaggio" con la trasparenza, non con un errore.** I
 pixel trasparenti diventano `img::NODATA`, e `img::coverage()` distingue una
 tessera vuota da una scena scura reale. Le tessere vuote **non vanno in cache**.
+
+**L'app aperta blocca il proprio eseguibile.** Il linker fallisce con
+"cannot open output file: Permission denied", che sembra un problema di
+permessi del disco. `build.bat` ora lo verifica e lo dice.
+
+**Attenzione a quale exe si sta lanciando.** L'utente ne aveva tre copie sparse
+e per ore ha guardato una build vecchia, credendo che una correzione non fosse
+stata applicata. La barra del titolo porta la versione apposta: se non dice
+`1.0.0`, è vecchio.
 
 **Cambiare un prodotto richiede due file**: `src/gibs.h` (app) e
 `sismo-worker/index.js` (Worker). Dimenticare il secondo dà `400 prodotto
