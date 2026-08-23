@@ -187,6 +187,35 @@ Image composite(const Image& base, const Image& over) {
     return im;
 }
 
+Image mutedClouds(const Image& src, double strength) {
+    Image im = src;
+    if (src.empty() || strength <= 0) return im;
+    if (strength > 1) strength = 1;
+    for (size_t i = 0; i < im.px.size(); ++i) {
+        uint32_t p = src.px[i];
+        if (p == NODATA) continue;
+        double r = ((p >> 16) & 0xff) / 255.0;
+        double g = ((p >> 8) & 0xff) / 255.0;
+        double b = (p & 0xff) / 255.0;
+        double hi = std::max(r, std::max(g, b)), lo = std::min(r, std::min(g, b));
+        double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        double sat = hi - lo;                       // dominante di colore
+        // Chiaro e senza dominante = nuvola. Le due soglie sfumano invece di
+        // scattare, cosi' il bordo di una nube non diventa un gradino netto.
+        double isCloud = std::min(1.0, std::max(0.0, (lum - 0.55) / 0.20))
+                       * std::min(1.0, std::max(0.0, (0.16 - sat) / 0.10));
+        if (isCloud <= 0) continue;
+        double k = isCloud * strength;
+        double grey = 0.30 + 0.45 * lum;            // grigio piatto, un po' di texture
+        auto mix = [&](double c) {
+            double v = c * (1 - k) + grey * k;
+            return (uint8_t)std::lround(std::max(0.0, std::min(1.0, v)) * 255);
+        };
+        im.px[i] = packARGB(mix(r), mix(g), mix(b));
+    }
+    return im;
+}
+
 double coverage(const Image& im) {
     if (im.empty()) return 0.0;
     size_t seen = 0;

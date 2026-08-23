@@ -67,4 +67,14 @@ double coverage(const Image& im);
 // soli sarebbero quasi tutti trasparenti e illeggibili senza un riferimento.
 Image composite(const Image& base, const Image& over);
 
+// Appiattisce le nuvole in un grigio neutro, lasciando intatto il resto.
+//
+// Una nuvola in true-color e' chiara *e* priva di dominante: terra e mare hanno
+// sempre un colore, il vapore no. Riconosciuta cosi', viene resa in grigio
+// uniforme - non per nasconderla, ma per il contrario: il terreno ancora
+// visibile torna a spiccare, e diventa immediato distinguere dove c'e'
+// osservazione da dove il sensore e' cieco. Non inventa nulla di cio' che sta
+// sotto: quel dato non esiste.
+Image mutedClouds(const Image& src, double strength = 1.0);
+
 } // namespace img

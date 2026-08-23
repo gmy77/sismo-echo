@@ -81,7 +81,7 @@ enum {
     IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH, IDC_LATEST, IDC_WORKER,
     IDC_BANDLIST, IDC_RGB, IDC_RCOMBO, IDC_GCOMBO, IDC_BCOMBO,
     IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE,
-    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG, IDC_RAWLAYER
+    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG, IDC_RAWLAYER, IDC_CLOUDGREY
 };
 
 // ----------------------------- theme --------------------------------------
@@ -151,7 +151,7 @@ struct App {
     HWND hwnd = nullptr;
     HWND satCombo=nullptr, prodCombo=nullptr, dateEdit=nullptr, workerChk=nullptr, stripChk=nullptr;
     HWND bandList=nullptr, rgbChk=nullptr, rCombo=nullptr, gCombo=nullptr, bCombo=nullptr;
-    HWND rawChk=nullptr, citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr, sharpChk=nullptr;
+    HWND rawChk=nullptr, cloudChk=nullptr, citiesChk=nullptr, bordersChk=nullptr, diffChk=nullptr, fpsEdit=nullptr, sharpChk=nullptr;
     ULONG_PTR gdip = 0;
     HBRUSH panelBrush = nullptr, cardBrush = nullptr;
 
@@ -167,6 +167,7 @@ struct App {
     bool stripMode = false;                  // "blocco": tall swath FVG -> equator
     bool sharpen   = true;                   // unsharp mask on the shown image
     bool rawOverlay= false;                  // strato "a punti" senza la base sotto
+    bool greyClouds= false;                  // nuvole appiattite in grigio neutro
 
     Bitmap* image = nullptr;
     int imgW = 0, imgH = 0;
@@ -252,6 +253,9 @@ static img::Image vRender(const GranuleView& v) {
     // resolves, so a MODIS crop of an area this small always arrives soft.
     // The unsharp mask restores edge contrast without inventing detail.
     if (g.sharpen && !im.empty()) im = img::sharpen(im, 0.9, 1);
+    // Dopo la nitidezza: cosi' il terreno resta inciso e solo la nuvola si
+    // appiattisce, invece di affilare un grigio che non ha dettaglio da dare.
+    if (g.greyClouds && !im.empty()) im = img::mutedClouds(im, 1.0);
     return im;
 }
 
@@ -937,6 +941,7 @@ static void doLayout() {
     row(g.bordersChk, 22);
     row(g.sharpChk, 22);
     row(g.rawChk, 22);
+    row(g.cloudChk, 22);
     row(g.diffChk, 22);
     row(GetDlgItem(g.hwnd, IDC_RESET), 28);
     row(GetDlgItem(g.hwnd, IDC_SAVEPNG), 28);
@@ -1308,6 +1313,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         g.bordersChk = mkCheck(hwnd, L"Mostra confini FVG", IDC_BORDERS, true);
         g.sharpChk   = mkCheck(hwnd, L"Nitidezza (unsharp)", IDC_SHARP, true);
         g.rawChk     = mkCheck(hwnd, L"Solo strato (senza base)", IDC_RAWLAYER, false);
+        g.cloudChk   = mkCheck(hwnd, L"Nuvole in grigio", IDC_CLOUDGREY, false);
         g.diffChk    = mkCheck(hwnd, L"Diff vs precedente", IDC_DIFF, false);
         mkButton(hwnd, L"Reset vista (fit)", IDC_RESET);
         mkButton(hwnd, L"Salva vista (PNG)", IDC_SAVEPNG);
@@ -1457,7 +1463,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nShow) {
     RegisterClassW(&wc);
 
     g.hwnd = CreateWindowExW(0, wc.lpszClassName, APP_TITLE, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 900, nullptr, nullptr, hInst, nullptr);
+        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 940, nullptr, nullptr, hInst, nullptr);
 
     { BOOL dark = !g.light; DwmSetWindowAttribute(g.hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof dark); }
     { int backdrop = DWMSBT_MAINWINDOW; DwmSetWindowAttribute(g.hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop, sizeof backdrop); }

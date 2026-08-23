@@ -95,6 +95,22 @@ int main(int argc, char** argv) {
     check(img::coverage(img::Image{}) == 0.0, "coverage di un'immagine vuota = 0");
     check(img::coverage(nat) > 0.5, "il granulo di esempio ha copertura reale");
 
+    // mutedClouds: appiattisce il chiaro-senza-colore, non tocca il colorato.
+    img::Image mix; mix.w = 3; mix.h = 1; mix.px.resize(3);
+    mix.px[0] = img::packARGB(238, 240, 242);   // nuvola: chiara e neutra
+    mix.px[1] = img::packARGB(40, 120, 40);     // prato: colorato
+    mix.px[2] = img::NODATA;
+    img::Image mc = img::mutedClouds(mix, 1.0);
+    check(mc.px[0] != mix.px[0], "la nuvola viene appiattita");
+    check(mc.px[1] == mix.px[1], "il terreno colorato resta intatto");
+    check(mc.px[2] == img::NODATA, "il no-data resta no-data");
+    check(img::mutedClouds(mix, 0.0).px == mix.px, "strength=0 non altera nulla");
+    auto sat = [](uint32_t p) {
+        int r=(p>>16)&0xff, g=(p>>8)&0xff, b=p&0xff;
+        return std::max(r,std::max(g,b)) - std::min(r,std::min(g,b));
+    };
+    check(sat(mc.px[0]) <= sat(mix.px[0]), "la nuvola non guadagna colore");
+
     std::printf(fails ? "\nRESULT: %d FAIL\n" : "\nRESULT: all tests passed\n", fails);
     return fails ? 1 : 0;
 }
