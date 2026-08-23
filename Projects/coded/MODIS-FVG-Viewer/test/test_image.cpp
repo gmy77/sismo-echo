@@ -82,6 +82,19 @@ int main(int argc, char** argv) {
     };
     check(spread(sh) > spread(nat), "sharpen aumenta il contrasto di bordo");
 
+    // coverage(): distingue "il satellite non e' passato" (tessera tutta
+    // trasparente -> tutta NODATA) da una scena reale ma scura.
+    img::Image empty; empty.w = 8; empty.h = 8;
+    empty.px.assign(64, img::NODATA);
+    check(img::coverage(empty) == 0.0, "coverage di un'immagine tutta no-data = 0");
+    img::Image dark; dark.w = 8; dark.h = 8;
+    dark.px.assign(64, img::packARGB(0, 0, 0));
+    check(img::coverage(dark) == 1.0, "coverage di una scena nera ma reale = 1");
+    dark.px[0] = img::NODATA; dark.px[1] = img::NODATA;
+    check(std::abs(img::coverage(dark) - 62.0 / 64.0) < 1e-9, "coverage parziale corretta");
+    check(img::coverage(img::Image{}) == 0.0, "coverage di un'immagine vuota = 0");
+    check(img::coverage(nat) > 0.5, "il granulo di esempio ha copertura reale");
+
     std::printf(fails ? "\nRESULT: %d FAIL\n" : "\nRESULT: all tests passed\n", fails);
     return fails ? 1 : 0;
 }

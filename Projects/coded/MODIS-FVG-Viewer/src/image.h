@@ -53,4 +53,11 @@ Image difference(const Image& a, const Image& b);
 // `amount` 0 = untouched, ~0.6 = gentle, ~1.5 = strong. NODATA is preserved.
 Image sharpen(const Image& src, double amount = 0.9, int radius = 1);
 
+// Fraction of pixels (0..1) that carry an actual observation, i.e. are not
+// NODATA. A satellite product with a long revisit time returns a fully
+// transparent tile on days it did not fly over, which decodes to all-NODATA:
+// this is how the viewer tells "no pass that day" from "a genuinely dark
+// scene" and can step back to the last day with real data.
+double coverage(const Image& im);
+
 } // namespace img

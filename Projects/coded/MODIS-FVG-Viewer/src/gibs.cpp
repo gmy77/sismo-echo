@@ -92,7 +92,15 @@ static bool decode(const std::vector<BYTE>& body, img::Image& out, std::wstring*
     if (bmp->LockBits(&rc, ImageLockModeRead, PixelFormat32bppARGB, &bd) == Ok) {
         for (int y = 0; y < h; ++y) {
             const uint32_t* src = (const uint32_t*)((BYTE*)bd.Scan0 + (size_t)y * bd.Stride);
-            for (int x = 0; x < w; ++x) out.px[(size_t)y * w + x] = 0xFF000000u | (src[x] & 0x00FFFFFFu);
+            // GIBS marks "no observation here" with transparency, not a colour.
+            // Forcing alpha to opaque would turn an empty granule into a black
+            // rectangle that looks like real (very dark) imagery; map it to
+            // NODATA instead, so the viewer can tell the two apart.
+            for (int x = 0; x < w; ++x) {
+                uint32_t p = src[x];
+                out.px[(size_t)y * w + x] = ((p >> 24) < 16) ? img::NODATA
+                                                             : (0xFF000000u | (p & 0x00FFFFFFu));
+            }
         }
         bmp->UnlockBits(&bd);
     } else { delete bmp; return fail(err, L"LockBits fallita"); }

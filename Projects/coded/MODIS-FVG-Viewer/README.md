@@ -171,9 +171,22 @@ dalla cache. Deploy del Worker: `cd sismo-worker && npx wrangler deploy`.
 Ogni immagine scaricata (via Worker o diretta) finisce comunque nella **cache su
 disco locale** (`cache\` accanto all'exe) e viene ricaricata all'avvio.
 
-> Nota: alcune date non hanno copertura MODIS sul FVG (le orbite non passano
-> sull'Italia ogni giorno). Se il download fallisce, prova una data vicina. La
-> data di default è **due giorni fa** (i prodotti GIBS hanno una breve latenza).
+### Ricerca automatica della data
+
+Non tutte le date hanno un'immagine: le orbite MODIS non passano sull'Italia ogni
+giorno, e i prodotti a 30 m rivisitano ogni 2-3 giorni con qualche giorno di
+latenza di elaborazione. GIBS in questi casi **non dà errore**: restituisce una
+tessera completamente **trasparente**.
+
+Il viewer la riconosce (`img::coverage()` misura la frazione di pixel con
+un'osservazione reale) e **cammina all'indietro nel tempo** finché non trova un
+giorno con dati veri — fino a 4 tentativi per MODIS, 14 per i prodotti a 30 m —
+aggiornando da solo il campo data. Le tessere vuote **non entrano in cache**,
+altrimenti verrebbero riservite per sempre come se fossero immagini.
+
+> Nota: una tessera trasparente diventa **no-data**, non nero. Confondere le due
+> cose farebbe sembrare "una scena molto scura" quello che invece è "il satellite
+> non è passato".
 
 ### Granuli HDF-EOS reali (`.hdf`)
 I file MODIS ufficiali (MOD021KM, MOD09, MOD11) sono HDF-EOS/HDF4 e vanno letti

@@ -32,6 +32,8 @@
 #include <dwmapi.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 using std::min;
@@ -526,25 +528,45 @@ static std::wstring dateMinusDays(int days) {
 
 // Core: fetch one granule for (satIdx, prodIdx, date). Uses the disk cache, then
 // the Cloudflare Worker (if enabled) or NASA GIBS directly. Reports errors.
+// Below this fraction of real pixels the tile is "the satellite wasn't here
+// that day", not a dark scene. A genuine FVG crop is essentially fully covered;
+// partial cloud still counts as data, so the bar can sit low.
+static const double MIN_COVERAGE = 0.02;
+
+// Show a message in the status bar and repaint right away — the fetch loop
+// blocks the message pump, so without this the user would stare at a frozen
+// window while we walk back through the dates.
+static void flashStatus(const std::wstring& msg) {
+    g.statusText = msg;
+    InvalidateRect(g.hwnd, &g.rcStatus, FALSE);
+    UpdateWindow(g.hwnd);
+}
+
 // `quiet` suppresses the error popup: the automatic fetches (switching product
 // or satellite) must never interrupt with a dialog, they just report in the
 // status bar. The explicit buttons stay loud.
-static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool quiet = false) {
+static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool quiet = false);
+
+// Step `date` back by `days` days. Dates here are always "YYYY-MM-DD".
+static std::string dateBack(const std::string& date, int days) {
+    SYSTEMTIME st{};
+    st.wYear  = (WORD)atoi(date.substr(0, 4).c_str());
+    st.wMonth = (WORD)atoi(date.substr(5, 2).c_str());
+    st.wDay   = (WORD)atoi(date.substr(8, 2).c_str());
+    FILETIME ft; if (!SystemTimeToFileTime(&st, &ft)) return date;
+    LARGE_INTEGER u; u.LowPart = ft.dwLowDateTime; u.HighPart = (LONG)ft.dwHighDateTime;
+    u.QuadPart -= (LONGLONG)days * 24 * 60 * 60 * 10000000LL;  // signed: days may be < 0
+    ft.dwLowDateTime = u.LowPart; ft.dwHighDateTime = (DWORD)u.HighPart;
+    if (!FileTimeToSystemTime(&ft, &st)) return date;
+    char b[16]; std::snprintf(b, 16, "%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
+    return b;
+}
+
+static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool quiet) {
     int nProd; const gibs::Product* P = gibs::products(nProd);
     const gibs::Product& pr = P[prodIdx < nProd ? prodIdx : 0];
     std::string layer = (satIdx == 1) ? pr.aquaLayer : pr.terraLayer;
     const bool strip = g.stripMode;
-
-    // Disk cache hit? Load, no network.
-    std::wstring cachePath = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, date, strip);
-    if (GetFileAttributesW(cachePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        img::Image cim; std::wstring cerr;
-        if (gibs::decodeFile(cachePath, cim, &cerr) && !cim.empty()) {
-            logLine(L"cache-hit: " + cachePath);
-            addRemote(std::move(cim), satIdx, prodIdx, date, strip);
-            return;
-        }
-    }
 
     Box bx = boxFor(strip);
     // Ask for as many pixels as the product actually resolves — no more (that
@@ -554,34 +576,76 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
     if (H < 64) H = 64;
     if (H > 4096) { H = 4096; W = (int)std::lround(H * (bx.lonMax - bx.lonMin) / (bx.latMax - bx.latMin)); }
 
-    HCURSOR prev = SetCursor(LoadCursor(nullptr, IDC_WAIT));
-    img::Image im; std::wstring err; bool ok;
-    if (g.viaWorker) {
-        ok = gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
-                pr.id, date, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
-    } else {
-        ok = gibs::download(layer, date, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
-    }
-    SetCursor(prev);
+    // A product that revisits every 2-3 days (and is processed days later) has
+    // no image on most dates; MODIS flies daily but still misses the FVG. So
+    // the requested day is a starting point: walk back until real data shows up.
+    const int maxTries = (pr.nativeM <= 30) ? 14 : 4;
+    std::string tryDate = date;
+    std::wstring lastErr = L"nessuna immagine trovata";
 
-    if (!ok || im.empty()) {
-        logLine(L"FETCH FAIL: " + toW(layer) + L" " + toW(date) + L" — " + err);
-        std::wstring hint = pr.nativeM <= 30
-            ? L"\n\nI layer a 30 m (Sentinel-2 / Landsat) passano ogni 2-3 giorni: "
-              L"se questa data non ha un passaggio, prova un giorno vicino."
-            : L"\n\nSuggerimento: prova una data diversa (alcuni giorni non hanno "
-              L"copertura MODIS sul FVG), o controlla la connessione.";
-        g.statusText = L"Download non riuscito — " + err;
-        InvalidateRect(g.hwnd, &g.rcStatus, FALSE);
-        if (!quiet)
-            MessageBoxW(g.hwnd, (L"Download non riuscito:\n" + err + hint
-                + (g.viaWorker ? L"\n(Sorgente: Cloudflare Worker)" : L"\n(Sorgente: NASA GIBS diretto)")).c_str(),
-                APP_TITLE, MB_OK | MB_ICONWARNING);
+    for (int attempt = 0; attempt < maxTries; ++attempt, tryDate = dateBack(tryDate, 1)) {
+        std::wstring cachePath = cacheDir() + L"\\" + cacheName(satIdx, prodIdx, tryDate, strip);
+
+        // Disk cache hit? Load, no network.
+        if (GetFileAttributesW(cachePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            img::Image cim; std::wstring cerr;
+            if (gibs::decodeFile(cachePath, cim, &cerr) && !cim.empty()) {
+                logLine(L"cache-hit: " + cachePath);
+                SetWindowTextW(g.dateEdit, toW(tryDate).c_str());
+                addRemote(std::move(cim), satIdx, prodIdx, tryDate, strip);
+                return;
+            }
+        }
+
+        if (attempt > 0)
+            flashStatus(L"Nessun dato fino al " + toW(tryDate) + L" — continuo a cercare indietro…");
+
+        HCURSOR prevCur = SetCursor(LoadCursor(nullptr, IDC_WAIT));
+        img::Image im; std::wstring err; bool ok;
+        if (g.viaWorker) {
+            ok = gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
+                    pr.id, tryDate, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
+        } else {
+            ok = gibs::download(layer, tryDate, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, W, H, im, &err, cachePath);
+        }
+        SetCursor(prevCur);
+
+        if (!ok || im.empty()) { lastErr = err; continue; }
+
+        // An all-transparent tile means "no pass", not a black scene. Don't let
+        // it into the cache: it would be served forever as if it were an image.
+        double cov = img::coverage(im);
+        if (cov < MIN_COVERAGE) {
+            DeleteFileW(cachePath.c_str());
+            logLine(L"FETCH VUOTO: " + toW(layer) + L" " + toW(tryDate));
+            lastErr = L"nessun passaggio del satellite in questa data";
+            continue;
+        }
+
+        logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": "
+                + toW(layer) + L" " + toW(tryDate) + L" " + std::to_wstring(W) + L"x" + std::to_wstring(H)
+                + L" cov=" + std::to_wstring((int)(cov * 100)) + L"%");
+        SetWindowTextW(g.dateEdit, toW(tryDate).c_str());
+        addRemote(std::move(im), satIdx, prodIdx, tryDate, strip);
         return;
     }
-    logLine(std::wstring(L"FETCH OK") + (g.viaWorker ? L" [worker]" : L" [gibs]") + L": "
-            + toW(layer) + L" " + toW(date) + L" " + std::to_wstring(W) + L"x" + std::to_wstring(H));
-    addRemote(std::move(im), satIdx, prodIdx, date, strip);
+
+    logLine(L"FETCH FAIL: " + toW(layer) + L" da " + toW(date) + L" — " + lastErr);
+    std::wstring span = toW(dateBack(date, maxTries - 1)) + L" … " + toW(date);
+    g.statusText = L"Nessuna immagine per " + toW(toU8(pr.label)) + L" (" + span + L")";
+    InvalidateRect(g.hwnd, &g.rcStatus, FALSE);
+    if (!quiet) {
+        std::wstring hint = pr.nativeM <= 30
+            ? L"\n\nI prodotti a 30 m (Sentinel-2 / Landsat) passano ogni 2-3 giorni e "
+              L"vengono elaborati con qualche giorno di ritardo: prova una data più "
+              L"vecchia, oppure usa un prodotto MODIS."
+            : L"\n\nAlcuni giorni non hanno copertura MODIS sul FVG: prova una data "
+              L"diversa, o controlla la connessione.";
+        MessageBoxW(g.hwnd, (L"Nessuna immagine trovata cercando dal " + span + L".\n"
+            L"Ultimo esito: " + lastErr + hint
+            + (g.viaWorker ? L"\n(Sorgente: Cloudflare Worker)" : L"\n(Sorgente: NASA GIBS diretto)")).c_str(),
+            APP_TITLE, MB_OK | MB_ICONWARNING);
+    }
 }
 
 // Current UI selection, shared by every fetch entry point.

@@ -176,4 +176,11 @@ Image sharpen(const Image& src, double amount, int radius) {
     return im;
 }
 
+double coverage(const Image& im) {
+    if (im.empty()) return 0.0;
+    size_t seen = 0;
+    for (uint32_t p : im.px) if (p != NODATA) ++seen;
+    return (double)seen / (double)im.px.size();
+}
+
 } // namespace img
