@@ -7,11 +7,13 @@ immagini **MODIS reali** da **NASA GIBS**, le tiene in una **cache su disco**,
 compone canali in RGB naturale calibrato, e monta una sequenza in **timelapse
 MP4** (Media Foundation).
 
-![Anteprima: true-color naturale sul Friuli Venezia Giulia](docs/preview.png)
-
-*Anteprima generata dallo stesso codice di rendering dell'app (composito naturale
-bande 1-4-3, calibrato) sul granulo di esempio: pianura verde, nuvola diagonale,
-Adriatico, lo "swath gap" no-data a sinistra, confini e città FVG.*
+> **Anteprima**: qui andrebbe una schermata dell'app con un'immagine MODIS
+> **vera**. La si ottiene dall'app stessa con *Salva vista (PNG)* o `Ctrl+S`,
+> salvando in `docs/preview.png`.
+>
+> Prima c'era un rendering del granulo **sintetico**, con nuvole disegnate: come
+> vetrina di un visualizzatore satellitare diceva la cosa sbagliata su cosa il
+> programma mostra, quindi è stato tolto.
 
 ---
 
@@ -258,7 +260,7 @@ src/
   app.manifest/.rc DPI-aware + visual styles + Win10/11
 test/              test portabili (CTest) + granuli .mgr di esempio
 tools/             make_sample, preview_render (portabili)
-docs/              MFVG-FORMAT.md, preview.png
+docs/              MFVG-FORMAT.md
 ```
 
 ## Requisiti
