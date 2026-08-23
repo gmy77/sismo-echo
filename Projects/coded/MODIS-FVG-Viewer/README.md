@@ -93,7 +93,8 @@ Ti serve **uno** tra Visual Studio (Desktop C++) o MinGW-w64.
 
 ### Modo più facile
 Doppio-click su **`build.bat`**, da un prompt qualsiasi. Crea
-`MODIS-FVG-Viewer.exe` e ci mette accanto i 3 granuli di esempio.
+`MODIS-FVG-Viewer.exe` nella cartella del progetto, e prima di dichiarare il
+successo verifica che sia davvero un eseguibile.
 
 **Non serve** aprire il *"x64 Native Tools Command Prompt"*: lo script cerca il
 compilatore da solo, in quest'ordine —
@@ -122,8 +123,7 @@ hanno il workload C++, MinGW nelle posizioni note) e dice cosa manca.
 cmake -B build -A x64
 cmake --build build --config Release
 ```
-L'eseguibile finisce in `build\Release\MODIS-FVG-Viewer.exe` con i sample
-copiati accanto. In alternativa, doppio-click su **`gen-sln.bat`** genera
+L'eseguibile finisce in `build\Release\MODIS-FVG-Viewer.exe`. In alternativa, doppio-click su **`gen-sln.bat`** genera
 `build\MODIS-FVG-Viewer.sln` per il flusso classico con Visual Studio.
 
 ### Verifica del core (multipiattaforma, senza Windows)
