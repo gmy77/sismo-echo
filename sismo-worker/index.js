@@ -3404,7 +3404,13 @@ const METOP_HTML = `<!doctype html>
     </select>
 
     <div class="sect">Canale / Prodotto</div>
-    <select id="product"></select>
+    <select id="cat">
+      <option value="real" selected>🌍 Colori reali (belle immagini)</option>
+      <option value="cloud">☁️ Nubi / infrarosso</option>
+      <option value="data">🔬 Dati (mare, vento, ozono…)</option>
+      <option value="all">Tutti i prodotti</option>
+    </select>
+    <select id="product" style="margin-top:6px"></select>
     <div id="prodhint" class="sub" style="margin-top:6px"></div>
 
     <div class="sect">Data</div>
@@ -3659,11 +3665,25 @@ function satMatch(title, sat){
   if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotti combinati: sempre
   return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
 }
+// Categoria del prodotto dal titolo: "colori reali" vs nubi/IR vs dati.
+function catOf(title){
+  const t=(title||"").toLowerCase();
+  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature/.test(t)) return "data";
+  if(/cloud|\bir\b|ir10|ir\d|fog|microphys|airmass|dust|convection|night|notte/.test(t)) return "cloud";
+  if(/natural|true.?colou?r/.test(t)) return "real";
+  return "other";
+}
+function catMatch(title, cat){
+  if(cat==="all") return true;
+  return catOf(title)===cat;
+}
 function populateProducts(){
   const s=sel(); s.innerHTML="";
-  const sat=$("sat").value;
-  const list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat))
-                             : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
+  const sat=$("sat").value, cat=$("cat").value;
+  let list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat) && catMatch(l.title,cat))
+                           : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
+  // se una categoria resta vuota, non lasciare il menu spoglio: mostra tutto
+  if(LAYERS.length && !list.length) list = LAYERS.filter(l=>satMatch(l.title,sat));
   if(!list.length){ const o=document.createElement("option"); o.textContent="(nessun layer)"; s.appendChild(o); return; }
   list.forEach(l=>{ const o=document.createElement("option"); o.value=l.name; o.textContent=l.title; s.appendChild(o); });
   onProductChange();
@@ -3694,6 +3714,7 @@ sel().onchange=onProductChange;
 $("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
 $("date").onchange=loadTimes;
 $("sat").onchange=populateProducts;
+$("cat").onchange=populateProducts;
 $("times").onchange=fetchImage;
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("grid").onchange=draw;
@@ -3894,18 +3915,43 @@ export default {
       const hit = await cache.match(cacheKey);
       if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
 
+      // Area della richiesta in "gradi quadri": serve a spiegare i timeout.
+      const bb = bbox.split(",").map(Number);
+      const areaDeg = (bb.length === 4) ? Math.abs((bb[2]-bb[0]) * (bb[3]-bb[1])) : 0;
+      const big = areaDeg > 20000; // ~mezzo pianeta o piu'
+
       let resp;
       try { resp = await fetch(wms, { cf: { cacheTtl: 86400, cacheEverything: true } }); }
-      catch (e) { return new Response(JSON.stringify({ error: "fetch EUMETView fallita", detail: String(e) }),
-        { status: 502, headers: { ...CORS, "Content-Type": "application/json" } }); }
-      if (!resp.ok) return new Response(JSON.stringify({ error: "EUMETView HTTP " + resp.status, layer, time }),
-        { status: 502, headers: { ...CORS, "Content-Type": "application/json" } });
+      catch (e) { return new Response(JSON.stringify({
+        error: "EUMETView non ha risposto (rete/timeout)" + (big ? " — l'area e' molto ampia: prova a restringere (Europa/Italia)" : " — riprova"),
+        detail: String(e), layer }), { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
 
+      // Un WMS in errore risponde XML (ServiceException) o un testo, non un'immagine.
+      // Ne leggiamo il contenuto per dire il MOTIVO vero, invece di un secco 502.
       const ct = resp.headers.get("Content-Type") || "";
+      if (!resp.ok || !ct.includes("image")) {
+        let body = "";
+        try { body = (await resp.text()).slice(0, 1200); } catch (_) {}
+        const m = body.match(/<ServiceException[^>]*>([\s\S]*?)<\/ServiceException>/i);
+        const reason = (m ? m[1] : body).replace(/\s+/g, " ").trim().slice(0, 300);
+        // Traduzione: distinguo "server sovraccarico/area enorme" da "niente dato".
+        let msg;
+        if (resp.status >= 500 || big)
+          msg = "EUMETView non ce l'ha fatta a generare questa immagine"
+              + (big ? " (area troppo ampia ad alta risoluzione): zooma su Europa/Italia o abbassa la risoluzione"
+                     : " (server occupato): riprova fra poco");
+        else if (/no data|not found|could not|empty|no features|out of range/i.test(reason))
+          msg = "Nessun passaggio per questa area/orario: scegli un altro passaggio, un'altra data o un'altra zona";
+        else
+          msg = "Immagine non disponibile per questa area/orario";
+        return new Response(JSON.stringify({ error: msg, status: resp.status, layer, time, bbox,
+          eumetview: reason || undefined }),
+          { status: resp.status >= 500 ? 502 : 404, headers: { ...CORS, "Content-Type": "application/json" } });
+      }
+
       const buf = await resp.arrayBuffer();
-      // un WMS in errore risponde XML (ServiceException), non un'immagine.
-      if (!ct.includes("image") || buf.byteLength < 200)
-        return new Response(JSON.stringify({ error: "nessuna immagine METOP per questa area/istante", layer, time, bbox }),
+      if (buf.byteLength < 200)
+        return new Response(JSON.stringify({ error: "Nessun passaggio per questa area/orario: prova un'altra zona o un altro passaggio", layer, time, bbox }),
           { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
 
       const headers = { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age=86400",

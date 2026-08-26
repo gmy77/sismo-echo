@@ -71,7 +71,13 @@
     </select>
 
     <div class="sect">Canale / Prodotto</div>
-    <select id="product"></select>
+    <select id="cat">
+      <option value="real" selected>🌍 Colori reali (belle immagini)</option>
+      <option value="cloud">☁️ Nubi / infrarosso</option>
+      <option value="data">🔬 Dati (mare, vento, ozono…)</option>
+      <option value="all">Tutti i prodotti</option>
+    </select>
+    <select id="product" style="margin-top:6px"></select>
     <div id="prodhint" class="sub" style="margin-top:6px"></div>
 
     <div class="sect">Data</div>
@@ -326,11 +332,25 @@ function satMatch(title, sat){
   if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotti combinati: sempre
   return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
 }
+// Categoria del prodotto dal titolo: "colori reali" vs nubi/IR vs dati.
+function catOf(title){
+  const t=(title||"").toLowerCase();
+  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature/.test(t)) return "data";
+  if(/cloud|\bir\b|ir10|ir\d|fog|microphys|airmass|dust|convection|night|notte/.test(t)) return "cloud";
+  if(/natural|true.?colou?r/.test(t)) return "real";
+  return "other";
+}
+function catMatch(title, cat){
+  if(cat==="all") return true;
+  return catOf(title)===cat;
+}
 function populateProducts(){
   const s=sel(); s.innerHTML="";
-  const sat=$("sat").value;
-  const list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat))
-                             : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
+  const sat=$("sat").value, cat=$("cat").value;
+  let list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat) && catMatch(l.title,cat))
+                           : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
+  // se una categoria resta vuota, non lasciare il menu spoglio: mostra tutto
+  if(LAYERS.length && !list.length) list = LAYERS.filter(l=>satMatch(l.title,sat));
   if(!list.length){ const o=document.createElement("option"); o.textContent="(nessun layer)"; s.appendChild(o); return; }
   list.forEach(l=>{ const o=document.createElement("option"); o.value=l.name; o.textContent=l.title; s.appendChild(o); });
   onProductChange();
@@ -361,6 +381,7 @@ sel().onchange=onProductChange;
 $("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
 $("date").onchange=loadTimes;
 $("sat").onchange=populateProducts;
+$("cat").onchange=populateProducts;
 $("times").onchange=fetchImage;
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("grid").onchange=draw;
