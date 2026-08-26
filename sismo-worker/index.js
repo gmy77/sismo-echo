@@ -3669,8 +3669,9 @@ function satMatch(title, sat){
 function catOf(title){
   const t=(title||"").toLowerCase();
   if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability/.test(t)) return "data";
-  // colori reali: natural/true colour + "Geo Colour" (MTG, giorno reale + luci di notte)
-  if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor/.test(t)) return "real";
+  // colori reali: natural/true colour, "Geo Colour" (MTG giorno+notte) e OLCI
+  // (Sentinel-3, titolato solo "OLCI … RGB" ma e' true colour a 300 m).
+  if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\bolci\b/.test(t)) return "real";
   // falsi-colore e canali singoli grigi: nubi, IR, vapore, cenere, airmass...
   if(/cloud|\bir\b|ir\d|\bwv\b|wv\d|vis\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
   return "other";
