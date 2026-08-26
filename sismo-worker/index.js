@@ -3330,11 +3330,473 @@ setInterval(refreshAll,5*60*1000);
 // ============================================================
 // HANDLER PRINCIPALE
 // ============================================================
+// >>>METOP_HTML (generato da build-metop.mjs — NON editare a mano: modifica metop-viewer.html)
+const METOP_HTML = `<!doctype html>
+<!-- METOP Polar Viewer — visualizzatore satelliti polari EUMETSAT (Metop-B/C).
+     Pagina autonoma: la serve il Worker su /polar, ma funziona anche come file
+     locale puntando all'API con ?api=https://<host>. Zero dipendenze, zero
+     build: e' HTML+JS puro, l'opposto della fatica di compilazione del gemello
+     C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
+     proxy e cache verso il WMS di EUMETSAT EUMETView. -->
+<!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+     METOP Polar Viewer 1.0.0 — costruito con Claude Code (Anthropic). -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>METOP · Polar Viewer 1.0.0</title>
+<style>
+  :root{
+    --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
+    --txt:#e9eef4; --sub:#94a0aa; --acc:#38cee2; --acc2:#2b90a8;
+    --warn:#e2b338; --err:#e2683c; --ok:#4fd08a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font:14px/1.4 "Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden}
+  #app{display:grid;grid-template-columns:300px 1fr;grid-template-rows:1fr 30px;height:100%}
+  /* ---- pannello ---- */
+  #panel{grid-row:1/3;background:var(--panel);border-right:1px solid var(--edge);
+    padding:14px;overflow-y:auto}
+  h1{margin:0;font-size:20px;color:var(--acc);letter-spacing:.5px}
+  .sub{color:var(--sub);font-size:12px;margin:2px 0 14px}
+  .sect{color:var(--sub);font-size:11px;font-weight:700;letter-spacing:.8px;
+    margin:16px 0 6px;text-transform:uppercase}
+  label{display:block;color:var(--sub);font-size:11px;margin:8px 0 3px}
+  select,input,button{width:100%;background:var(--card);color:var(--txt);
+    border:1px solid var(--edge);border-radius:7px;padding:7px 9px;font:inherit}
+  button{cursor:pointer;transition:.12s;font-weight:600}
+  button:hover{border-color:var(--acc);color:var(--acc)}
+  button.primary{background:var(--acc2);border-color:var(--acc2);color:#04121a}
+  button.primary:hover{background:var(--acc);border-color:var(--acc);color:#04121a}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  .chk{display:flex;align-items:center;gap:8px;margin:7px 0;cursor:pointer;color:var(--txt)}
+  .chk input{width:auto;flex:0}
+  .cred{margin:22px 0 4px;color:var(--sub);font-size:10px;opacity:.7}
+  /* ---- canvas ---- */
+  #stage{position:relative;background:
+    radial-gradient(120% 120% at 50% 0%,#12171e,#080b0f);overflow:hidden}
+  canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
+  canvas.drag{cursor:grabbing}
+  #chip{position:absolute;top:12px;left:12px;background:rgba(8,12,18,.72);
+    border:1px solid var(--edge);border-radius:10px;padding:7px 12px;font-size:12px;
+    color:var(--txt);pointer-events:none;max-width:70%}
+  #spin{position:absolute;top:12px;right:12px;background:rgba(8,12,18,.72);
+    border:1px solid var(--edge);border-radius:10px;padding:6px 11px;font-size:12px;
+    color:var(--acc);display:none}
+  #spin.on{display:block}
+  /* ---- status ---- */
+  #status{grid-column:2;background:var(--panel);border-top:1px solid var(--edge);
+    display:flex;align-items:center;padding:0 12px;font-size:12px;color:var(--sub);gap:16px}
+  .tag{padding:1px 7px;border-radius:6px;background:var(--card);border:1px solid var(--edge)}
+</style>
+
+<div id="app">
+  <div id="panel">
+    <h1>METOP · POLARI</h1>
+    <div class="sub">EUMETSAT Metop-B / Metop-C · EUMETView · v1.0.0</div>
+
+    <div class="sect">Satellite</div>
+    <select id="sat">
+      <option value="metopb">Metop-B</option>
+      <option value="metopc" selected>Metop-C</option>
+    </select>
+
+    <div class="sect">Canale / Prodotto</div>
+    <select id="product"></select>
+    <div id="prodhint" class="sub" style="margin-top:6px"></div>
+
+    <div class="sect">Data</div>
+    <div class="row">
+      <input id="date" type="date">
+      <button id="today" title="Ieri (UTC)">ieri</button>
+    </div>
+    <label>Passaggi noti per questa data</label>
+    <select id="times"><option value="">— (usa la data intera) —</option></select>
+
+    <div class="sect">Area</div>
+    <div class="row">
+      <button data-bbox="-60,-180,80,180">Mondo</button>
+      <button data-bbox="30,-15,72,45">Europa</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button data-bbox="35,6,48,19">Italia</button>
+      <button data-bbox="45.3,12.0,46.8,14.1">FVG</button>
+    </div>
+
+    <div class="sect">Qualità immagine</div>
+    <label class="chk"><input type="checkbox" id="enhance" checked> Immagine brillante</label>
+    <label>Intensità</label>
+    <input id="enhamt" type="range" min="0" max="100" value="55">
+
+    <div class="sect">Vista</div>
+    <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
+    <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
+    <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
+
+    <div class="sect">Azioni</div>
+    <button id="fetch" class="primary">Scarica passaggio</button>
+    <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
+
+    <div class="cred">
+      METOP-Polar v1.0.0<br>
+      Costruito con Claude Code (Anthropic)<br>
+      © 2026 Gimmy Pignolo · Tutti i diritti riservati
+    </div>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="chip">Pronto — trascina per spostarti, rotella per zoomare.</div>
+    <div id="spin">⏳ scarico…</div>
+  </div>
+
+  <div id="status">
+    <span id="st-view" class="tag">bbox —</span>
+    <span id="st-prod" class="tag">—</span>
+    <span id="st-cache" class="tag">cache —</span>
+    <span id="st-msg" style="flex:1"></span>
+  </div>
+</div>
+
+<script>
+// --------------------------------------------------------------------------
+// Config. L'API di default e' il Worker; ?api=... la puo' sovrascrivere, cosi'
+// lo stesso file gira da locale puntando al Worker deployato.
+const API = new URLSearchParams(location.search).get("api")
+          || (location.origin.startsWith("http") ? location.origin
+              : "https://sismo-fvg.gimmy077.workers.dev");
+
+// Catalogo prodotti. Gli id sono quelli capiti dal Worker (/metop?product=...).
+// La descrizione e' per l'utente. I nomi dei layer veri stanno nel Worker.
+const PRODUCTS = [
+  { id:"avhrr_natural", label:"AVHRR — colore naturale", hint:"Immagine diurna: terra, mare, nubi. La piu' leggibile." },
+  { id:"avhrr_cloud",   label:"AVHRR — nubi/notte (RGB)", hint:"Contrasto su nubi e temperatura, utile anche di notte." },
+  { id:"iasi_temp",     label:"IASI — temperatura",       hint:"Sondaggio atmosferico: profilo termico." },
+  { id:"iasi_ozone",    label:"IASI — ozono totale",      hint:"Colonna di ozono dal sondatore IASI." },
+  { id:"ascat_wind",    label:"ASCAT — vento sul mare",   hint:"Vento superficiale sugli oceani dallo scatterometro." },
+];
+
+// --------------------------------------------------------------------------
+// Stato della vista: un bbox in gradi (lat,lon) e nient'altro. Il canvas e'
+// una proiezione equirettangolare del bbox — la stessa che il WMS EPSG:4326
+// restituisce, quindi immagine e griglia combaciano senza conti.
+let view = { latMin:-60, lonMin:-180, latMax:80, lonMax:180 };
+let img = null;                 // Image scaricata per il bbox corrente
+let imgBox = null;              // bbox a cui l'immagine si riferisce
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+
+function fitDPR(){
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width*d); cv.height = Math.round(r.height*d);
+}
+// canvas <-> geo (equirettangolare sul bbox della vista)
+function xToLon(x){ return view.lonMin + (x/cv.width)*(view.lonMax-view.lonMin); }
+function yToLat(y){ return view.latMax - (y/cv.height)*(view.latMax-view.latMin); }
+function lonToX(lon){ return (lon-view.lonMin)/(view.lonMax-view.lonMin)*cv.width; }
+function latToY(lat){ return (view.latMax-lat)/(view.latMax-view.latMin)*cv.height; }
+
+// Enhancement in sola visualizzazione: contrasto/saturazione/luminosita'
+// calibrati sull'intensita' scelta. Non inventa dati — rende piu' vivida
+// l'immagine gia' scaricata, come la maschera di contrasto del gemello C++.
+function enhanceFilter(){
+  if(!document.getElementById("enhance").checked) return "none";
+  const t = (+document.getElementById("enhamt").value)/100;      // 0..1
+  const contrast   = (1 + 0.18*t).toFixed(3);
+  const saturate   = (1 + 0.55*t).toFixed(3);
+  const brightness = (1 + 0.05*t).toFixed(3);
+  return "contrast("+contrast+") saturate("+saturate+") brightness("+brightness+")";
+}
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // immagine, se copre (anche in parte) la vista
+  if(img && imgBox){
+    const dx0 = lonToX(imgBox.lonMin), dx1 = lonToX(imgBox.lonMax);
+    const dy0 = latToY(imgBox.latMax), dy1 = latToY(imgBox.latMin);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.filter = enhanceFilter();               // solo sull'immagine
+    ctx.drawImage(img, dx0, dy0, dx1-dx0, dy1-dy0);
+    ctx.filter = "none";                        // la griglia resta netta
+  }
+  if(document.getElementById("grid").checked) drawGraticule();
+  document.getElementById("st-view").textContent =
+    "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
+    view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
+}
+
+function niceStep(spanDeg){
+  const target = spanDeg/8;                     // ~8 linee
+  const steps = [1,2,5,10,15,30,45,90];
+  for(const s of steps) if(s>=target) return s;
+  return 90;
+}
+function drawGraticule(){
+  const showLab = document.getElementById("labels").checked;
+  ctx.lineWidth = 1; ctx.strokeStyle = "rgba(150,170,190,.22)";
+  ctx.fillStyle = "rgba(190,205,220,.75)";
+  ctx.font = (12*(window.devicePixelRatio||1))+"px 'Segoe UI',sans-serif";
+  const latStep = niceStep(view.latMax-view.latMin);
+  const lonStep = niceStep(view.lonMax-view.lonMin);
+  for(let lat=Math.ceil(view.latMin/latStep)*latStep; lat<=view.latMax; lat+=latStep){
+    const y=latToY(lat); ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cv.width,y); ctx.stroke();
+    if(showLab) ctx.fillText(lat.toFixed(0)+"°", 4, y-3);
+  }
+  for(let lon=Math.ceil(view.lonMin/lonStep)*lonStep; lon<=view.lonMax; lon+=lonStep){
+    const x=lonToX(lon); ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,cv.height); ctx.stroke();
+    if(showLab) ctx.fillText(lon.toFixed(0)+"°", x+3, 14*(window.devicePixelRatio||1));
+  }
+}
+
+// --------------------------------------------------------------------------
+// Interazione: trascinamento e zoom aggiornano SOLO il bbox della vista. Il
+// download avviene quando il gesto finisce (mouse fermo), non durante — cosi'
+// non si scatena una raffica di richieste, come da nota di progetto.
+let drag=null;
+cv.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY,view:{...view}}; cv.classList.add("drag"); cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointermove",e=>{
+  if(!drag) return;
+  const r=cv.getBoundingClientRect();
+  const dLon=(e.clientX-drag.x)/r.width*(view.lonMax-view.lonMin);
+  const dLat=(e.clientY-drag.y)/r.height*(view.latMax-view.latMin);
+  view={ lonMin:drag.view.lonMin-dLon, lonMax:drag.view.lonMax-dLon,
+         latMin:drag.view.latMin+dLat, latMax:drag.view.latMax+dLat };
+  clampView(); draw();
+});
+cv.addEventListener("pointerup",()=>{ if(drag){ drag=null; cv.classList.remove("drag"); scheduleFetch(); }});
+cv.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const r=cv.getBoundingClientRect();
+  const lon=xToLon((e.clientX-r.left)*cv.width/r.width);
+  const lat=yToLat((e.clientY-r.top)*cv.height/r.height);
+  const k=e.deltaY<0?0.8:1.25;                 // zoom in / out
+  view={ lonMin:lon-(lon-view.lonMin)*k, lonMax:lon+(view.lonMax-lon)*k,
+         latMin:lat-(lat-view.latMin)*k, latMax:lat+(view.latMax-lat)*k };
+  clampView(); draw(); scheduleFetch();
+},{passive:false});
+
+function clampView(){
+  // niente ribaltamenti; limiti fisici del pianeta.
+  if(view.latMin<-90)view.latMin=-90; if(view.latMax>90)view.latMax=90;
+  if(view.latMax-view.latMin<0.5) view.latMax=view.latMin+0.5;
+  if(view.lonMax-view.lonMin<0.5) view.lonMax=view.lonMin+0.5;
+}
+let fetchTimer=null;
+function scheduleFetch(){ clearTimeout(fetchTimer); fetchTimer=setTimeout(fetchImage,350); }
+
+// --------------------------------------------------------------------------
+async function fetchImage(){
+  const sat=document.getElementById("sat").value;
+  const product=document.getElementById("product").value;
+  const date=document.getElementById("date").value;
+  const time=document.getElementById("times").value;
+  // pixel proporzionati al canvas, cap 2048 per lato
+  const r=cv.getBoundingClientRect();
+  const w=Math.min(2048,Math.round(r.width)), h=Math.min(2048,Math.round(r.height));
+  const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
+  let u=API+"/metop?sat="+sat+"&product="+product+"&bbox="+bbox+"&w="+w+"&h="+h;
+  if(date) u+="&date="+date;
+  if(time) u+="&time="+encodeURIComponent(time);
+
+  document.getElementById("spin").classList.add("on");
+  document.getElementById("st-msg").textContent="";
+  try{
+    const resp=await fetch(u);
+    document.getElementById("st-cache").textContent="cache "+(resp.headers.get("X-Cache")||"—");
+    const ct=resp.headers.get("Content-Type")||"";
+    if(!ct.includes("image")){
+      const j=await resp.json().catch(()=>({error:"risposta non valida"}));
+      throw new Error(j.error+(j.disponibili?" ("+j.disponibili.join(", ")+")":""));
+    }
+    const blob=await resp.blob(), im=new Image();
+    await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
+    img=im; imgBox={...view};
+    document.getElementById("chip").textContent =
+      document.getElementById("product").selectedOptions[0].text+" · "+sat.replace("metop","Metop-").toUpperCase()+(date?" · "+date:"");
+    draw();
+  }catch(err){
+    document.getElementById("st-msg").innerHTML="<span style='color:var(--err)'>"+err.message+"</span>";
+  }finally{
+    document.getElementById("spin").classList.remove("on");
+  }
+}
+
+// carica i passaggi noti (TIME dal GetCapabilities, via Worker) per data+prodotto
+async function loadTimes(){
+  const sel=document.getElementById("times");
+  sel.innerHTML='<option value="">— (usa la data intera) —</option>';
+  const sat=document.getElementById("sat").value;
+  const product=document.getElementById("product").value;
+  const date=document.getElementById("date").value;
+  try{
+    const r=await fetch(API+"/metop/times?sat="+sat+"&product="+product+(date?"&date="+date:""));
+    if(!r.ok) return;
+    const j=await r.json();
+    (j.times||[]).forEach(t=>{
+      const o=document.createElement("option"); o.value=t;
+      o.textContent=t.replace("T"," ").replace("Z"," UTC"); sel.appendChild(o);
+    });
+    document.getElementById("st-msg").textContent =
+      (j.times&&j.times.length)? j.times.length+" passaggi disponibili" : "nessun passaggio elencato per questa data";
+  }catch(_){ /* silenzioso: la data intera funziona comunque */ }
+}
+
+// --------------------------------------------------------------------------
+// wiring UI
+function initProducts(){
+  const sel=document.getElementById("product");
+  PRODUCTS.forEach(p=>{ const o=document.createElement("option"); o.value=p.id; o.textContent=p.label; sel.appendChild(o); });
+  sel.onchange=()=>{ document.getElementById("prodhint").textContent=PRODUCTS.find(p=>p.id===sel.value).hint;
+                     document.getElementById("st-prod").textContent=sel.selectedOptions[0].text; loadTimes(); scheduleFetch(); };
+  sel.dispatchEvent(new Event("change"));
+}
+function yesterdayUTC(){ return new Date(Date.now()-24*3600*1000).toISOString().slice(0,10); }
+
+document.getElementById("date").value=yesterdayUTC();
+document.getElementById("today").onclick=()=>{ document.getElementById("date").value=yesterdayUTC(); loadTimes(); scheduleFetch(); };
+document.getElementById("date").onchange=()=>{ loadTimes(); scheduleFetch(); };
+document.getElementById("sat").onchange=()=>{ loadTimes(); scheduleFetch(); };
+document.getElementById("grid").onchange=draw;
+document.getElementById("labels").onchange=draw;
+document.getElementById("enhance").onchange=draw;
+document.getElementById("enhamt").oninput=draw;
+document.getElementById("reset").onclick=()=>{ view={latMin:-60,lonMin:-180,latMax:80,lonMax:180}; draw(); scheduleFetch(); };
+document.querySelectorAll("button[data-bbox]").forEach(b=>b.onclick=()=>{
+  const [a,lo,c,hi]=b.dataset.bbox.split(",").map(Number);
+  view={latMin:a,lonMin:lo,latMax:c,lonMax:hi}; draw(); scheduleFetch();
+});
+document.getElementById("fetch").onclick=fetchImage;
+document.getElementById("save").onclick=()=>{
+  const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click();
+};
+window.addEventListener("resize",()=>{ fitDPR(); draw(); });
+
+fitDPR(); initProducts(); draw(); loadTimes();
+</script>
+`;
+// <<<METOP_HTML
+
+// Base WMS di EUMETSAT EUMETView (GeoServer pubblico, senza autenticazione per
+// le immagini). E' l'analogo di NASA GIBS ma per i satelliti polari europei.
+const EUMETVIEW = "https://view.eumetsat.int/geoserver/wms";
+
+// Prodotti METOP -> layer EUMETView.
+// ATTENZIONE: i nomi dei layer qui sotto sono la nostra migliore ipotesi e
+// vanno VERIFICATI (da questo ambiente EUMETSAT e' irraggiungibile). Se un
+// prodotto da errore, si corregge il nome qui — oppure, senza toccare il
+// Worker, si passa il layer vero col parametro &layer=<nome> nella richiesta.
+const METOP_LAYERS = {
+  avhrr_natural: "metop:avhrr3_natural",
+  avhrr_cloud:   "metop:avhrr3_cloud",
+  iasi_temp:     "metop:iasi_temperature",
+  iasi_ozone:    "metop:iasi_ozone",
+  ascat_wind:    "metop:ascat_wind",
+};
+
 export default {
   async fetch(request, env) {
     const url    = new URL(request.url);
     const db     = env.DB;
     const SECRET = getUpdateSecret(env);
+
+    // ============================================================
+    // METOP — pagina del visualizzatore polari (servita su /polar) e proxy
+    // immagini EUMETView (su /metop). Stessa filosofia di /modis: nessun DB,
+    // cache edge, CORS aperto. La UI e' in metop-viewer.html (embedded qui).
+    // ============================================================
+    if (url.pathname === "/polar" || url.pathname === "/metop-viewer") {
+      return new Response(METOP_HTML || "<h1>METOP</h1><p>Pagina non ancora generata: esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
+        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+    }
+
+    // Passaggi disponibili per data: legge la dimensione TIME dal GetCapabilities
+    // di EUMETView per il layer scelto e la restituisce come lista di istanti.
+    //   GET /metop/times?sat=&product=&date=YYYY-MM-DD
+    if (url.pathname === "/metop/times") {
+      const CORS = { "Access-Control-Allow-Origin": "*" };
+      const product = (url.searchParams.get("product") || "avhrr_natural").toLowerCase();
+      const layer = url.searchParams.get("layer") || METOP_LAYERS[product];
+      if (!layer) return new Response(JSON.stringify({ times: [], error: "prodotto sconosciuto" }),
+        { headers: { ...CORS, "Content-Type": "application/json" } });
+      const date = url.searchParams.get("date"); // opzionale: filtra per giorno
+      const capUrl = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0&namespace="
+                   + encodeURIComponent(layer.split(":")[0]);
+      let times = [];
+      try {
+        const r = await fetch(capUrl, { cf: { cacheTtl: 3600, cacheEverything: true } });
+        if (r.ok) {
+          const xml = await r.text();
+          // isola il blocco <Layer> del nostro layer, poi la sua <Dimension time>
+          const short = layer.split(":").pop();
+          const i = xml.indexOf("<Name>" + short + "</Name>");
+          if (i >= 0) {
+            const seg = xml.slice(i, i + 6000);
+            const m = seg.match(/<Dimension[^>]*name="time"[^>]*>([\s\S]*?)<\/Dimension>/i);
+            if (m) times = m[1].split(",").map(s => s.trim()).filter(Boolean);
+          }
+        }
+      } catch (_) { /* la data intera funziona comunque */ }
+      if (date) times = times.filter(t => t.startsWith(date));
+      // troppi istanti sono inutili: tieni gli ultimi ~40
+      if (times.length > 40) times = times.slice(-40);
+      return new Response(JSON.stringify({ layer, times }),
+        { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=1800" } });
+    }
+
+    //   GET /metop?sat=metopb|metopc&product=avhrr_natural|...&bbox=lat,lon,lat,lon
+    //             &date=YYYY-MM-DD | &time=<ISO>  &w=&h=  [&layer=<override>]
+    if (url.pathname === "/metop") {
+      const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+
+      const product = (url.searchParams.get("product") || "avhrr_natural").toLowerCase();
+      const layer = url.searchParams.get("layer") || METOP_LAYERS[product];
+      if (!layer) return new Response(JSON.stringify({
+        error: "prodotto sconosciuto", product, disponibili: Object.keys(METOP_LAYERS),
+        hint: "Passa il layer EUMETView vero con &layer=<workspace:nome> per aggirare i nomi predefiniti."
+      }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
+
+      const bbox = url.searchParams.get("bbox") || "-60,-180,80,180"; // lat,lon (WMS 1.3.0)
+      const w = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("w") || "1024") || 1024));
+      const h = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("h") || "768")  || 768));
+      // TIME: istante preciso se dato, altrimenti il giorno (default: ieri UTC).
+      let time = url.searchParams.get("time");
+      if (!time) {
+        let date = url.searchParams.get("date");
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
+          date = new Date(Date.now() - 24*3600*1000).toISOString().slice(0,10);
+        time = date;
+      }
+
+      const wms = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + encodeURIComponent(layer)
+        + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox + "&WIDTH=" + w + "&HEIGHT=" + h
+        + "&FORMAT=image/png&TRANSPARENT=true&TIME=" + encodeURIComponent(time);
+
+      const cache = caches.default;
+      const cacheKey = new Request(url.origin + "/metop?k=" + encodeURIComponent(layer+"|"+time+"|"+bbox+"|"+w+"x"+h));
+      const hit = await cache.match(cacheKey);
+      if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
+
+      let resp;
+      try { resp = await fetch(wms, { cf: { cacheTtl: 86400, cacheEverything: true } }); }
+      catch (e) { return new Response(JSON.stringify({ error: "fetch EUMETView fallita", detail: String(e) }),
+        { status: 502, headers: { ...CORS, "Content-Type": "application/json" } }); }
+      if (!resp.ok) return new Response(JSON.stringify({ error: "EUMETView HTTP " + resp.status, layer, time }),
+        { status: 502, headers: { ...CORS, "Content-Type": "application/json" } });
+
+      const ct = resp.headers.get("Content-Type") || "";
+      const buf = await resp.arrayBuffer();
+      // un WMS in errore risponde XML (ServiceException), non un'immagine.
+      if (!ct.includes("image") || buf.byteLength < 200)
+        return new Response(JSON.stringify({ error: "nessuna immagine METOP per questa area/istante", layer, time, bbox }),
+          { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
+
+      const headers = { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age=86400",
+                        "X-Cache": "MISS", "X-METOP-Layer": layer, "X-METOP-Time": time };
+      const out = new Response(buf, { headers });
+      try { await cache.put(cacheKey, out.clone()); } catch (_) {}
+      return out;
+    }
 
     // ============================================================
     // MODIS FVG — proxy + cache immagini reali NASA GIBS (Terra/Aqua).
