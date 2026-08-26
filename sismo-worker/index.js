@@ -3339,10 +3339,10 @@ const METOP_HTML = `<!doctype html>
      C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
      proxy e cache verso il WMS di EUMETSAT EUMETView. -->
 <!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-     METOP Polar Viewer 1.1.1 — costruito con Claude Code (Anthropic). -->
+     METOP Polar Viewer 1.1.2 — costruito con Claude Code (Anthropic). -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>METOP · Polar Viewer 1.1.1</title>
+<title>METOP · Polar Viewer 1.1.2</title>
 <style>
   :root{
     --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
@@ -3393,7 +3393,7 @@ const METOP_HTML = `<!doctype html>
 <div id="app">
   <div id="panel">
     <h1>METOP · POLARI</h1>
-    <div class="sub">EUMETSAT Metop-B / Metop-C · EUMETView · v1.1.1</div>
+    <div class="sub">EUMETSAT Metop-B / Metop-C · EUMETView · v1.1.2</div>
 
     <div class="sect">Satellite</div>
     <select id="sat">
@@ -3447,7 +3447,7 @@ const METOP_HTML = `<!doctype html>
     <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
 
     <div class="cred">
-      METOP-Polar v1.1.1<br>
+      METOP-Polar v1.1.2<br>
       Costruito con Claude Code (Anthropic)<br>
       © 2026 Gimmy Pignolo · Tutti i diritti riservati
     </div>
@@ -3673,25 +3673,28 @@ function satMatch(title, sat){
   if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotti combinati: sempre
   return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
 }
-// Categoria del prodotto dal titolo: "colori reali" vs nubi/IR vs dati.
-function catOf(title){
-  const t=(title||"").toLowerCase();
+// Categoria del prodotto. Guardo PRIMA il nome del layer (inequivocabile) e poi
+// il titolo: cosi' OLCI/SLSTR RGB e Geo Colour finiscono sempre fra i colori reali.
+function catOf(title, name){
+  const t=(title||"").toLowerCase(), n=(name||"").toLowerCase();
+  // --- per NOME (robusto): OLCI/SLSTR true colour, natural, geo colour ---
+  if(/olci.*rgb|rgb.*olci|geocolou?r|rgb_natural|rgb_geocolour|truecolor|true_colour|slstr.*rgb/.test(n)) return "real";
+  if(/rgb_124|_ir\d|_wv\d|_vis\d|_cloud|_fog|_dust|_ash|_airmass/.test(n)) return "cloud";
+  if(/sst|_chl|ascat|wind|ozone|aerosol|orbit|footprint|instab/.test(n)) return "data";
+  // --- per TITOLO (fallback) ---
   if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability/.test(t)) return "data";
-  // colori reali: natural/true colour, "Geo Colour" (MTG giorno+notte) e OLCI
-  // (Sentinel-3, titolato solo "OLCI … RGB" ma e' true colour a 300 m).
   if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\bolci\b/.test(t)) return "real";
-  // falsi-colore e canali singoli grigi: nubi, IR, vapore, cenere, airmass...
   if(/cloud|\bir\b|ir\d|\bwv\b|wv\d|vis\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
   return "other";
 }
-function catMatch(title, cat){
+function catMatch(l, cat){
   if(cat==="all") return true;
-  return catOf(title)===cat;
+  return catOf(l.title, l.name)===cat;
 }
 function populateProducts(){
   const s=sel(); s.innerHTML="";
   const sat=$("sat").value, cat=$("cat").value;
-  let list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat) && catMatch(l.title,cat))
+  let list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat) && catMatch(l,cat))
                            : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
   // se una categoria resta vuota, non lasciare il menu spoglio: mostra tutto
   if(LAYERS.length && !list.length) list = LAYERS.filter(l=>satMatch(l.title,sat));
