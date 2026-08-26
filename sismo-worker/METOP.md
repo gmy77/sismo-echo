@@ -70,9 +70,9 @@ il copyright qui sopra riguarda il codice del visualizzatore, non le immagini.
 
 ---
 
-**METOP-Polar v1.1.0** — Costruito con **Claude Code** (Anthropic) · © 2026 **Gimmy Pignolo**
+**METOP-Polar v1.1.1** — Costruito con **Claude Code** (Anthropic) · © 2026 **Gimmy Pignolo**
 
-## Novità v1.1.0
+## Novità v1.1.1
 
 - Menu **categoria** (Colori reali / Nubi-IR / Dati / Tutti): di default mostra
   solo le immagini a colori reali, nasconde falsi-colore e dati scientifici.
