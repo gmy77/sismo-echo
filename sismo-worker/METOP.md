@@ -70,4 +70,21 @@ il copyright qui sopra riguarda il codice del visualizzatore, non le immagini.
 
 ---
 
-**METOP-Polar v1.0.0** — Costruito con **Claude Code** (Anthropic) · © 2026 **Gimmy Pignolo**
+**METOP-Polar v1.1.0** — Costruito con **Claude Code** (Anthropic) · © 2026 **Gimmy Pignolo**
+
+## Novità v1.1.0
+
+- Menu **categoria** (Colori reali / Nubi-IR / Dati / Tutti): di default mostra
+  solo le immagini a colori reali, nasconde falsi-colore e dati scientifici.
+- **OLCI Sentinel-3**, **Geo Colour / True Colour MTG** e le AVHRR/MSG naturali
+  messe in evidenza fra i "colori reali".
+- **Ultima data robusta**: senza un passaggio scelto non si manda alcun TIME e
+  GeoServer serve il suo default (l'ultimo disponibile), niente più 502 da data
+  nuda.
+- **Sfondo Terra** opzionale (NaturalEarth composta sotto ai dati).
+- **Errori parlanti**: "area troppo ampia / server occupato" vs "nessun
+  passaggio per area/orario", col testo reale della ServiceException.
+- Avviso **striscia singola** sui prodotti polari a orbita unica (usa le
+  versioni *Daily/Accumulated* per coprire la mappa).
+- Rotta `/metop/` (con slash) serve la pagina; catalogo ripulito da sfondi e
+  duplicati.
