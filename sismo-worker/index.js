@@ -3718,12 +3718,14 @@ const EUMETVIEW = "https://view.eumetsat.int/geoserver/wms";
 // vanno VERIFICATI (da questo ambiente EUMETSAT e' irraggiungibile). Se un
 // prodotto da errore, si corregge il nome qui — oppure, senza toccare il
 // Worker, si passa il layer vero col parametro &layer=<nome> nella richiesta.
+// Fallback con i nomi VERI di EUMETView (verificati dal catalogo), usati solo
+// se un client chiama /metop con &product= invece del &layer= reale.
 const METOP_LAYERS = {
-  avhrr_natural: "metop:avhrr3_natural",
-  avhrr_cloud:   "metop:avhrr3_cloud",
-  iasi_temp:     "metop:iasi_temperature",
-  iasi_ozone:    "metop:iasi_ozone",
-  ascat_wind:    "metop:ascat_wind",
+  olci_daily:    "copernicus:daily_sentinel3ab_olci_l1_rgb_fulres", // Sentinel-3 OLCI ~300 m
+  avhrr_natural: "eps:m01_rgb_natural_fog",   // AVHRR Natural + Fog, Metop-B
+  avhrr_cloud:   "eps:m01_rgb_124",           // AVHRR nubi/giorno, Metop-B
+  avhrr_ir:      "eps:m01_ir108",             // AVHRR IR 10.8, Metop-B
+  ascat_wind:    "eps:m01_ascat_wind",        // ASCAT vento sul mare, Metop-B
 };
 
 // Estrae i layer (name + title + se hanno dimensione TIME) da un documento
