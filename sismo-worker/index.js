@@ -3337,11 +3337,751 @@ setInterval(refreshAll,5*60*1000);
 // ============================================================
 // HANDLER PRINCIPALE
 // ============================================================
+// >>>METOP_HTML (generato da build-metop.mjs — NON editare a mano: modifica metop-viewer.html)
+const METOP_HTML = `<!doctype html>
+<!-- METOP Polar Viewer — visualizzatore satelliti polari EUMETSAT (Metop-B/C).
+     Pagina autonoma: la serve il Worker su /polar, ma funziona anche come file
+     locale puntando all'API con ?api=https://<host>. Zero dipendenze, zero
+     build: e' HTML+JS puro, l'opposto della fatica di compilazione del gemello
+     C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
+     proxy e cache verso il WMS di EUMETSAT EUMETView. -->
+<!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
+     METOP Polar Viewer 1.1.2 — costruito con Claude Code (Anthropic). -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>METOP · Polar Viewer 1.1.2</title>
+<style>
+  :root{
+    --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
+    --txt:#e9eef4; --sub:#94a0aa; --acc:#38cee2; --acc2:#2b90a8;
+    --warn:#e2b338; --err:#e2683c; --ok:#4fd08a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font:14px/1.4 "Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden}
+  #app{display:grid;grid-template-columns:300px 1fr;grid-template-rows:1fr 30px;height:100%}
+  /* ---- pannello ---- */
+  #panel{grid-row:1/3;background:var(--panel);border-right:1px solid var(--edge);
+    padding:14px;overflow-y:auto}
+  h1{margin:0;font-size:20px;color:var(--acc);letter-spacing:.5px}
+  .sub{color:var(--sub);font-size:12px;margin:2px 0 14px}
+  .sect{color:var(--sub);font-size:11px;font-weight:700;letter-spacing:.8px;
+    margin:16px 0 6px;text-transform:uppercase}
+  label{display:block;color:var(--sub);font-size:11px;margin:8px 0 3px}
+  select,input,button{width:100%;background:var(--card);color:var(--txt);
+    border:1px solid var(--edge);border-radius:7px;padding:7px 9px;font:inherit}
+  button{cursor:pointer;transition:.12s;font-weight:600}
+  button:hover{border-color:var(--acc);color:var(--acc)}
+  button.primary{background:var(--acc2);border-color:var(--acc2);color:#04121a}
+  button.primary:hover{background:var(--acc);border-color:var(--acc);color:#04121a}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  .chk{display:flex;align-items:center;gap:8px;margin:7px 0;cursor:pointer;color:var(--txt)}
+  .chk input{width:auto;flex:0}
+  .cred{margin:22px 0 4px;color:var(--sub);font-size:10px;opacity:.7}
+  /* ---- canvas ---- */
+  #stage{position:relative;background:
+    radial-gradient(120% 120% at 50% 0%,#12171e,#080b0f);overflow:hidden}
+  canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
+  canvas.drag{cursor:grabbing}
+  #chip{position:absolute;top:12px;left:12px;background:rgba(8,12,18,.72);
+    border:1px solid var(--edge);border-radius:10px;padding:7px 12px;font-size:12px;
+    color:var(--txt);pointer-events:none;max-width:70%}
+  #spin{position:absolute;top:12px;right:12px;background:rgba(8,12,18,.72);
+    border:1px solid var(--edge);border-radius:10px;padding:6px 11px;font-size:12px;
+    color:var(--acc);display:none}
+  #spin.on{display:block}
+  /* ---- status ---- */
+  #status{grid-column:2;background:var(--panel);border-top:1px solid var(--edge);
+    display:flex;align-items:center;padding:0 12px;font-size:12px;color:var(--sub);gap:16px}
+  .tag{padding:1px 7px;border-radius:6px;background:var(--card);border:1px solid var(--edge)}
+</style>
+
+<div id="app">
+  <div id="panel">
+    <h1>METOP · POLARI</h1>
+    <div class="sub">EUMETSAT Metop-B / Metop-C · EUMETView · v1.1.2</div>
+
+    <div class="sect">Satellite</div>
+    <select id="sat">
+      <option value="" selected>Tutti</option>
+      <option value="metop-a">Metop-A</option>
+      <option value="metop-b">Metop-B</option>
+      <option value="metop-c">Metop-C</option>
+    </select>
+
+    <div class="sect">Canale / Prodotto</div>
+    <select id="cat">
+      <option value="real" selected>🌍 Colori reali (belle immagini)</option>
+      <option value="cloud">☁️ Nubi / infrarosso</option>
+      <option value="data">🔬 Dati (mare, vento, ozono…)</option>
+      <option value="all">Tutti i prodotti</option>
+    </select>
+    <select id="product" style="margin-top:6px"></select>
+    <div id="prodhint" class="sub" style="margin-top:6px"></div>
+
+    <div class="sect">Data</div>
+    <div class="row">
+      <input id="date" type="date">
+      <button id="today" title="Ieri (UTC)">ieri</button>
+    </div>
+    <label>Passaggi noti per questa data</label>
+    <select id="times"><option value="">— (usa la data intera) —</option></select>
+
+    <div class="sect">Area</div>
+    <div class="row">
+      <button data-bbox="-60,-180,80,180">Mondo</button>
+      <button data-bbox="30,-15,72,45">Europa</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button data-bbox="35,6,48,19">Italia</button>
+      <button data-bbox="45.3,12.0,46.8,14.1">FVG</button>
+    </div>
+
+    <div class="sect">Qualità immagine</div>
+    <label class="chk"><input type="checkbox" id="enhance" checked> Immagine brillante</label>
+    <label>Intensità</label>
+    <input id="enhamt" type="range" min="0" max="100" value="55">
+
+    <div class="sect">Vista</div>
+    <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
+    <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
+    <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
+    <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
+
+    <div class="sect">Azioni</div>
+    <button id="fetch" class="primary">Scarica passaggio</button>
+    <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
+
+    <div class="cred">
+      METOP-Polar v1.1.2<br>
+      Costruito con Claude Code (Anthropic)<br>
+      © 2026 Gimmy Pignolo · Tutti i diritti riservati
+    </div>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="chip">Pronto — trascina per spostarti, rotella per zoomare.</div>
+    <div id="spin">⏳ scarico…</div>
+  </div>
+
+  <div id="status">
+    <span id="st-view" class="tag">bbox —</span>
+    <span id="st-prod" class="tag">—</span>
+    <span id="st-cache" class="tag">cache —</span>
+    <span id="st-msg" style="flex:1"></span>
+  </div>
+</div>
+
+<script>
+// --------------------------------------------------------------------------
+// Config. L'API di default e' il Worker; ?api=... la puo' sovrascrivere, cosi'
+// lo stesso file gira da locale puntando al Worker deployato.
+const API = new URLSearchParams(location.search).get("api")
+          || (location.origin.startsWith("http") ? location.origin
+              : "https://sismo-fvg.gimmy077.workers.dev");
+
+// Catalogo prodotti. Gli id sono quelli capiti dal Worker (/metop?product=...).
+// La descrizione e' per l'utente. I nomi dei layer veri stanno nel Worker.
+const PRODUCTS = [
+  { id:"avhrr_natural", label:"AVHRR — colore naturale", hint:"Immagine diurna: terra, mare, nubi. La piu' leggibile." },
+  { id:"avhrr_cloud",   label:"AVHRR — nubi/notte (RGB)", hint:"Contrasto su nubi e temperatura, utile anche di notte." },
+  { id:"iasi_temp",     label:"IASI — temperatura",       hint:"Sondaggio atmosferico: profilo termico." },
+  { id:"iasi_ozone",    label:"IASI — ozono totale",      hint:"Colonna di ozono dal sondatore IASI." },
+  { id:"ascat_wind",    label:"ASCAT — vento sul mare",   hint:"Vento superficiale sugli oceani dallo scatterometro." },
+];
+
+// --------------------------------------------------------------------------
+// Stato della vista: un bbox in gradi (lat,lon) e nient'altro. Il canvas e'
+// una proiezione equirettangolare del bbox — la stessa che il WMS EPSG:4326
+// restituisce, quindi immagine e griglia combaciano senza conti.
+let view = { latMin:-60, lonMin:-180, latMax:80, lonMax:180 };
+let img = null;                 // Image scaricata per il bbox corrente
+let imgBox = null;              // bbox a cui l'immagine si riferisce
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+
+function fitDPR(){
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width*d); cv.height = Math.round(r.height*d);
+}
+// canvas <-> geo (equirettangolare sul bbox della vista)
+function xToLon(x){ return view.lonMin + (x/cv.width)*(view.lonMax-view.lonMin); }
+function yToLat(y){ return view.latMax - (y/cv.height)*(view.latMax-view.latMin); }
+function lonToX(lon){ return (lon-view.lonMin)/(view.lonMax-view.lonMin)*cv.width; }
+function latToY(lat){ return (view.latMax-lat)/(view.latMax-view.latMin)*cv.height; }
+
+// Enhancement in sola visualizzazione: contrasto/saturazione/luminosita'
+// calibrati sull'intensita' scelta. Non inventa dati — rende piu' vivida
+// l'immagine gia' scaricata, come la maschera di contrasto del gemello C++.
+function enhanceFilter(){
+  if(!document.getElementById("enhance").checked) return "none";
+  const t = (+document.getElementById("enhamt").value)/100;      // 0..1
+  const contrast   = (1 + 0.18*t).toFixed(3);
+  const saturate   = (1 + 0.55*t).toFixed(3);
+  const brightness = (1 + 0.05*t).toFixed(3);
+  return "contrast("+contrast+") saturate("+saturate+") brightness("+brightness+")";
+}
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // immagine, se copre (anche in parte) la vista
+  if(img && imgBox){
+    const dx0 = lonToX(imgBox.lonMin), dx1 = lonToX(imgBox.lonMax);
+    const dy0 = latToY(imgBox.latMax), dy1 = latToY(imgBox.latMin);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.filter = enhanceFilter();               // solo sull'immagine
+    ctx.drawImage(img, dx0, dy0, dx1-dx0, dy1-dy0);
+    ctx.filter = "none";                        // la griglia resta netta
+  }
+  if(document.getElementById("grid").checked) drawGraticule();
+  document.getElementById("st-view").textContent =
+    "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
+    view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
+}
+
+function niceStep(spanDeg){
+  const target = spanDeg/8;                     // ~8 linee
+  const steps = [1,2,5,10,15,30,45,90];
+  for(const s of steps) if(s>=target) return s;
+  return 90;
+}
+function drawGraticule(){
+  const showLab = document.getElementById("labels").checked;
+  ctx.lineWidth = 1; ctx.strokeStyle = "rgba(150,170,190,.22)";
+  ctx.fillStyle = "rgba(190,205,220,.75)";
+  ctx.font = (12*(window.devicePixelRatio||1))+"px 'Segoe UI',sans-serif";
+  const latStep = niceStep(view.latMax-view.latMin);
+  const lonStep = niceStep(view.lonMax-view.lonMin);
+  for(let lat=Math.ceil(view.latMin/latStep)*latStep; lat<=view.latMax; lat+=latStep){
+    const y=latToY(lat); ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cv.width,y); ctx.stroke();
+    if(showLab) ctx.fillText(lat.toFixed(0)+"°", 4, y-3);
+  }
+  for(let lon=Math.ceil(view.lonMin/lonStep)*lonStep; lon<=view.lonMax; lon+=lonStep){
+    const x=lonToX(lon); ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,cv.height); ctx.stroke();
+    if(showLab) ctx.fillText(lon.toFixed(0)+"°", x+3, 14*(window.devicePixelRatio||1));
+  }
+}
+
+// --------------------------------------------------------------------------
+// Interazione: trascinamento e zoom aggiornano SOLO il bbox della vista. Il
+// download avviene quando il gesto finisce (mouse fermo), non durante — cosi'
+// non si scatena una raffica di richieste, come da nota di progetto.
+let drag=null;
+cv.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY,view:{...view}}; cv.classList.add("drag"); cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointermove",e=>{
+  if(!drag) return;
+  const r=cv.getBoundingClientRect();
+  const dLon=(e.clientX-drag.x)/r.width*(view.lonMax-view.lonMin);
+  const dLat=(e.clientY-drag.y)/r.height*(view.latMax-view.latMin);
+  view={ lonMin:drag.view.lonMin-dLon, lonMax:drag.view.lonMax-dLon,
+         latMin:drag.view.latMin+dLat, latMax:drag.view.latMax+dLat };
+  clampView(); draw();
+});
+cv.addEventListener("pointerup",()=>{ if(drag){ drag=null; cv.classList.remove("drag"); scheduleFetch(); }});
+cv.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const r=cv.getBoundingClientRect();
+  const lon=xToLon((e.clientX-r.left)*cv.width/r.width);
+  const lat=yToLat((e.clientY-r.top)*cv.height/r.height);
+  const k=e.deltaY<0?0.8:1.25;                 // zoom in / out
+  view={ lonMin:lon-(lon-view.lonMin)*k, lonMax:lon+(view.lonMax-lon)*k,
+         latMin:lat-(lat-view.latMin)*k, latMax:lat+(view.latMax-lat)*k };
+  clampView(); draw(); scheduleFetch();
+},{passive:false});
+
+function clampView(){
+  // niente ribaltamenti; limiti fisici del pianeta.
+  if(view.latMin<-90)view.latMin=-90; if(view.latMax>90)view.latMax=90;
+  if(view.latMax-view.latMin<0.5) view.latMax=view.latMin+0.5;
+  if(view.lonMax-view.lonMin<0.5) view.lonMax=view.lonMin+0.5;
+}
+let fetchTimer=null;
+function scheduleFetch(){ clearTimeout(fetchTimer); fetchTimer=setTimeout(fetchImage,350); }
+
+// --------------------------------------------------------------------------
+// Catalogo scoperto dal Worker (layer VERI di EUMETView). Se la scoperta
+// fallisce si ripiega sulla lista statica PRODUCTS.
+let LAYERS = [];
+// Prodotti "belli" garantiti: li innestiamo SEMPRE nel catalogo (in testa), cosi'
+// restano nel menu anche se la scoperta o la cache di EUMETView non li restituisce.
+const CURATED = [
+  {name:"copernicus:daily_sentinel3ab_olci_l1_rgb_fulres", title:"OLCI Level 1B RGB Daily Accumulated - Sentinel-3", hasTime:true},
+  {name:"copernicus:sentinel3a_olci_l1_rgb_fullres",       title:"OLCI Level 1B RGB - Sentinel-3A", hasTime:true},
+  {name:"copernicus:sentinel3b_olci_l1_rgb_fullres",       title:"OLCI Level 1B RGB - Sentinel-3B", hasTime:true},
+  {name:"mtg_fd:rgb_geocolour", title:"Geo Colour RGB - MTG-I - 0 degree", hasTime:true},
+];
+const $ = id => document.getElementById(id);
+const sel = () => $("product");
+const curVal = () => sel().value;                 // layer vero (con ":") o id di PRODUCTS
+const isRealLayer = v => v && v.includes(":");
+function qParam(){ return isRealLayer(curVal()) ? "&layer="+encodeURIComponent(curVal())
+                                                 : "&product="+curVal(); }
+
+async function fetchImage(){
+  const date=$("date").value, time=$("times").value;
+  const r=cv.getBoundingClientRect();
+  const w=Math.min(2048,Math.round(r.width)), h=Math.min(2048,Math.round(r.height));
+  const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
+  let u=API+"/metop?bbox="+bbox+"&w="+w+"&h="+h+qParam();
+  // Passaggio scelto -> quell'istante. Nessun passaggio scelto -> nessun TIME,
+  // cosi' il Worker/GeoServer serve l'ultimo disponibile (evita il 502 da data nuda).
+  if(time) u+="&time="+encodeURIComponent(time);
+  if($("bg").checked) u+="&bg=1";
+
+  $("spin").classList.add("on"); $("st-msg").textContent="";
+  try{
+    const resp=await fetch(u);
+    $("st-cache").textContent="cache "+(resp.headers.get("X-Cache")||"—");
+    const ct=resp.headers.get("Content-Type")||"";
+    if(!ct.includes("image")){
+      const j=await resp.json().catch(()=>({error:"risposta non valida"}));
+      throw new Error(j.error+(j.disponibili?" ("+j.disponibili.join(", ")+")":""));
+    }
+    const blob=await resp.blob(), im=new Image();
+    await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
+    img=im; imgBox={...view};
+    $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""));
+    draw();
+  }catch(err){
+    $("st-msg").innerHTML="<span style='color:var(--err)'>"+err.message+"</span>";
+  }finally{ $("spin").classList.remove("on"); }
+}
+
+// Passaggi (TIME) per il layer scelto. Trovato l'elenco, salta all'ultimo
+// istante disponibile e lo scarica: cosi' "Scarica" prende sempre qualcosa che
+// esiste davvero, invece di una data a caso senza copertura.
+async function loadTimes(){
+  const t=$("times"); t.innerHTML='<option value="">— (ultima disponibile) —</option>';
+  const date=$("date").value;
+  try{
+    const r=await fetch(API+"/metop/times?"+qParam().slice(1)+(date?"&date="+date:""));
+    if(!r.ok){ $("st-msg").textContent="catalogo tempi non disponibile"; scheduleFetch(); return; }
+    const j=await r.json();
+    const times=j.times||[];
+    times.forEach(s=>{ const o=document.createElement("option"); o.value=s;
+      o.textContent=s.replace("T"," ").replace("Z"," UTC"); t.appendChild(o); });
+    if(times.length){
+      t.value=times[times.length-1];               // il piu' recente
+      $("st-msg").innerHTML="<span style='color:var(--ok)'>"+times.length+" passaggi · ultimo "+t.value.replace("T"," ").replace("Z"," UTC")+"</span>";
+    }else{
+      $("st-msg").textContent = date? "nessun passaggio il "+date+" — provo la data intera" : "nessun passaggio elencato";
+    }
+    scheduleFetch();
+  }catch(_){ scheduleFetch(); }
+}
+
+// --------------------------------------------------------------------------
+// popolamento prodotti dal catalogo, con filtro per satellite sui titoli
+function satMatch(title, sat){
+  if(!sat) return true;
+  const L=sat.slice(-1).toUpperCase();             // A / B / C
+  if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotti combinati: sempre
+  return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
+}
+// Categoria del prodotto. Guardo PRIMA il nome del layer (inequivocabile) e poi
+// il titolo: cosi' OLCI/SLSTR RGB e Geo Colour finiscono sempre fra i colori reali.
+function catOf(title, name){
+  const t=(title||"").toLowerCase(), n=(name||"").toLowerCase();
+  // --- per NOME (robusto): OLCI/SLSTR true colour, natural, geo colour ---
+  if(/olci.*rgb|rgb.*olci|geocolou?r|rgb_natural|rgb_geocolour|truecolor|true_colour|slstr.*rgb/.test(n)) return "real";
+  if(/rgb_124|_ir\d|_wv\d|_vis\d|_cloud|_fog|_dust|_ash|_airmass/.test(n)) return "cloud";
+  if(/sst|_chl|ascat|wind|ozone|aerosol|orbit|footprint|instab/.test(n)) return "data";
+  // --- per TITOLO (fallback) ---
+  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability/.test(t)) return "data";
+  if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\bolci\b/.test(t)) return "real";
+  if(/cloud|\bir\b|ir\d|\bwv\b|wv\d|vis\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
+  return "other";
+}
+function catMatch(l, cat){
+  if(cat==="all") return true;
+  return catOf(l.title, l.name)===cat;
+}
+function populateProducts(){
+  const s=sel(); s.innerHTML="";
+  const sat=$("sat").value, cat=$("cat").value;
+  let list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat) && catMatch(l,cat))
+                           : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
+  // se una categoria resta vuota, non lasciare il menu spoglio: mostra tutto
+  if(LAYERS.length && !list.length) list = LAYERS.filter(l=>satMatch(l.title,sat));
+  if(!list.length){ const o=document.createElement("option"); o.textContent="(nessun layer)"; s.appendChild(o); return; }
+  list.forEach(l=>{ const o=document.createElement("option"); o.value=l.name; o.textContent=l.title; s.appendChild(o); });
+  onProductChange();
+}
+function onProductChange(){
+  const v=curVal();
+  const title=(sel().selectedOptions[0]||{}).text||"";
+  // Prodotto polare a striscia singola (un satellite, non 'accumulated/daily'):
+  // copre solo la fascia di un'orbita, il resto e' nero. Avvisa e suggerisci.
+  const single = /sentinel-?3[ab]\b|metop[\s-]?[abc]\b/i.test(title)
+              && !/accumulat|daily|giornalier|orbits/i.test(title);
+  if(single)
+    $("prodhint").innerHTML="<span style='color:var(--warn)'>striscia di una singola orbita — usa una versione "
+      +"<b>Daily / Accumulated</b> per coprire tutta la mappa</span>";
+  else
+    $("prodhint").textContent = isRealLayer(v) ? v
+        : (PRODUCTS.find(p=>p.id===v)||{}).hint || "";
+  $("st-prod").textContent = title;
+  loadTimes();
+}
+async function initCatalog(){
+  $("st-msg").textContent="carico il catalogo EUMETView…";
+  try{
+    const r=await fetch(API+"/metop/layers?v="+Date.now());  // niente cache vecchia
+    const j=await r.json();
+    if(j.layers && j.layers.length){ LAYERS=j.layers; $("st-msg").textContent=j.count+" prodotti disponibili"; }
+    else { $("st-msg").innerHTML="<span style='color:var(--warn)'>catalogo vuoto: uso i prodotti predefiniti</span>"; }
+  }catch(_){ $("st-msg").innerHTML="<span style='color:var(--warn)'>catalogo non raggiungibile: prodotti predefiniti</span>"; }
+  // innesta le curate mancanti, in testa: OLCI & Geo Colour ci sono comunque
+  const have=new Set(LAYERS.map(l=>l.name));
+  LAYERS = CURATED.filter(c=>!have.has(c.name)).concat(LAYERS);
+  populateProducts();
+}
+function yesterdayUTC(){ return new Date(Date.now()-24*3600*1000).toISOString().slice(0,10); }
+
+// --------------------------------------------------------------------------
+// wiring UI
+$("date").value=yesterdayUTC();
+sel().onchange=onProductChange;
+$("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
+$("date").onchange=loadTimes;
+$("sat").onchange=populateProducts;
+$("cat").onchange=populateProducts;
+$("times").onchange=fetchImage;
+$("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
+$("grid").onchange=draw;
+$("labels").onchange=draw;
+$("enhance").onchange=draw;
+$("enhamt").oninput=draw;
+$("reset").onclick=()=>{ view={latMin:-60,lonMin:-180,latMax:80,lonMax:180}; draw(); scheduleFetch(); };
+document.querySelectorAll("button[data-bbox]").forEach(b=>b.onclick=()=>{
+  const [a,lo,c,hi]=b.dataset.bbox.split(",").map(Number);
+  view={latMin:a,lonMin:lo,latMax:c,lonMax:hi}; draw(); scheduleFetch();
+});
+$("fetch").onclick=fetchImage;
+$("save").onclick=()=>{ const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click(); };
+window.addEventListener("resize",()=>{ fitDPR(); draw(); });
+
+fitDPR(); draw(); initCatalog();
+</script>
+`;
+// <<<METOP_HTML
+
+// Base WMS di EUMETSAT EUMETView (GeoServer pubblico, senza autenticazione per
+// le immagini). E' l'analogo di NASA GIBS ma per i satelliti polari europei.
+const EUMETVIEW = "https://view.eumetsat.int/geoserver/wms";
+
+// Prodotti METOP -> layer EUMETView.
+// ATTENZIONE: i nomi dei layer qui sotto sono la nostra migliore ipotesi e
+// vanno VERIFICATI (da questo ambiente EUMETSAT e' irraggiungibile). Se un
+// prodotto da errore, si corregge il nome qui — oppure, senza toccare il
+// Worker, si passa il layer vero col parametro &layer=<nome> nella richiesta.
+// Fallback con i nomi VERI di EUMETView (verificati dal catalogo), usati solo
+// se un client chiama /metop con &product= invece del &layer= reale.
+const METOP_LAYERS = {
+  olci_daily:    "copernicus:daily_sentinel3ab_olci_l1_rgb_fulres", // Sentinel-3 OLCI ~300 m
+  avhrr_natural: "eps:m01_rgb_natural_fog",   // AVHRR Natural + Fog, Metop-B
+  avhrr_cloud:   "eps:m01_rgb_124",           // AVHRR nubi/giorno, Metop-B
+  avhrr_ir:      "eps:m01_ir108",             // AVHRR IR 10.8, Metop-B
+  ascat_wind:    "eps:m01_ascat_wind",        // ASCAT vento sul mare, Metop-B
+};
+
+// Estrae i layer (name + title + se hanno dimensione TIME) da un documento
+// GetCapabilities WMS. Il Worker gira su Cloudflare, che RAGGIUNGE EUMETSAT:
+// cosi' l'app scopre i layer veri invece di indovinarli.
+function parseWmsLayers(xml) {
+  const out = [];
+  const re = /<Name>([^<]+)<\/Name>\s*<Title>([^<]*)<\/Title>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const name = m[1].trim(), title = (m[2] || "").trim();
+    if (!name.includes(":")) continue;               // scarta i contenitori
+    const hasTime = /<Dimension[^>]*name="time"/i.test(xml.slice(m.index, m.index + 4000));
+    out.push({ name, title, hasTime });
+  }
+  return out;
+}
+
 export default {
   async fetch(request, env) {
     const url    = new URL(request.url);
     const db     = env.DB;
     const SECRET = getUpdateSecret(env);
+
+    // ============================================================
+    // METOP — pagina del visualizzatore polari (servita su /polar) e proxy
+    // immagini EUMETView (su /metop). Stessa filosofia di /modis: nessun DB,
+    // cache edge, CORS aperto. La UI e' in metop-viewer.html (embedded qui).
+    // ============================================================
+    //   /polar, /metop-viewer, /metop/  → la pagina del visualizzatore.
+    //   (/metop SENZA slash resta il proxy immagini qui sotto.)
+    if (url.pathname === "/polar" || url.pathname === "/metop-viewer" || url.pathname === "/metop/") {
+      return new Response(METOP_HTML || "<h1>METOP</h1><p>Pagina non ancora generata: esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
+        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+    }
+
+    // Catalogo: elenca i layer realmente offerti da EUMETView (name+title+time).
+    // L'app lo usa per popolare il menu prodotti con nomi VERI, senza indovinare.
+    //   GET /metop/layers[?q=avhrr]
+    if (url.pathname === "/metop/layers") {
+      const CORS = { "Access-Control-Allow-Origin": "*" };
+      const capUrl = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0";
+      try {
+        const r = await fetch(capUrl, { cf: { cacheTtl: 21600, cacheEverything: true } });
+        if (!r.ok) return new Response(JSON.stringify({ error: "GetCapabilities HTTP " + r.status, layers: [] }),
+          { status: 502, headers: { ...CORS, "Content-Type": "application/json" } });
+        const xml = await r.text();
+        let layers = parseWmsLayers(xml);
+        const q = (url.searchParams.get("q") || "").toLowerCase();
+        if (q) layers = layers.filter(l => (l.title + " " + l.name).toLowerCase().includes(q));
+        // solo i layer con tempo (i prodotti d'immagine); niente basemap/overlay
+        const NOISE = /^(backgrounds|osmgray|osm|waterways|graticules|coastlines)\b/i;
+        const seen = new Set();
+        const timed = layers.filter(l => {
+          if (!l.hasTime) return false;
+          if (NOISE.test(l.name)) return false;        // sfondi/reticoli: non sono dati
+          if (seen.has(l.name)) return false;          // duplicati (es. orbital_tracks)
+          seen.add(l.name); return true;
+        });
+        // "In primo piano": le naturali/true-colour di qualita' migliore, nell'
+        // ordine voluto. Sentinel-3 OLCI (~300 m) e' la piu' nitida; poi le AVHRR
+        // Metop; poi i singoli passaggi OLCI; poi l'anello globale multimission.
+        const FEATURED = [
+          "copernicus:daily_sentinel3ab_olci_l1_rgb_fulres", // OLCI RGB giornaliero A+B (typo "fulres" e' il nome vero)
+          "eps:m01_rgb_natural_fog", "eps:m03_rgb_natural_fog", "eps:m02_rgb_natural_fog",
+          "copernicus:sentinel3a_olci_l1_rgb_fullres", "copernicus:sentinel3b_olci_l1_rgb_fullres",
+          "mumi:wideareacoverage_rgb_natural",
+        ];
+        const feat = n => { const i = FEATURED.indexOf(n); return i < 0 ? 999 : i; };
+        // Progetto = METOP POLARE: i workspace polari "eps:"/Sentinel-3 "copernicus:"
+        // vengono prima; il geostazionario Meteosat (msg/mtg) scende in fondo.
+        const isPolar = n => /^(eps|copernicus):/i.test(n);
+        const isGeo   = n => /^(msg|mtg)/i.test(n);
+        const rankT = t => { t = t.toLowerCase();
+          if (/natural|true.?colou?r/.test(t)) return 0; if (/cloud|rgb/.test(t)) return 1;
+          if (/avhrr|ir\b/.test(t)) return 2; if (/sst/.test(t)) return 3;
+          if (/ascat|wind/.test(t)) return 4; if (/iasi/.test(t)) return 5; return 8; };
+        const grp = n => isPolar(n) ? 0 : isGeo(n) ? 2 : 1;   // polare < altro < geo
+        timed.sort((a, b) => feat(a.name) - feat(b.name) || grp(a.name) - grp(b.name)
+          || rankT(a.title) - rankT(b.title) || a.title.localeCompare(b.title));
+        return new Response(JSON.stringify({ count: timed.length, layers: timed.slice(0, 400) }),
+          { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=10800" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e), layers: [] }),
+          { status: 502, headers: { ...CORS, "Content-Type": "application/json" } });
+      }
+    }
+
+    // Passaggi disponibili per data: legge la dimensione TIME dal GetCapabilities
+    // di EUMETView per il layer scelto e la restituisce come lista di istanti.
+    //   GET /metop/times?layer=<name>&date=YYYY-MM-DD
+    if (url.pathname === "/metop/times") {
+      const CORS = { "Access-Control-Allow-Origin": "*" };
+      const product = (url.searchParams.get("product") || "avhrr_natural").toLowerCase();
+      const layer = url.searchParams.get("layer") || METOP_LAYERS[product];
+      if (!layer) return new Response(JSON.stringify({ times: [], error: "prodotto sconosciuto" }),
+        { headers: { ...CORS, "Content-Type": "application/json" } });
+      const date = url.searchParams.get("date"); // opzionale: filtra per giorno
+      const capUrl = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0&namespace="
+                   + encodeURIComponent(layer.split(":")[0]);
+      let times = [];
+      try {
+        const r = await fetch(capUrl, { cf: { cacheTtl: 3600, cacheEverything: true } });
+        if (r.ok) {
+          const xml = await r.text();
+          // isola il blocco <Layer> del nostro layer, poi la sua <Dimension time>.
+          // EUMETView elenca i layer col nome COMPLETO (<Name>ws:layer</Name>):
+          // cercare il nome corto falliva sempre -> nessun passaggio, TIME sbagliato.
+          let i = xml.indexOf("<Name>" + layer + "</Name>");
+          if (i < 0) i = xml.indexOf("<Name>" + layer.split(":").pop() + "</Name>");
+          if (i >= 0) {
+            const seg = xml.slice(i, i + 6000);
+            const m = seg.match(/<Dimension[^>]*name="time"[^>]*>([\s\S]*?)<\/Dimension>/i);
+            if (m) times = m[1].split(",").map(s => s.trim()).filter(Boolean);
+          }
+        }
+      } catch (_) { /* la data intera funziona comunque */ }
+      if (date) times = times.filter(t => t.startsWith(date));
+      // troppi istanti sono inutili: tieni gli ultimi ~40
+      if (times.length > 40) times = times.slice(-40);
+      return new Response(JSON.stringify({ layer, times }),
+        { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=1800" } });
+    }
+
+    //   GET /metop?sat=metopb|metopc&product=avhrr_natural|...&bbox=lat,lon,lat,lon
+    //             &date=YYYY-MM-DD | &time=<ISO>  &w=&h=  [&layer=<override>]
+    if (url.pathname === "/metop") {
+      const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+
+      const product = (url.searchParams.get("product") || "avhrr_natural").toLowerCase();
+      const layer = url.searchParams.get("layer") || METOP_LAYERS[product];
+      if (!layer) return new Response(JSON.stringify({
+        error: "prodotto sconosciuto", product, disponibili: Object.keys(METOP_LAYERS),
+        hint: "Passa il layer EUMETView vero con &layer=<workspace:nome> per aggirare i nomi predefiniti."
+      }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
+
+      const bbox = url.searchParams.get("bbox") || "-60,-180,80,180"; // lat,lon (WMS 1.3.0)
+      const w = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("w") || "1024") || 1024));
+      const h = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("h") || "768")  || 768));
+      // TIME: istante preciso se &time=; il giorno se &date=; ALTRIMENTI nessun
+      // TIME -> GeoServer serve il suo default, cioe' l'ULTIMO disponibile. E' la
+      // via robusta per "ultima data": una data nuda senza copertura dava 502.
+      const timeArg = url.searchParams.get("time");
+      const dateArg = url.searchParams.get("date");
+      let time = "";
+      if (timeArg) time = timeArg;
+      else if (dateArg && /^\d{4}-\d{2}-\d{2}$/.test(dateArg)) time = dateArg;
+
+      // Sfondo Terra opzionale: sotto ai dati (trasparenti) mettiamo la mappa
+      // NaturalEarth, cosi' si vedono coste e continenti come un globo.
+      const bg = url.searchParams.get("bg") === "1";
+      const layersArg = bg ? ("backgrounds:ne_gray," + layer) : layer;
+
+      const wms = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + encodeURIComponent(layersArg)
+        + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox + "&WIDTH=" + w + "&HEIGHT=" + h
+        + "&FORMAT=image/png&TRANSPARENT=true" + (time ? "&TIME=" + encodeURIComponent(time) : "");
+
+      const cache = caches.default;
+      const cacheKey = new Request(url.origin + "/metop?k=" + encodeURIComponent(layersArg+"|"+(time||"latest")+"|"+bbox+"|"+w+"x"+h));
+      const hit = await cache.match(cacheKey);
+      if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
+
+      // Area della richiesta in "gradi quadri": serve a spiegare i timeout.
+      const bb = bbox.split(",").map(Number);
+      const areaDeg = (bb.length === 4) ? Math.abs((bb[2]-bb[0]) * (bb[3]-bb[1])) : 0;
+      const big = areaDeg > 20000; // ~mezzo pianeta o piu'
+
+      let resp;
+      try { resp = await fetch(wms, { cf: { cacheTtl: 86400, cacheEverything: true } }); }
+      catch (e) { return new Response(JSON.stringify({
+        error: "EUMETView non ha risposto (rete/timeout)" + (big ? " — l'area e' molto ampia: prova a restringere (Europa/Italia)" : " — riprova"),
+        detail: String(e), layer }), { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
+
+      // Un WMS in errore risponde XML (ServiceException) o un testo, non un'immagine.
+      // Ne leggiamo il contenuto per dire il MOTIVO vero, invece di un secco 502.
+      const ct = resp.headers.get("Content-Type") || "";
+      if (!resp.ok || !ct.includes("image")) {
+        let body = "";
+        try { body = (await resp.text()).slice(0, 1200); } catch (_) {}
+        const m = body.match(/<ServiceException[^>]*>([\s\S]*?)<\/ServiceException>/i);
+        const reason = (m ? m[1] : body).replace(/\s+/g, " ").trim().slice(0, 300);
+        // Traduzione: distinguo "server sovraccarico/area enorme" da "niente dato".
+        let msg;
+        if (resp.status >= 500 || big)
+          msg = "EUMETView non ce l'ha fatta a generare questa immagine"
+              + (big ? " (area troppo ampia ad alta risoluzione): zooma su Europa/Italia o abbassa la risoluzione"
+                     : " (server occupato): riprova fra poco");
+        else if (/no data|not found|could not|empty|no features|out of range/i.test(reason))
+          msg = "Nessun passaggio per questa area/orario: scegli un altro passaggio, un'altra data o un'altra zona";
+        else
+          msg = "Immagine non disponibile per questa area/orario";
+        return new Response(JSON.stringify({ error: msg, status: resp.status, layer, time, bbox,
+          eumetview: reason || undefined }),
+          { status: resp.status >= 500 ? 502 : 404, headers: { ...CORS, "Content-Type": "application/json" } });
+      }
+
+      const buf = await resp.arrayBuffer();
+      if (buf.byteLength < 200)
+        return new Response(JSON.stringify({ error: "Nessun passaggio per questa area/orario: prova un'altra zona o un altro passaggio", layer, time, bbox }),
+          { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
+
+      const headers = { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age=86400",
+                        "X-Cache": "MISS", "X-METOP-Layer": layer, "X-METOP-Time": time };
+      const out = new Response(buf, { headers });
+      try { await cache.put(cacheKey, out.clone()); } catch (_) {}
+      return out;
+    }
+
+    // ============================================================
+    // MODIS FVG — proxy + cache immagini reali NASA GIBS (Terra/Aqua).
+    // Usato dal visualizzatore desktop MODIS-FVG-Viewer: scarica lato edge,
+    // mette in cache, e serve il PNG al PC. Nessun DB richiesto.
+    //   GET /modis?sat=terra|aqua&product=truecolor|bands721|bands367|lst
+    //             &date=YYYY-MM-DD (default: ieri UTC)
+    //             &bbox=latMin,lonMin,latMax,lonMax (default: FVG)
+    //             &w=1024&h=768
+    // ============================================================
+    if (url.pathname === "/modis") {
+      const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+
+      // hls_* sono Landsat/Sentinel-2 armonizzati a 30 m: ~8x piu' nitidi di
+      // MODIS, ma non sono prodotti Terra/Aqua (stesso layer per entrambi).
+      const HLS = { hls_s30:"HLS_S30_Nadir_BRDF_Adjusted_Reflectance",
+                    hls_l30:"HLS_L30_Nadir_BRDF_Adjusted_Reflectance" };
+      const LAYERS = {
+        terra: { truecolor:"MODIS_Terra_CorrectedReflectance_TrueColor",
+                 bands721:"MODIS_Terra_CorrectedReflectance_Bands721",
+                 bands367:"MODIS_Terra_CorrectedReflectance_Bands367",
+                 lst:"MODIS_Terra_Land_Surface_Temp_Day",
+                 fires:"MODIS_Terra_Thermal_Anomalies_All",
+                 aerosol:"MODIS_Terra_Aerosol",
+                 snow:"MODIS_Terra_NDSI_Snow_Cover",
+                 ndvi:"MODIS_Terra_NDVI_8Day",
+                 chlor:"MODIS_Terra_Chlorophyll_A", ...HLS },
+        aqua:  { truecolor:"MODIS_Aqua_CorrectedReflectance_TrueColor",
+                 bands721:"MODIS_Aqua_CorrectedReflectance_Bands721",
+                 bands367:"MODIS_Aqua_CorrectedReflectance_Bands367",
+                 lst:"MODIS_Aqua_Land_Surface_Temp_Day",
+                 fires:"MODIS_Aqua_Thermal_Anomalies_All",
+                 aerosol:"MODIS_Aqua_Aerosol",
+                 snow:"MODIS_Aqua_NDSI_Snow_Cover",
+                 ndvi:"MODIS_Aqua_NDVI_8Day",
+                 chlor:"MODIS_Aqua_Chlorophyll_A", ...HLS },
+      };
+      const sat     = (url.searchParams.get("sat") || "terra").toLowerCase();
+      const product = (url.searchParams.get("product") || "truecolor").toLowerCase();
+      // Un prodotto sconosciuto NON deve ripiegare in silenzio sul true-color:
+      // il client etichetterebbe l'immagine con il prodotto che ha chiesto, e si
+      // ritroverebbe MODIS spacciato per Sentinel-2. Meglio un errore parlante.
+      const layer = (LAYERS[sat] || LAYERS.terra)[product];
+      if (!layer) {
+        return new Response(JSON.stringify({
+          error: "prodotto sconosciuto",
+          product,
+          disponibili: Object.keys(LAYERS.terra),
+          hint: "Worker non aggiornato? I prodotti hls_* richiedono l'ultima versione."
+        }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
+      }
+
+      let date = url.searchParams.get("date");
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {           // default: ieri (UTC)
+        date = new Date(Date.now() - 24*3600*1000).toISOString().slice(0,10);
+      }
+      const bbox = url.searchParams.get("bbox") || "45.5,12.3,46.7,13.9"; // lat,lon (WMS 1.3.0)
+      // Fino a 4096 px: serve ai layer a 30 m, dove chiedere meno pixel
+      // butterebbe via proprio il dettaglio per cui li si usa.
+      const w = Math.max(64, Math.min(4096, parseInt(url.searchParams.get("w")||"1024") || 1024));
+      const h = Math.max(64, Math.min(4096, parseInt(url.searchParams.get("h")||"768")  || 768));
+
+      const gibs = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
+        + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + layer
+        + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox
+        + "&WIDTH=" + w + "&HEIGHT=" + h + "&FORMAT=image/png&TIME=" + date;
+
+      const cache = caches.default;
+      const cacheKey = new Request(url.origin + "/modis?k=" + encodeURIComponent(layer+"|"+date+"|"+bbox+"|"+w+"x"+h));
+      const hit = await cache.match(cacheKey);
+      if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
+
+      let resp;
+      try { resp = await fetch(gibs, { cf: { cacheTtl: 86400, cacheEverything: true } }); }
+      catch (e) { return new Response(JSON.stringify({error:"fetch GIBS fallita", detail:String(e)}), {status:502, headers:{...CORS,"Content-Type":"application/json"}}); }
+      if (!resp.ok) return new Response(JSON.stringify({error:"GIBS HTTP "+resp.status, layer, date}), {status:502, headers:{...CORS,"Content-Type":"application/json"}});
+
+      const ct  = resp.headers.get("Content-Type") || "";
+      const buf = await resp.arrayBuffer();
+      if (!ct.includes("image") || buf.byteLength < 200)
+        return new Response(JSON.stringify({error:"nessuna immagine MODIS per questa data/area", layer, date, bbox}), {status:404, headers:{...CORS,"Content-Type":"application/json"}});
+
+      const headers = { ...CORS, "Content-Type":"image/png", "Cache-Control":"public, max-age=86400",
+                        "X-Cache":"MISS", "X-MODIS-Layer":layer, "X-MODIS-Date":date };
+      const out = new Response(buf, { headers });
+      try { await cache.put(cacheKey, out.clone()); } catch (_) {}
+      return out;
+    }
 
     if (!db) return new Response(JSON.stringify({error:"DB binding non trovato"}),{status:500,headers:{"Content-Type":"application/json"}});
 

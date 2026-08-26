@@ -1,0 +1,116 @@
+// test_image.cpp — portable test for the band compositing (image.cpp).
+//   g++ -std=c++17 ../src/modis.cpp ../src/image.cpp test_image.cpp -o ti && ./ti sample_MODIS_FVG.mgr
+#include "../src/modis.h"
+#include "../src/image.h"
+#include <cstdio>
+
+static int fails = 0;
+static void check(bool ok, const char* msg) {
+    std::printf("  [%s] %s\n", ok ? "OK" : "FAIL", msg);
+    if (!ok) ++fails;
+}
+
+int main(int argc, char** argv) {
+    const char* path = argc > 1 ? argv[1] : "sample_MODIS_FVG.mgr";
+    std::string err;
+    modis::Granule g = modis::parseFile(path, &err);
+    check(!g.bands.empty(), "granulo caricato");
+
+    // Single band -> image at the band's native resolution.
+    img::Image gray = img::renderSingle(g, 1, cmap::Ramp::Gray);
+    check(!gray.empty(), "render banda singola non vuoto");
+    check(gray.w == 384 && gray.h == 288, "banda 1 renderizzata 384x288");
+
+    // The no-data stripe must appear as NODATA pixels somewhere.
+    bool sawNodata = false;
+    for (uint32_t p : gray.px) if (p == img::NODATA) { sawNodata = true; break; }
+    check(sawNodata, "pixel no-data presenti nell'immagine");
+
+    // Thermal band on a thermal ramp.
+    img::Image th = img::renderSingle(g, 31, cmap::Ramp::Thermal);
+    check(!th.empty() && th.w == 96 && th.h == 72, "banda 31 termica 96x72");
+
+    // RGB false colour 7-2-1 uses the largest band (250 m -> 384x288).
+    img::Image rgb = img::renderRGB(g, 7, 2, 1);
+    check(!rgb.empty(), "composito RGB 7-2-1 non vuoto");
+    check(rgb.w == 384 && rgb.h == 288, "RGB usa la risoluzione migliore (250 m)");
+
+    // Every pixel is opaque (alpha = 0xFF), including NODATA.
+    bool allOpaque = true;
+    for (uint32_t p : rgb.px) if ((p >> 24) != 0xFF) { allOpaque = false; break; }
+    check(allOpaque, "tutti i pixel opachi");
+
+    // Natural true colour (1-4-3), calibrated on absolute reflectance.
+    img::Image nat = img::renderTrueColor(g);
+    check(!nat.empty() && nat.w == 384 && nat.h == 288, "true-color naturale 1-4-3 384x288");
+
+    // Difference of two different images is non-trivial; of an image with
+    // itself is all-black (no change) except NODATA.
+    img::Image self = img::difference(nat, nat);
+    check(!self.empty(), "difference(nat,nat) non vuoto");
+    bool allBlackOrNodata = true;
+    for (uint32_t p : self.px) if (p != img::NODATA && (p & 0x00FFFFFF) != 0) { allBlackOrNodata = false; break; }
+    check(allBlackOrNodata, "differenza di un'immagine con se stessa = nera");
+    img::Image diff = img::difference(nat, rgb); // natural vs false-colour -> changes
+    bool sawChange = false;
+    for (uint32_t p : diff.px) if (p != img::NODATA && (p & 0x00FFFFFF) != 0) { sawChange = true; break; }
+    check(sawChange, "differenza tra compositi diversi mostra variazioni");
+
+    // A missing band => empty image, not a crash.
+    img::Image none = img::renderSingle(g, 99, cmap::Ramp::Gray);
+    check(none.empty(), "banda inesistente -> immagine vuota");
+
+    // Unsharp mask: same geometry, amount 0 is a no-op, NODATA survives, and a
+    // real amount raises local contrast rather than just shifting brightness.
+    img::Image sh = img::sharpen(nat, 0.9, 1);
+    check(sh.w == nat.w && sh.h == nat.h, "sharpen conserva le dimensioni");
+    img::Image noop = img::sharpen(nat, 0.0, 1);
+    check(noop.px == nat.px, "sharpen(amount=0) non altera l'immagine");
+    bool nodataKept = true;
+    for (size_t i = 0; i < nat.px.size(); ++i)
+        if ((nat.px[i] == img::NODATA) != (sh.px[i] == img::NODATA)) { nodataKept = false; break; }
+    check(nodataKept, "sharpen preserva esattamente i pixel no-data");
+    auto spread = [](const img::Image& im) {           // mean |neighbour delta|
+        double acc = 0; size_t n = 0;
+        for (int y = 0; y < im.h; ++y)
+            for (int x = 1; x < im.w; ++x) {
+                uint32_t a = im.at(x - 1, y), b = im.at(x, y);
+                if (a == img::NODATA || b == img::NODATA) continue;
+                acc += std::abs((int)(a & 0xff) - (int)(b & 0xff)); ++n;
+            }
+        return n ? acc / n : 0.0;
+    };
+    check(spread(sh) > spread(nat), "sharpen aumenta il contrasto di bordo");
+
+    // coverage(): distingue "il satellite non e' passato" (tessera tutta
+    // trasparente -> tutta NODATA) da una scena reale ma scura.
+    img::Image empty; empty.w = 8; empty.h = 8;
+    empty.px.assign(64, img::NODATA);
+    check(img::coverage(empty) == 0.0, "coverage di un'immagine tutta no-data = 0");
+    img::Image dark; dark.w = 8; dark.h = 8;
+    dark.px.assign(64, img::packARGB(0, 0, 0));
+    check(img::coverage(dark) == 1.0, "coverage di una scena nera ma reale = 1");
+    dark.px[0] = img::NODATA; dark.px[1] = img::NODATA;
+    check(std::abs(img::coverage(dark) - 62.0 / 64.0) < 1e-9, "coverage parziale corretta");
+    check(img::coverage(img::Image{}) == 0.0, "coverage di un'immagine vuota = 0");
+    check(img::coverage(nat) > 0.5, "il granulo di esempio ha copertura reale");
+
+    // mutedClouds: appiattisce il chiaro-senza-colore, non tocca il colorato.
+    img::Image mix; mix.w = 3; mix.h = 1; mix.px.resize(3);
+    mix.px[0] = img::packARGB(238, 240, 242);   // nuvola: chiara e neutra
+    mix.px[1] = img::packARGB(40, 120, 40);     // prato: colorato
+    mix.px[2] = img::NODATA;
+    img::Image mc = img::mutedClouds(mix, 1.0);
+    check(mc.px[0] != mix.px[0], "la nuvola viene appiattita");
+    check(mc.px[1] == mix.px[1], "il terreno colorato resta intatto");
+    check(mc.px[2] == img::NODATA, "il no-data resta no-data");
+    check(img::mutedClouds(mix, 0.0).px == mix.px, "strength=0 non altera nulla");
+    auto sat = [](uint32_t p) {
+        int r=(p>>16)&0xff, g=(p>>8)&0xff, b=p&0xff;
+        return std::max(r,std::max(g,b)) - std::min(r,std::min(g,b));
+    };
+    check(sat(mc.px[0]) <= sat(mix.px[0]), "la nuvola non guadagna colore");
+
+    std::printf(fails ? "\nRESULT: %d FAIL\n" : "\nRESULT: all tests passed\n", fails);
+    return fails ? 1 : 0;
+}
