@@ -34,27 +34,30 @@ deployato con `?api=https://sismo-fvg.gimmy077.workers.dev`.
   preciso istante invece dell'intera giornata.
 - Griglia lat/lon con etichette, salvataggio della vista in **PNG**.
 
+## Scoperta automatica dei layer
+
+Il punto chiave: **il Worker gira su Cloudflare, che raggiunge EUMETSAT** (a
+differenza dell'ambiente di sviluppo, dove è bloccato). Quindi l'app **non
+indovina** i nomi dei layer: la rotta `/metop/layers` interroga il
+GetCapabilities di EUMETView, ne estrae i layer reali (nome + titolo + se hanno
+la dimensione TIME), e il menu prodotti si popola con quelli veri. Scelto un
+prodotto, `/metop/times` elenca i suoi passaggi e la UI **salta all'ultimo
+disponibile**, così "Scarica" prende sempre dati che esistono.
+
+`METOP_LAYERS` in `index.js` resta solo come **fallback** se la scoperta
+fallisce; e `&layer=<workspace:nome>` permette comunque di forzare un layer
+preciso.
+
 ## Rotte del Worker
 
 | Rotta | Cosa fa |
 |---|---|
 | `/polar` | la pagina del visualizzatore |
-| `/metop?sat=&product=&bbox=&date=\|time=&w=&h=` | immagine WMS (proxy + cache) |
-| `/metop/times?sat=&product=&date=` | istanti disponibili (dal GetCapabilities) |
+| `/metop/layers[?q=]` | **catalogo**: i layer reali di EUMETView (name+title+time) |
+| `/metop/times?layer=&date=` | istanti (TIME) disponibili per un layer |
+| `/metop?layer=\|product=&bbox=&date=\|time=&w=&h=` | immagine WMS (proxy + cache) |
 
-## ⚠️ Da verificare: i nomi dei layer EUMETView
-
-I nomi dei layer in `METOP_LAYERS` (dentro `index.js`) sono la **migliore
-ipotesi** e vanno confermati: dall'ambiente di sviluppo EUMETSAT è irraggiungibile,
-quindi non è stato possibile interrogare il catalogo. Se un canale dà errore:
-
-- **Correzione permanente**: aggiorna il nome in `METOP_LAYERS` e ridistribuisci.
-- **Prova al volo, senza redeploy**: passa il layer vero nella richiesta con
-  `&layer=<workspace:nome>` — la UI e le rotte lo rispettano e scavalcano i
-  predefiniti. Utile per trovare il nome giusto interrogando EUMETView dal
-  browser, poi lo si fissa nel Worker.
-
-Elenco dei layer EUMETView: <https://view.eumetsat.int/geoserver/wms?SERVICE=WMS&REQUEST=GetCapabilities>
+Catalogo EUMETView (per riferimento): <https://view.eumetsat.int/geoserver/wms?SERVICE=WMS&REQUEST=GetCapabilities>
 
 ## Licenza
 

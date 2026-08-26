@@ -3397,8 +3397,10 @@ const METOP_HTML = `<!doctype html>
 
     <div class="sect">Satellite</div>
     <select id="sat">
-      <option value="metopb">Metop-B</option>
-      <option value="metopc" selected>Metop-C</option>
+      <option value="" selected>Tutti</option>
+      <option value="metop-a">Metop-A</option>
+      <option value="metop-b">Metop-B</option>
+      <option value="metop-c">Metop-C</option>
     </select>
 
     <div class="sect">Canale / Prodotto</div>
@@ -3585,24 +3587,28 @@ let fetchTimer=null;
 function scheduleFetch(){ clearTimeout(fetchTimer); fetchTimer=setTimeout(fetchImage,350); }
 
 // --------------------------------------------------------------------------
+// Catalogo scoperto dal Worker (layer VERI di EUMETView). Se la scoperta
+// fallisce si ripiega sulla lista statica PRODUCTS.
+let LAYERS = [];
+const $ = id => document.getElementById(id);
+const sel = () => $("product");
+const curVal = () => sel().value;                 // layer vero (con ":") o id di PRODUCTS
+const isRealLayer = v => v && v.includes(":");
+function qParam(){ return isRealLayer(curVal()) ? "&layer="+encodeURIComponent(curVal())
+                                                 : "&product="+curVal(); }
+
 async function fetchImage(){
-  const sat=document.getElementById("sat").value;
-  const product=document.getElementById("product").value;
-  const date=document.getElementById("date").value;
-  const time=document.getElementById("times").value;
-  // pixel proporzionati al canvas, cap 2048 per lato
+  const date=$("date").value, time=$("times").value;
   const r=cv.getBoundingClientRect();
   const w=Math.min(2048,Math.round(r.width)), h=Math.min(2048,Math.round(r.height));
   const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
-  let u=API+"/metop?sat="+sat+"&product="+product+"&bbox="+bbox+"&w="+w+"&h="+h;
-  if(date) u+="&date="+date;
-  if(time) u+="&time="+encodeURIComponent(time);
+  let u=API+"/metop?bbox="+bbox+"&w="+w+"&h="+h+qParam();
+  if(time) u+="&time="+encodeURIComponent(time); else if(date) u+="&date="+date;
 
-  document.getElementById("spin").classList.add("on");
-  document.getElementById("st-msg").textContent="";
+  $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
     const resp=await fetch(u);
-    document.getElementById("st-cache").textContent="cache "+(resp.headers.get("X-Cache")||"—");
+    $("st-cache").textContent="cache "+(resp.headers.get("X-Cache")||"—");
     const ct=resp.headers.get("Content-Type")||"";
     if(!ct.includes("image")){
       const j=await resp.json().catch(()=>({error:"risposta non valida"}));
@@ -3611,67 +3617,94 @@ async function fetchImage(){
     const blob=await resp.blob(), im=new Image();
     await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
     img=im; imgBox={...view};
-    document.getElementById("chip").textContent =
-      document.getElementById("product").selectedOptions[0].text+" · "+sat.replace("metop","Metop-").toUpperCase()+(date?" · "+date:"");
+    $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""));
     draw();
   }catch(err){
-    document.getElementById("st-msg").innerHTML="<span style='color:var(--err)'>"+err.message+"</span>";
-  }finally{
-    document.getElementById("spin").classList.remove("on");
-  }
+    $("st-msg").innerHTML="<span style='color:var(--err)'>"+err.message+"</span>";
+  }finally{ $("spin").classList.remove("on"); }
 }
 
-// carica i passaggi noti (TIME dal GetCapabilities, via Worker) per data+prodotto
+// Passaggi (TIME) per il layer scelto. Trovato l'elenco, salta all'ultimo
+// istante disponibile e lo scarica: cosi' "Scarica" prende sempre qualcosa che
+// esiste davvero, invece di una data a caso senza copertura.
 async function loadTimes(){
-  const sel=document.getElementById("times");
-  sel.innerHTML='<option value="">— (usa la data intera) —</option>';
-  const sat=document.getElementById("sat").value;
-  const product=document.getElementById("product").value;
-  const date=document.getElementById("date").value;
+  const t=$("times"); t.innerHTML='<option value="">— (ultima disponibile) —</option>';
+  const date=$("date").value;
   try{
-    const r=await fetch(API+"/metop/times?sat="+sat+"&product="+product+(date?"&date="+date:""));
-    if(!r.ok) return;
+    const r=await fetch(API+"/metop/times?"+qParam().slice(1)+(date?"&date="+date:""));
+    if(!r.ok){ $("st-msg").textContent="catalogo tempi non disponibile"; scheduleFetch(); return; }
     const j=await r.json();
-    (j.times||[]).forEach(t=>{
-      const o=document.createElement("option"); o.value=t;
-      o.textContent=t.replace("T"," ").replace("Z"," UTC"); sel.appendChild(o);
-    });
-    document.getElementById("st-msg").textContent =
-      (j.times&&j.times.length)? j.times.length+" passaggi disponibili" : "nessun passaggio elencato per questa data";
-  }catch(_){ /* silenzioso: la data intera funziona comunque */ }
+    const times=j.times||[];
+    times.forEach(s=>{ const o=document.createElement("option"); o.value=s;
+      o.textContent=s.replace("T"," ").replace("Z"," UTC"); t.appendChild(o); });
+    if(times.length){
+      t.value=times[times.length-1];               // il piu' recente
+      $("st-msg").innerHTML="<span style='color:var(--ok)'>"+times.length+" passaggi · ultimo "+t.value.replace("T"," ").replace("Z"," UTC")+"</span>";
+    }else{
+      $("st-msg").textContent = date? "nessun passaggio il "+date+" — provo la data intera" : "nessun passaggio elencato";
+    }
+    scheduleFetch();
+  }catch(_){ scheduleFetch(); }
 }
 
 // --------------------------------------------------------------------------
-// wiring UI
-function initProducts(){
-  const sel=document.getElementById("product");
-  PRODUCTS.forEach(p=>{ const o=document.createElement("option"); o.value=p.id; o.textContent=p.label; sel.appendChild(o); });
-  sel.onchange=()=>{ document.getElementById("prodhint").textContent=PRODUCTS.find(p=>p.id===sel.value).hint;
-                     document.getElementById("st-prod").textContent=sel.selectedOptions[0].text; loadTimes(); scheduleFetch(); };
-  sel.dispatchEvent(new Event("change"));
+// popolamento prodotti dal catalogo, con filtro per satellite sui titoli
+function satMatch(title, sat){
+  if(!sat) return true;
+  const L=sat.slice(-1).toUpperCase();             // A / B / C
+  if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotti combinati: sempre
+  return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
+}
+function populateProducts(){
+  const s=sel(); s.innerHTML="";
+  const sat=$("sat").value;
+  const list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat))
+                             : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
+  if(!list.length){ const o=document.createElement("option"); o.textContent="(nessun layer)"; s.appendChild(o); return; }
+  list.forEach(l=>{ const o=document.createElement("option"); o.value=l.name; o.textContent=l.title; s.appendChild(o); });
+  onProductChange();
+}
+function onProductChange(){
+  const v=curVal();
+  $("prodhint").textContent = isRealLayer(v) ? v
+      : (PRODUCTS.find(p=>p.id===v)||{}).hint || "";
+  $("st-prod").textContent = sel().selectedOptions[0].text;
+  loadTimes();
+}
+async function initCatalog(){
+  $("st-msg").textContent="carico il catalogo EUMETView…";
+  try{
+    const r=await fetch(API+"/metop/layers");
+    const j=await r.json();
+    if(j.layers && j.layers.length){ LAYERS=j.layers; $("st-msg").textContent=j.count+" prodotti disponibili"; }
+    else { $("st-msg").innerHTML="<span style='color:var(--warn)'>catalogo vuoto: uso i prodotti predefiniti</span>"; }
+  }catch(_){ $("st-msg").innerHTML="<span style='color:var(--warn)'>catalogo non raggiungibile: prodotti predefiniti</span>"; }
+  populateProducts();
 }
 function yesterdayUTC(){ return new Date(Date.now()-24*3600*1000).toISOString().slice(0,10); }
 
-document.getElementById("date").value=yesterdayUTC();
-document.getElementById("today").onclick=()=>{ document.getElementById("date").value=yesterdayUTC(); loadTimes(); scheduleFetch(); };
-document.getElementById("date").onchange=()=>{ loadTimes(); scheduleFetch(); };
-document.getElementById("sat").onchange=()=>{ loadTimes(); scheduleFetch(); };
-document.getElementById("grid").onchange=draw;
-document.getElementById("labels").onchange=draw;
-document.getElementById("enhance").onchange=draw;
-document.getElementById("enhamt").oninput=draw;
-document.getElementById("reset").onclick=()=>{ view={latMin:-60,lonMin:-180,latMax:80,lonMax:180}; draw(); scheduleFetch(); };
+// --------------------------------------------------------------------------
+// wiring UI
+$("date").value=yesterdayUTC();
+sel().onchange=onProductChange;
+$("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
+$("date").onchange=loadTimes;
+$("sat").onchange=populateProducts;
+$("times").onchange=fetchImage;
+$("grid").onchange=draw;
+$("labels").onchange=draw;
+$("enhance").onchange=draw;
+$("enhamt").oninput=draw;
+$("reset").onclick=()=>{ view={latMin:-60,lonMin:-180,latMax:80,lonMax:180}; draw(); scheduleFetch(); };
 document.querySelectorAll("button[data-bbox]").forEach(b=>b.onclick=()=>{
   const [a,lo,c,hi]=b.dataset.bbox.split(",").map(Number);
   view={latMin:a,lonMin:lo,latMax:c,lonMax:hi}; draw(); scheduleFetch();
 });
-document.getElementById("fetch").onclick=fetchImage;
-document.getElementById("save").onclick=()=>{
-  const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click();
-};
+$("fetch").onclick=fetchImage;
+$("save").onclick=()=>{ const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click(); };
 window.addEventListener("resize",()=>{ fitDPR(); draw(); });
 
-fitDPR(); initProducts(); draw(); loadTimes();
+fitDPR(); draw(); initCatalog();
 </script>
 `;
 // <<<METOP_HTML
@@ -3693,6 +3726,22 @@ const METOP_LAYERS = {
   ascat_wind:    "metop:ascat_wind",
 };
 
+// Estrae i layer (name + title + se hanno dimensione TIME) da un documento
+// GetCapabilities WMS. Il Worker gira su Cloudflare, che RAGGIUNGE EUMETSAT:
+// cosi' l'app scopre i layer veri invece di indovinarli.
+function parseWmsLayers(xml) {
+  const out = [];
+  const re = /<Name>([^<]+)<\/Name>\s*<Title>([^<]*)<\/Title>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const name = m[1].trim(), title = (m[2] || "").trim();
+    if (!name.includes(":")) continue;               // scarta i contenitori
+    const hasTime = /<Dimension[^>]*name="time"/i.test(xml.slice(m.index, m.index + 4000));
+    out.push({ name, title, hasTime });
+  }
+  return out;
+}
+
 export default {
   async fetch(request, env) {
     const url    = new URL(request.url);
@@ -3709,9 +3758,38 @@ export default {
         { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
     }
 
+    // Catalogo: elenca i layer realmente offerti da EUMETView (name+title+time).
+    // L'app lo usa per popolare il menu prodotti con nomi VERI, senza indovinare.
+    //   GET /metop/layers[?q=avhrr]
+    if (url.pathname === "/metop/layers") {
+      const CORS = { "Access-Control-Allow-Origin": "*" };
+      const capUrl = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0";
+      try {
+        const r = await fetch(capUrl, { cf: { cacheTtl: 21600, cacheEverything: true } });
+        if (!r.ok) return new Response(JSON.stringify({ error: "GetCapabilities HTTP " + r.status, layers: [] }),
+          { status: 502, headers: { ...CORS, "Content-Type": "application/json" } });
+        const xml = await r.text();
+        let layers = parseWmsLayers(xml);
+        const q = (url.searchParams.get("q") || "").toLowerCase();
+        if (q) layers = layers.filter(l => (l.title + " " + l.name).toLowerCase().includes(q));
+        // solo i layer con tempo (i prodotti d'immagine); i piu' utili in cima
+        const timed = layers.filter(l => l.hasTime);
+        const rank = t => { t = t.toLowerCase();
+          if (/natural/.test(t)) return 0; if (/cloud|rgb/.test(t)) return 1;
+          if (/avhrr|ir\b/.test(t)) return 2; if (/sst/.test(t)) return 3;
+          if (/ascat|wind/.test(t)) return 4; if (/iasi/.test(t)) return 5; return 9; };
+        timed.sort((a, b) => rank(a.title) - rank(b.title) || a.title.localeCompare(b.title));
+        return new Response(JSON.stringify({ count: timed.length, layers: timed.slice(0, 400) }),
+          { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=10800" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e), layers: [] }),
+          { status: 502, headers: { ...CORS, "Content-Type": "application/json" } });
+      }
+    }
+
     // Passaggi disponibili per data: legge la dimensione TIME dal GetCapabilities
     // di EUMETView per il layer scelto e la restituisce come lista di istanti.
-    //   GET /metop/times?sat=&product=&date=YYYY-MM-DD
+    //   GET /metop/times?layer=<name>&date=YYYY-MM-DD
     if (url.pathname === "/metop/times") {
       const CORS = { "Access-Control-Allow-Origin": "*" };
       const product = (url.searchParams.get("product") || "avhrr_natural").toLowerCase();
