@@ -3783,17 +3783,26 @@ export default {
           if (seen.has(l.name)) return false;          // duplicati (es. orbital_tracks)
           seen.add(l.name); return true;
         });
-        // Progetto = METOP POLARE: i layer del workspace polare "eps:" vengono
-        // PRIMA di tutto (AVHRR/ASCAT/IASI/OSI-SAF). Il geostazionario Meteosat
-        // (msg/mtg) e il resto scendono in fondo, cosi' il menu guida sui polari.
-        const isPolar = n => /^eps:/i.test(n);
+        // "In primo piano": le naturali/true-colour di qualita' migliore, nell'
+        // ordine voluto. Sentinel-3 OLCI (~300 m) e' la piu' nitida; poi le AVHRR
+        // Metop; poi i singoli passaggi OLCI; poi l'anello globale multimission.
+        const FEATURED = [
+          "copernicus:daily_sentinel3ab_olci_l1_rgb_fulres", // OLCI RGB giornaliero A+B (typo "fulres" e' il nome vero)
+          "eps:m01_rgb_natural_fog", "eps:m03_rgb_natural_fog", "eps:m02_rgb_natural_fog",
+          "copernicus:sentinel3a_olci_l1_rgb_fullres", "copernicus:sentinel3b_olci_l1_rgb_fullres",
+          "mumi:wideareacoverage_rgb_natural",
+        ];
+        const feat = n => { const i = FEATURED.indexOf(n); return i < 0 ? 999 : i; };
+        // Progetto = METOP POLARE: i workspace polari "eps:"/Sentinel-3 "copernicus:"
+        // vengono prima; il geostazionario Meteosat (msg/mtg) scende in fondo.
+        const isPolar = n => /^(eps|copernicus):/i.test(n);
         const isGeo   = n => /^(msg|mtg)/i.test(n);
         const rankT = t => { t = t.toLowerCase();
-          if (/natural/.test(t)) return 0; if (/cloud|rgb/.test(t)) return 1;
+          if (/natural|true.?colou?r/.test(t)) return 0; if (/cloud|rgb/.test(t)) return 1;
           if (/avhrr|ir\b/.test(t)) return 2; if (/sst/.test(t)) return 3;
           if (/ascat|wind/.test(t)) return 4; if (/iasi/.test(t)) return 5; return 8; };
         const grp = n => isPolar(n) ? 0 : isGeo(n) ? 2 : 1;   // polare < altro < geo
-        timed.sort((a, b) => grp(a.name) - grp(b.name)
+        timed.sort((a, b) => feat(a.name) - feat(b.name) || grp(a.name) - grp(b.name)
           || rankT(a.title) - rankT(b.title) || a.title.localeCompare(b.title));
         return new Response(JSON.stringify({ count: timed.length, layers: timed.slice(0, 400) }),
           { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=10800" } });
