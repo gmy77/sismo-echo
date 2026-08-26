@@ -359,9 +359,18 @@ function populateProducts(){
 }
 function onProductChange(){
   const v=curVal();
-  $("prodhint").textContent = isRealLayer(v) ? v
-      : (PRODUCTS.find(p=>p.id===v)||{}).hint || "";
-  $("st-prod").textContent = sel().selectedOptions[0].text;
+  const title=(sel().selectedOptions[0]||{}).text||"";
+  // Prodotto polare a striscia singola (un satellite, non 'accumulated/daily'):
+  // copre solo la fascia di un'orbita, il resto e' nero. Avvisa e suggerisci.
+  const single = /sentinel-?3[ab]\b|metop[\s-]?[abc]\b/i.test(title)
+              && !/accumulat|daily|giornalier|orbits/i.test(title);
+  if(single)
+    $("prodhint").innerHTML="<span style='color:var(--warn)'>striscia di una singola orbita — usa una versione "
+      +"<b>Daily / Accumulated</b> per coprire tutta la mappa</span>";
+  else
+    $("prodhint").textContent = isRealLayer(v) ? v
+        : (PRODUCTS.find(p=>p.id===v)||{}).hint || "";
+  $("st-prod").textContent = title;
   loadTimes();
 }
 async function initCatalog(){
