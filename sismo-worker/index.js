@@ -3783,11 +3783,18 @@ export default {
           if (seen.has(l.name)) return false;          // duplicati (es. orbital_tracks)
           seen.add(l.name); return true;
         });
-        const rank = t => { t = t.toLowerCase();
+        // Progetto = METOP POLARE: i layer del workspace polare "eps:" vengono
+        // PRIMA di tutto (AVHRR/ASCAT/IASI/OSI-SAF). Il geostazionario Meteosat
+        // (msg/mtg) e il resto scendono in fondo, cosi' il menu guida sui polari.
+        const isPolar = n => /^eps:/i.test(n);
+        const isGeo   = n => /^(msg|mtg)/i.test(n);
+        const rankT = t => { t = t.toLowerCase();
           if (/natural/.test(t)) return 0; if (/cloud|rgb/.test(t)) return 1;
           if (/avhrr|ir\b/.test(t)) return 2; if (/sst/.test(t)) return 3;
-          if (/ascat|wind/.test(t)) return 4; if (/iasi/.test(t)) return 5; return 9; };
-        timed.sort((a, b) => rank(a.title) - rank(b.title) || a.title.localeCompare(b.title));
+          if (/ascat|wind/.test(t)) return 4; if (/iasi/.test(t)) return 5; return 8; };
+        const grp = n => isPolar(n) ? 0 : isGeo(n) ? 2 : 1;   // polare < altro < geo
+        timed.sort((a, b) => grp(a.name) - grp(b.name)
+          || rankT(a.title) - rankT(b.title) || a.title.localeCompare(b.title));
         return new Response(JSON.stringify({ count: timed.length, layers: timed.slice(0, 400) }),
           { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=10800" } });
       } catch (e) {
@@ -3813,9 +3820,11 @@ export default {
         const r = await fetch(capUrl, { cf: { cacheTtl: 3600, cacheEverything: true } });
         if (r.ok) {
           const xml = await r.text();
-          // isola il blocco <Layer> del nostro layer, poi la sua <Dimension time>
-          const short = layer.split(":").pop();
-          const i = xml.indexOf("<Name>" + short + "</Name>");
+          // isola il blocco <Layer> del nostro layer, poi la sua <Dimension time>.
+          // EUMETView elenca i layer col nome COMPLETO (<Name>ws:layer</Name>):
+          // cercare il nome corto falliva sempre -> nessun passaggio, TIME sbagliato.
+          let i = xml.indexOf("<Name>" + layer + "</Name>");
+          if (i < 0) i = xml.indexOf("<Name>" + layer.split(":").pop() + "</Name>");
           if (i >= 0) {
             const seg = xml.slice(i, i + 6000);
             const m = seg.match(/<Dimension[^>]*name="time"[^>]*>([\s\S]*?)<\/Dimension>/i);
