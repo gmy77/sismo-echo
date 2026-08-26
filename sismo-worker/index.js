@@ -3431,6 +3431,7 @@ const METOP_HTML = `<!doctype html>
     <input id="enhamt" type="range" min="0" max="100" value="55">
 
     <div class="sect">Vista</div>
+    <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
     <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
     <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
     <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
@@ -3603,7 +3604,10 @@ async function fetchImage(){
   const w=Math.min(2048,Math.round(r.width)), h=Math.min(2048,Math.round(r.height));
   const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
   let u=API+"/metop?bbox="+bbox+"&w="+w+"&h="+h+qParam();
-  if(time) u+="&time="+encodeURIComponent(time); else if(date) u+="&date="+date;
+  // Passaggio scelto -> quell'istante. Nessun passaggio scelto -> nessun TIME,
+  // cosi' il Worker/GeoServer serve l'ultimo disponibile (evita il 502 da data nuda).
+  if(time) u+="&time="+encodeURIComponent(time);
+  if($("bg").checked) u+="&bg=1";
 
   $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
@@ -3691,6 +3695,7 @@ $("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
 $("date").onchange=loadTimes;
 $("sat").onchange=populateProducts;
 $("times").onchange=fetchImage;
+$("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("grid").onchange=draw;
 $("labels").onchange=draw;
 $("enhance").onchange=draw;
@@ -3866,21 +3871,26 @@ export default {
       const bbox = url.searchParams.get("bbox") || "-60,-180,80,180"; // lat,lon (WMS 1.3.0)
       const w = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("w") || "1024") || 1024));
       const h = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("h") || "768")  || 768));
-      // TIME: istante preciso se dato, altrimenti il giorno (default: ieri UTC).
-      let time = url.searchParams.get("time");
-      if (!time) {
-        let date = url.searchParams.get("date");
-        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date))
-          date = new Date(Date.now() - 24*3600*1000).toISOString().slice(0,10);
-        time = date;
-      }
+      // TIME: istante preciso se &time=; il giorno se &date=; ALTRIMENTI nessun
+      // TIME -> GeoServer serve il suo default, cioe' l'ULTIMO disponibile. E' la
+      // via robusta per "ultima data": una data nuda senza copertura dava 502.
+      const timeArg = url.searchParams.get("time");
+      const dateArg = url.searchParams.get("date");
+      let time = "";
+      if (timeArg) time = timeArg;
+      else if (dateArg && /^\d{4}-\d{2}-\d{2}$/.test(dateArg)) time = dateArg;
 
-      const wms = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + encodeURIComponent(layer)
+      // Sfondo Terra opzionale: sotto ai dati (trasparenti) mettiamo la mappa
+      // NaturalEarth, cosi' si vedono coste e continenti come un globo.
+      const bg = url.searchParams.get("bg") === "1";
+      const layersArg = bg ? ("backgrounds:ne_gray," + layer) : layer;
+
+      const wms = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + encodeURIComponent(layersArg)
         + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox + "&WIDTH=" + w + "&HEIGHT=" + h
-        + "&FORMAT=image/png&TRANSPARENT=true&TIME=" + encodeURIComponent(time);
+        + "&FORMAT=image/png&TRANSPARENT=true" + (time ? "&TIME=" + encodeURIComponent(time) : "");
 
       const cache = caches.default;
-      const cacheKey = new Request(url.origin + "/metop?k=" + encodeURIComponent(layer+"|"+time+"|"+bbox+"|"+w+"x"+h));
+      const cacheKey = new Request(url.origin + "/metop?k=" + encodeURIComponent(layersArg+"|"+(time||"latest")+"|"+bbox+"|"+w+"x"+h));
       const hit = await cache.match(cacheKey);
       if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
 

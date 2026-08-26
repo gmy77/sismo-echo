@@ -98,6 +98,7 @@
     <input id="enhamt" type="range" min="0" max="100" value="55">
 
     <div class="sect">Vista</div>
+    <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
     <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
     <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
     <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
@@ -270,7 +271,10 @@ async function fetchImage(){
   const w=Math.min(2048,Math.round(r.width)), h=Math.min(2048,Math.round(r.height));
   const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
   let u=API+"/metop?bbox="+bbox+"&w="+w+"&h="+h+qParam();
-  if(time) u+="&time="+encodeURIComponent(time); else if(date) u+="&date="+date;
+  // Passaggio scelto -> quell'istante. Nessun passaggio scelto -> nessun TIME,
+  // cosi' il Worker/GeoServer serve l'ultimo disponibile (evita il 502 da data nuda).
+  if(time) u+="&time="+encodeURIComponent(time);
+  if($("bg").checked) u+="&bg=1";
 
   $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
@@ -358,6 +362,7 @@ $("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
 $("date").onchange=loadTimes;
 $("sat").onchange=populateProducts;
 $("times").onchange=fetchImage;
+$("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("grid").onchange=draw;
 $("labels").onchange=draw;
 $("enhance").onchange=draw;
