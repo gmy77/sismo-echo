@@ -264,6 +264,14 @@ function scheduleFetch(){ clearTimeout(fetchTimer); fetchTimer=setTimeout(fetchI
 // Catalogo scoperto dal Worker (layer VERI di EUMETView). Se la scoperta
 // fallisce si ripiega sulla lista statica PRODUCTS.
 let LAYERS = [];
+// Prodotti "belli" garantiti: li innestiamo SEMPRE nel catalogo (in testa), cosi'
+// restano nel menu anche se la scoperta o la cache di EUMETView non li restituisce.
+const CURATED = [
+  {name:"copernicus:daily_sentinel3ab_olci_l1_rgb_fulres", title:"OLCI Level 1B RGB Daily Accumulated - Sentinel-3", hasTime:true},
+  {name:"copernicus:sentinel3a_olci_l1_rgb_fullres",       title:"OLCI Level 1B RGB - Sentinel-3A", hasTime:true},
+  {name:"copernicus:sentinel3b_olci_l1_rgb_fullres",       title:"OLCI Level 1B RGB - Sentinel-3B", hasTime:true},
+  {name:"mtg_fd:rgb_geocolour", title:"Geo Colour RGB - MTG-I - 0 degree", hasTime:true},
+];
 const $ = id => document.getElementById(id);
 const sel = () => $("product");
 const curVal = () => sel().value;                 // layer vero (con ":") o id di PRODUCTS
@@ -377,11 +385,14 @@ function onProductChange(){
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
   try{
-    const r=await fetch(API+"/metop/layers");
+    const r=await fetch(API+"/metop/layers?v="+Date.now());  // niente cache vecchia
     const j=await r.json();
     if(j.layers && j.layers.length){ LAYERS=j.layers; $("st-msg").textContent=j.count+" prodotti disponibili"; }
     else { $("st-msg").innerHTML="<span style='color:var(--warn)'>catalogo vuoto: uso i prodotti predefiniti</span>"; }
   }catch(_){ $("st-msg").innerHTML="<span style='color:var(--warn)'>catalogo non raggiungibile: prodotti predefiniti</span>"; }
+  // innesta le curate mancanti, in testa: OLCI & Geo Colour ci sono comunque
+  const have=new Set(LAYERS.map(l=>l.name));
+  LAYERS = CURATED.filter(c=>!have.has(c.name)).concat(LAYERS);
   populateProducts();
 }
 function yesterdayUTC(){ return new Date(Date.now()-24*3600*1000).toISOString().slice(0,10); }
