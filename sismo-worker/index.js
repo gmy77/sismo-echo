@@ -3753,7 +3753,9 @@ export default {
     // immagini EUMETView (su /metop). Stessa filosofia di /modis: nessun DB,
     // cache edge, CORS aperto. La UI e' in metop-viewer.html (embedded qui).
     // ============================================================
-    if (url.pathname === "/polar" || url.pathname === "/metop-viewer") {
+    //   /polar, /metop-viewer, /metop/  → la pagina del visualizzatore.
+    //   (/metop SENZA slash resta il proxy immagini qui sotto.)
+    if (url.pathname === "/polar" || url.pathname === "/metop-viewer" || url.pathname === "/metop/") {
       return new Response(METOP_HTML || "<h1>METOP</h1><p>Pagina non ancora generata: esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
         { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
     }
@@ -3772,8 +3774,15 @@ export default {
         let layers = parseWmsLayers(xml);
         const q = (url.searchParams.get("q") || "").toLowerCase();
         if (q) layers = layers.filter(l => (l.title + " " + l.name).toLowerCase().includes(q));
-        // solo i layer con tempo (i prodotti d'immagine); i piu' utili in cima
-        const timed = layers.filter(l => l.hasTime);
+        // solo i layer con tempo (i prodotti d'immagine); niente basemap/overlay
+        const NOISE = /^(backgrounds|osmgray|osm|waterways|graticules|coastlines)\b/i;
+        const seen = new Set();
+        const timed = layers.filter(l => {
+          if (!l.hasTime) return false;
+          if (NOISE.test(l.name)) return false;        // sfondi/reticoli: non sono dati
+          if (seen.has(l.name)) return false;          // duplicati (es. orbital_tracks)
+          seen.add(l.name); return true;
+        });
         const rank = t => { t = t.toLowerCase();
           if (/natural/.test(t)) return 0; if (/cloud|rgb/.test(t)) return 1;
           if (/avhrr|ir\b/.test(t)) return 2; if (/sst/.test(t)) return 3;
