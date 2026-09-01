@@ -1602,6 +1602,7 @@ function a0_0x26da(_0x517a64,_0x9c7876){_0x517a64=_0x517a64-0xb4;var _0x4861a5=a
   var rbtn=document.getElementById('rbtn');
   if(rbtn) rbtn.addEventListener('click',function(){ _prevML=0; _gameOver=false; });
 })();
+</script>
 <script>
 (function(){
   function _toast(msg,color){
