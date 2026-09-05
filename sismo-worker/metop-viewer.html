@@ -6,10 +6,11 @@
      C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
      proxy e cache verso il WMS di EUMETSAT EUMETView. -->
 <!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-     METOP Polar Viewer 1.1.2 — costruito con Claude Code (Anthropic). -->
+     METOP Polar Viewer 1.2.2 — costruito con Claude Code (Anthropic). -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>METOP · Polar Viewer 1.1.2</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d1b2a'/><text x='50' y='70' font-size='58' text-anchor='middle'>🛰️</text></svg>">
+<title>METOP · Polar Viewer 1.2.2</title>
 <style>
   :root{
     --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
@@ -60,9 +61,21 @@
 <div id="app">
   <div id="panel">
     <h1>METOP · POLARI</h1>
-    <div class="sub">EUMETSAT Metop-B / Metop-C · EUMETView · v1.1.2</div>
+    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.2.2</div>
 
-    <div class="sect">Satellite</div>
+    <div class="sect">Immagini migliori</div>
+    <select id="bestProduct">
+      <option value="geocolour">Geo Colour MTG-I · Europa live</option>
+      <option value="truecolour">True Colour MTG-I · colori naturali</option>
+      <option value="hrv">European HRV MSG · massima nitidezza diurna</option>
+      <option value="natural">Natural Colour MSG · colori naturali avanzati</option>
+      <option value="infrared">IR 10.5 MTG-I · nubi anche di notte</option>
+      <option value="cloudRelief" hidden>Nubi in rilievo · TEST</option>
+    </select>
+    <div class="sub" style="margin-top:6px">Copertura europea continua, senza mosaici a strisce.</div>
+    <button id="cloudRelief" style="margin-top:-5px">Prova nubi in rilievo · TEST</button>
+
+    <div class="sect">Altri satelliti e prodotti</div>
     <select id="sat">
       <option value="" selected>Tutti</option>
       <optgroup label="METOP · polari">
@@ -103,6 +116,7 @@
     <select id="times"><option value="">— (usa la data intera) —</option></select>
 
     <div class="sect">Area</div>
+    <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
     <div class="row">
       <button data-bbox="-60,-180,80,180">Mondo</button>
       <button data-bbox="30,-15,72,45">Europa</button>
@@ -113,14 +127,19 @@
     </div>
 
     <div class="sect">Qualità immagine</div>
-    <label class="chk"><input type="checkbox" id="enhance" checked> Immagine brillante</label>
-    <label>Intensità</label>
-    <input id="enhamt" type="range" min="0" max="100" value="55">
+    <label>Luminosità <span id="brightnessValue">100%</span></label>
+    <input id="brightness" type="range" min="60" max="150" value="100">
+    <label>Contrasto <span id="contrastValue">100%</span></label>
+    <input id="contrast" type="range" min="70" max="170" value="100">
+    <label>Saturazione <span id="saturationValue">100%</span></label>
+    <input id="saturation" type="range" min="0" max="180" value="100">
+    <button id="resetImage" style="margin-top:8px">Ripristina immagine originale</button>
 
     <div class="sect">Vista</div>
     <label class="chk"><input type="checkbox" id="globe"> Globo (disco rotondo) invece di mappa piatta</label>
     <div id="globehint" class="sub" style="margin:-4px 0 8px"></div>
     <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
+    <label class="chk"><input type="checkbox" id="borders" checked> Confini delle nazioni</label>
     <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
     <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
     <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
@@ -130,7 +149,7 @@
     <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
 
     <div class="cred">
-      METOP-Polar v1.1.2<br>
+      METOP-Polar v1.2.2<br>
       Costruito con Claude Code (Anthropic)<br>
       © 2026 Gimmy Pignolo · Tutti i diritti riservati
     </div>
@@ -172,7 +191,7 @@ const PRODUCTS = [
 // Stato della vista: un bbox in gradi (lat,lon) e nient'altro. Il canvas e'
 // una proiezione equirettangolare del bbox — la stessa che il WMS EPSG:4326
 // restituisce, quindi immagine e griglia combaciano senza conti.
-let view = { latMin:-60, lonMin:-180, latMax:80, lonMax:180 };
+let view = { latMin:30, lonMin:-15, latMax:72, lonMax:45 };
 let img = null;                 // Image scaricata per il bbox corrente
 let imgBox = null;              // bbox a cui l'immagine si riferisce
 const cv = document.getElementById("cv");
@@ -188,16 +207,11 @@ function yToLat(y){ return view.latMax - (y/cv.height)*(view.latMax-view.latMin)
 function lonToX(lon){ return (lon-view.lonMin)/(view.lonMax-view.lonMin)*cv.width; }
 function latToY(lat){ return (view.latMax-lat)/(view.latMax-view.latMin)*cv.height; }
 
-// Enhancement in sola visualizzazione: contrasto/saturazione/luminosita'
-// calibrati sull'intensita' scelta. Non inventa dati — rende piu' vivida
-// l'immagine gia' scaricata, come la maschera di contrasto del gemello C++.
+// Regolazioni locali del canvas: non modificano ne' ricaricano il dato EUMETSAT.
+// I valori neutri conservano il rendering originale del prodotto satellitare.
 function enhanceFilter(){
-  if(!document.getElementById("enhance").checked) return "none";
-  const t = (+document.getElementById("enhamt").value)/100;      // 0..1
-  const contrast   = (1 + 0.18*t).toFixed(3);
-  const saturate   = (1 + 0.55*t).toFixed(3);
-  const brightness = (1 + 0.05*t).toFixed(3);
-  return "contrast("+contrast+") saturate("+saturate+") brightness("+brightness+")";
+  return "brightness(" + $("brightness").value + "%) contrast(" + $("contrast").value
+       + "%) saturate(" + $("saturation").value + "%)";
 }
 function draw(){
   ctx.clearRect(0,0,cv.width,cv.height);
@@ -458,6 +472,8 @@ const CURATED = [
   // intero ogni ~10-15 min, il Rapid Scan MSG ogni ~5 min sull'Europa.
   {name:"mtg_fd:rgb_geocolour",       title:"Geo Colour RGB - MTG-I - 0 degree", hasTime:true},
   {name:"mtg_fd:rgb_truecolour",      title:"True Colour RGB - MTG-I - 0 degree", hasTime:true},
+  {name:"mtg_fd:ir105_hrfi",          title:"FCI HRFI IR10.5 - MTG-I - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_eview",          title:"European HRV RGB - MSG - 0 degree", hasTime:true},
   {name:"msg_fes:rgb_naturalenhncd",  title:"Natural Colour Enhanced RGB - MSG - 0 degree", hasTime:true},
   {name:"msg_rss:rgb_natural_nrt",    title:"Rapid Scan High Rate SEVIRI RGB Natural Colour - MSG", hasTime:true},
   // Composizioni "false colore" gia' pronte (ricette RGB standard EUMETSAT: IR/WV/VIS
@@ -500,13 +516,16 @@ function qParam(){ return isRealLayer(curVal()) ? "&layer="+encodeURIComponent(c
 async function fetchImage(){
   const date=$("date").value, time=$("times").value;
   const r=cv.getBoundingClientRect();
-  const w=Math.min(2048,Math.round(r.width)), h=Math.min(2048,Math.round(r.height));
+  // Richiede la risoluzione del canvas fisico, non i soli pixel CSS: su schermi
+  // HiDPI evita di ingrandire un'immagine piccola e mantiene nitidi costa e nubi.
+  const w=Math.min(2048,cv.width), h=Math.min(2048,cv.height);
   const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
   let u=API+"/metop?bbox="+bbox+"&w="+w+"&h="+h+qParam();
   // Passaggio scelto -> quell'istante. Nessun passaggio scelto -> nessun TIME,
   // cosi' il Worker/GeoServer serve l'ultimo disponibile (evita il 502 da data nuda).
   if(time) u+="&time="+encodeURIComponent(time);
   if($("bg").checked) u+="&bg=1";
+  if($("borders").checked) u+="&borders=1";
 
   $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
@@ -530,24 +549,32 @@ async function fetchImage(){
 // Passaggi (TIME) per il layer scelto. Trovato l'elenco, salta all'ultimo
 // istante disponibile e lo scarica: cosi' "Scarica" prende sempre qualcosa che
 // esiste davvero, invece di una data a caso senza copertura.
+let timesRequestId=0;
 async function loadTimes(){
+  const requestId=++timesRequestId;
   const t=$("times"); t.innerHTML='<option value="">— (ultima disponibile) —</option>';
   const date=$("date").value;
   try{
-    const r=await fetch(API+"/metop/times?"+qParam().slice(1)+(date?"&date="+date:""));
+    const r=await fetch(API+"/metop/times?"+qParam().slice(1)+(date?"&date="+date:"")+"&v="+Date.now(),
+      {cache:"no-store"});
+    if(requestId!==timesRequestId) return;
     if(!r.ok){ $("st-msg").textContent="catalogo tempi non disponibile"; scheduleFetch(); return; }
     const j=await r.json();
-    const times=j.times||[];
+    if(requestId!==timesRequestId) return;
+    // La galleria e' volutamente live: non propone immagini piu' vecchie
+    // di 24 ore, anche se EUMETView conserva passaggi storici.
+    const cutoff=Date.now()-24*3600*1000;
+    const times=(j.times||[]).filter(s=>Date.parse(s)>=cutoff);
     times.forEach(s=>{ const o=document.createElement("option"); o.value=s;
       o.textContent=s.replace("T"," ").replace("Z"," UTC"); t.appendChild(o); });
     if(times.length){
       t.value=times[times.length-1];               // il piu' recente
-      $("st-msg").innerHTML="<span style='color:var(--ok)'>"+times.length+" passaggi · ultimo "+t.value.replace("T"," ").replace("Z"," UTC")+"</span>";
+      $("st-msg").innerHTML="<span style='color:var(--ok)'>"+times.length+" immagini nelle ultime 24 ore · ultima "+t.value.replace("T"," ").replace("Z"," UTC")+"</span>";
     }else{
-      $("st-msg").textContent = date? "nessun passaggio il "+date+" — provo la data intera" : "nessun passaggio elencato";
+      $("st-msg").textContent = "nessuna immagine nelle ultime 24 ore — provo l'ultima disponibile";
     }
     scheduleFetch();
-  }catch(_){ scheduleFetch(); }
+  }catch(_){ if(requestId===timesRequestId) scheduleFetch(); }
 }
 
 // --------------------------------------------------------------------------
@@ -657,30 +684,89 @@ async function initCatalog(){
   populateProducts();
 }
 function yesterdayUTC(){ return new Date(Date.now()-24*3600*1000).toISOString().slice(0,10); }
+function todayUTC(){ return new Date().toISOString().slice(0,10); }
+const BEST_IMAGES = {
+  geocolour:  { layer:"mtg_fd:rgb_geocolour",      sat:"mtg",     cat:"real" },
+  truecolour: { layer:"mtg_fd:rgb_truecolour",     sat:"mtg",     cat:"real" },
+  hrv:        { layer:"msg_fes:rgb_eview",         sat:"msg-fes", cat:"all"  },
+  natural:    { layer:"msg_fes:rgb_naturalenhncd", sat:"msg-fes", cat:"real" },
+  infrared:   { layer:"mtg_fd:ir105_hrfi",         sat:"mtg",     cat:"all"  },
+  cloudRelief:{ layer:"mtg_fd:rgb_geocolour",      sat:"mtg",     cat:"real" },
+};
+function configureEuropeImage(id="geocolour"){
+  const preset=BEST_IMAGES[id] || BEST_IMAGES.geocolour;
+  view={ latMin:30, lonMin:-15, latMax:72, lonMax:45 };
+  $("bestProduct").value=id in BEST_IMAGES ? id : "geocolour";
+  $("sat").value=preset.sat;
+  $("cat").value=preset.cat;
+  populateProducts();
+  if([...sel().options].some(o=>o.value===preset.layer))
+    sel().value=preset.layer;
+  $("bg").checked=false;
+  $("borders").checked=true;
+  $("grid").checked=false;
+  $("labels").checked=false;
+  onProductChange();
+  $("globe").checked=false;
+  draw();
+}
+function configureCloudRelief(){
+  configureEuropeImage("cloudRelief");
+  // Il Geo Colour conserva la superficie; una regolazione lieve fa emergere
+  // la tessitura delle nubi senza trasformare il prodotto in falsi colori.
+  $("brightness").value=102;
+  $("contrast").value=118;
+  $("saturation").value=108;
+  updateImageControls();
+  $("prodhint").innerHTML="<span style='color:var(--acc)'>modalita' test: Geo Colour naturale con dettaglio delle nubi enfatizzato</span>";
+}
 
 // --------------------------------------------------------------------------
 // wiring UI
-$("date").value=yesterdayUTC();
+$("date").min=yesterdayUTC();
+$("date").max=todayUTC();
+$("date").value=todayUTC();
 sel().onchange=onProductChange;
-$("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
-$("date").onchange=loadTimes;
+$("today").textContent="oggi UTC";
+$("today").onclick=()=>{ $("date").value=todayUTC(); loadTimes(); };
+$("date").onchange=()=>{
+  const min=yesterdayUTC(), max=todayUTC();
+  if($("date").value<min) $("date").value=min;
+  if($("date").value>max) $("date").value=max;
+  loadTimes();
+};
+$("bestProduct").onchange=()=>{ configureEuropeImage($("bestProduct").value); loadTimes(); };
+$("cloudRelief").onclick=configureCloudRelief;
 $("sat").onchange=populateProducts;
 $("cat").onchange=populateProducts;
 $("times").onchange=fetchImage;
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
+$("borders").onchange=scheduleFetch;
 $("globe").onchange=()=>{ $("globehint").textContent=""; draw(); };
 $("grid").onchange=draw;
 $("labels").onchange=draw;
-$("enhance").onchange=draw;
-$("enhamt").oninput=draw;
+function updateImageControls(){
+  $("brightnessValue").textContent=$("brightness").value+"%";
+  $("contrastValue").textContent=$("contrast").value+"%";
+  $("saturationValue").textContent=$("saturation").value+"%";
+  draw();
+}
+["brightness","contrast","saturation"].forEach(id=>$(id).oninput=updateImageControls);
+$("resetImage").onclick=()=>{
+  $("brightness").value=100;
+  $("contrast").value=100;
+  $("saturation").value=100;
+  updateImageControls();
+};
 $("reset").onclick=()=>{ view={latMin:-60,lonMin:-180,latMax:80,lonMax:180}; draw(); scheduleFetch(); };
 document.querySelectorAll("button[data-bbox]").forEach(b=>b.onclick=()=>{
   const [a,lo,c,hi]=b.dataset.bbox.split(",").map(Number);
   view={latMin:a,lonMin:lo,latMax:c,lonMax:hi}; draw(); scheduleFetch();
 });
+$("quickEurope").onclick=()=>{ configureEuropeImage(); loadTimes(); };
 $("fetch").onclick=fetchImage;
 $("save").onclick=()=>{ const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click(); };
 window.addEventListener("resize",()=>{ fitDPR(); draw(); });
 
-fitDPR(); draw(); initCatalog();
+fitDPR(); draw(); initCatalog().then(configureEuropeImage);
 </script>
