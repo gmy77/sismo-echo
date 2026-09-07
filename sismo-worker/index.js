@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.10";
+const ECHO_VERSION = "3.11";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -3361,11 +3361,11 @@ const METOP_HTML = `<!doctype html>
      C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
      proxy e cache verso il WMS di EUMETSAT EUMETView. -->
 <!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-     METOP Polar Viewer 1.2.2 — costruito con Claude Code (Anthropic). -->
+     METOP Polar Viewer 1.4.2 — costruito con Claude Code (Anthropic). -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d1b2a'/><text x='50' y='70' font-size='58' text-anchor='middle'>🛰️</text></svg>">
-<title>METOP · Polar Viewer 1.2.2</title>
+<title>METOP · Polar Viewer 1.4.2</title>
 <style>
   :root{
     --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
@@ -3416,7 +3416,7 @@ const METOP_HTML = `<!doctype html>
 <div id="app">
   <div id="panel">
     <h1>METOP · POLARI</h1>
-    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.2.2</div>
+    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.4.2</div>
 
     <div class="sect">Immagini migliori</div>
     <select id="bestProduct">
@@ -3425,10 +3425,8 @@ const METOP_HTML = `<!doctype html>
       <option value="hrv">European HRV MSG · massima nitidezza diurna</option>
       <option value="natural">Natural Colour MSG · colori naturali avanzati</option>
       <option value="infrared">IR 10.5 MTG-I · nubi anche di notte</option>
-      <option value="cloudRelief" hidden>Nubi in rilievo · TEST</option>
     </select>
     <div class="sub" style="margin-top:6px">Copertura europea continua, senza mosaici a strisce.</div>
-    <button id="cloudRelief" style="margin-top:-5px">Prova nubi in rilievo · TEST</button>
 
     <div class="sect">Altri satelliti e prodotti</div>
     <select id="sat">
@@ -3469,6 +3467,8 @@ const METOP_HTML = `<!doctype html>
     </div>
     <label>Passaggi noti per questa data</label>
     <select id="times"><option value="">— (usa la data intera) —</option></select>
+    <label class="chk"><input type="checkbox" id="live" checked> <span id="liveLabel">Aggiornamento automatico</span></label>
+    <div id="livehint" class="sub" style="margin:-4px 0 8px"></div>
 
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
@@ -3490,6 +3490,11 @@ const METOP_HTML = `<!doctype html>
     <input id="saturation" type="range" min="0" max="180" value="100">
     <button id="resetImage" style="margin-top:8px">Ripristina immagine originale</button>
 
+    <label class="chk" style="margin-top:14px"><input type="checkbox" id="relief"> Rilievo nuvole (ombre 3D dal sole reale)</label>
+    <div id="reliefhint" class="sub" style="margin:-4px 0 8px">calcola l'ombreggiatura dalla posizione vera del sole sull'area/orario inquadrati — come nei prodotti professionali</div>
+    <label>Intensità rilievo <span id="reliefStrengthValue">100%</span></label>
+    <input id="reliefStrength" type="range" min="30" max="220" value="100">
+
     <div class="sect">Vista</div>
     <label class="chk"><input type="checkbox" id="globe"> Globo (disco rotondo) invece di mappa piatta</label>
     <div id="globehint" class="sub" style="margin:-4px 0 8px"></div>
@@ -3504,7 +3509,7 @@ const METOP_HTML = `<!doctype html>
     <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
 
     <div class="cred">
-      METOP-Polar v1.2.2<br>
+      METOP-Polar v1.4.2<br>
       Costruito con Claude Code (Anthropic)<br>
       © 2026 Gimmy Pignolo · Tutti i diritti riservati
     </div>
@@ -3584,7 +3589,7 @@ function draw(){
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.filter = enhanceFilter();               // solo sull'immagine
-      ctx.drawImage(img, dx0, dy0, dx1-dx0, dy1-dy0);
+      ctx.drawImage(activeSourceImg(), dx0, dy0, dx1-dx0, dy1-dy0);
       ctx.filter = "none";                        // la griglia resta netta
     }
   }
@@ -3703,18 +3708,19 @@ function scheduleGlobeRedraw(){ clearTimeout(globeTimer); globeTimer=setTimeout(
 let globeSrcCache={ img:null, data:null, w:0, h:0 };
 function renderGlobeImage(){
   if(!img || !imgBox || !$("globe").checked) return;
+  const active=activeSourceImg();
   const p=globeParams();
   const scale=Math.min(1, 700/Math.max(p.W,p.H));
   const w=Math.max(64,Math.round(p.W*scale)), h=Math.max(64,Math.round(p.H*scale));
   let src, offW, offH;
-  if(globeSrcCache.img===img){
+  if(globeSrcCache.img===active){
     src=globeSrcCache.data; offW=globeSrcCache.w; offH=globeSrcCache.h;
   } else {
-    offW=img.naturalWidth||img.width; offH=img.naturalHeight||img.height;
+    offW=active.naturalWidth||active.width; offH=active.naturalHeight||active.height;
     const off=document.createElement("canvas"); off.width=offW; off.height=offH;
-    const octx=off.getContext("2d"); octx.drawImage(img,0,0);
+    const octx=off.getContext("2d"); octx.drawImage(active,0,0);
     try{ src=octx.getImageData(0,0,offW,offH).data; }catch(_){ return; } // CORS: se capita, niente globo
-    globeSrcCache={ img, data:src, w:offW, h:offH };
+    globeSrcCache={ img:active, data:src, w:offW, h:offH };
   }
   const dst=new ImageData(w,h);
   const cx=w/2, cy=h/2, R=Math.min(w,h)/2*0.94;
@@ -3876,8 +3882,12 @@ async function fetchImage(){
   const w=Math.min(2048,cv.width), h=Math.min(2048,cv.height);
   const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
   let u=API+"/metop?bbox="+bbox+"&w="+w+"&h="+h+qParam();
-  // Passaggio scelto -> quell'istante. Nessun passaggio scelto -> nessun TIME,
-  // cosi' il Worker/GeoServer serve l'ultimo disponibile (evita il 502 da data nuda).
+  // SEMPRE un TIME esplicito sui geostazionari: senza, GeoServer compone la
+  // mosaico "ultimo disponibile" pescando tile con orari diversi (il lato
+  // ancora da aggiornare resta al ciclo di scansione precedente) e il disco
+  // esce a meta' vecchio/meta' nuovo, con un taglio netto invece del confine
+  // giorno/notte reale. loadTimes() risolve sempre l'ultimo istante COERENTE
+  // prima di chiamare questa funzione (vedi anche isFollowingLive()).
   if(time) u+="&time="+encodeURIComponent(time);
   if($("bg").checked) u+="&bg=1";
   if($("borders").checked) u+="&borders=1";
@@ -3894,7 +3904,9 @@ async function fetchImage(){
     const blob=await resp.blob(), im=new Image();
     await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
     img=im; imgBox={...view};
-    $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""));
+    const now=new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""))
+      + (isFollowingLive()?" · 🔴 LIVE aggiornata alle "+now:"");
     draw();
   }catch(err){
     $("st-msg").innerHTML="<span style='color:var(--err)'>"+err.message+"</span>";
@@ -3928,6 +3940,7 @@ async function loadTimes(){
     }else{
       $("st-msg").textContent = "nessuna immagine nelle ultime 24 ore — provo l'ultima disponibile";
     }
+    updateLiveHint();
     scheduleFetch();
   }catch(_){ if(requestId===timesRequestId) scheduleFetch(); }
 }
@@ -4011,7 +4024,12 @@ function onProductChange(){
     $("prodhint").innerHTML="<span style='color:var(--acc)'>RGB false-colore: "+recipe+"</span>"
       +(freshness?"<br><span style='color:var(--ok)'>"+freshness.replace(" · ","")+"</span>":"");
   else if(fullDisk)
-    $("prodhint").innerHTML="<span style='color:var(--ok)'>satellite geostazionario — disco intero"+freshness+"</span>";
+    $("prodhint").innerHTML="<span style='color:var(--ok)'>satellite geostazionario — disco intero"+freshness+"</span>"
+      // non e' un difetto dell'immagine: sul lato in ombra il prodotto passa da colore
+      // vero a infrarosso notturno (molto piu' scuro, spesso solo luci di citta'), quindi
+      // il confine giorno/notte puo' sembrare un "taglio" netto sull'immagine.
+      +"<br><span class='sub' style='margin:2px 0 0'>il lato in ombra e' piu' scuro (infrarosso notturno): "
+      +"non e' un'immagine tagliata, e' il confine giorno/notte reale</span>";
   else
     $("prodhint").textContent = isRealLayer(v) ? v
         : (PRODUCTS.find(p=>p.id===v)||{}).hint || "";
@@ -4023,7 +4041,7 @@ function onProductChange(){
   $("globe").disabled = single;
   $("globehint").textContent = single ? "non disponibile su una striscia a singola orbita"
     : fullDisk ? "consigliata per questo prodotto (disco intero)" : "";
-  loadTimes(); draw();
+  loadTimes(); draw(); updateLiveHint();
 }
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
@@ -4046,7 +4064,6 @@ const BEST_IMAGES = {
   hrv:        { layer:"msg_fes:rgb_eview",         sat:"msg-fes", cat:"all"  },
   natural:    { layer:"msg_fes:rgb_naturalenhncd", sat:"msg-fes", cat:"real" },
   infrared:   { layer:"mtg_fd:ir105_hrfi",         sat:"mtg",     cat:"all"  },
-  cloudRelief:{ layer:"mtg_fd:rgb_geocolour",      sat:"mtg",     cat:"real" },
 };
 function configureEuropeImage(id="geocolour"){
   const preset=BEST_IMAGES[id] || BEST_IMAGES.geocolour;
@@ -4065,15 +4082,84 @@ function configureEuropeImage(id="geocolour"){
   $("globe").checked=false;
   draw();
 }
-function configureCloudRelief(){
-  configureEuropeImage("cloudRelief");
-  // Il Geo Colour conserva la superficie; una regolazione lieve fa emergere
-  // la tessitura delle nubi senza trasformare il prodotto in falsi colori.
-  $("brightness").value=102;
-  $("contrast").value=118;
-  $("saturation").value=108;
-  updateImageControls();
-  $("prodhint").innerHTML="<span style='color:var(--acc)'>modalita' test: Geo Colour naturale con dettaglio delle nubi enfatizzato</span>";
+// --------------------------------------------------------------------------
+// Rilievo nuvole: non e' un filtro finto (contrasto/saturazione), ma un vero
+// ombreggiamento 3D. Il gradiente di luminanza dell'immagine gia' scaricata
+// fa da "altezza" della superficie nuvolosa (nubi piu' chiare/dense = piu'
+// alte), e la illuminiamo con la posizione REALE del sole per l'orario e il
+// centro geografico inquadrati: le ombre cadono dalla parte giusta, come nei
+// prodotti professionali (es. RAMMB SLIDER 3D), non con una luce finta fissa.
+function sunPosition(date, latDeg, lonDeg){
+  const rad=Math.PI/180;
+  const d=(date.getTime()-Date.UTC(2000,0,1,12,0,0))/86400000;   // giorni da J2000.0
+  const g=(357.529+0.98560028*d)%360;                             // anomalia media
+  const q=(280.459+0.98564736*d)%360;                             // longitudine media
+  const L=(q+1.915*Math.sin(g*rad)+0.020*Math.sin(2*g*rad))%360;  // longitudine eclittica
+  const e=23.439-0.00000036*d;                                    // obliquita' dell'eclittica
+  const ra=Math.atan2(Math.cos(e*rad)*Math.sin(L*rad),Math.cos(L*rad))/rad;
+  const dec=Math.asin(Math.sin(e*rad)*Math.sin(L*rad))/rad;
+  const gmst=(280.46061837+360.98564736629*d)%360;
+  const lst=(gmst+lonDeg)%360;
+  const ha=(((lst-ra+540)%360)-180)*rad;
+  const latR=latDeg*rad, decR=dec*rad;
+  const sinAlt=Math.sin(latR)*Math.sin(decR)+Math.cos(latR)*Math.cos(decR)*Math.cos(ha);
+  const alt=Math.asin(Math.min(1,Math.max(-1,sinAlt)))/rad;
+  const cosAz=(Math.sin(decR)-Math.sin(latR)*sinAlt)/(Math.cos(latR)*Math.cos(alt*rad));
+  let az=Math.acos(Math.min(1,Math.max(-1,cosAz)))/rad;
+  if(Math.sin(ha)>0) az=360-az;                                   // azimut da nord, verso est
+  return { altitude:alt, azimuth:az };
+}
+let reliefImg=null, reliefForImg=null, reliefBusy=false;
+async function computeRelief(){
+  if(!img || !imgBox || reliefBusy) return;
+  reliefBusy=true;
+  $("reliefhint").innerHTML="<span style='color:var(--acc)'>calcolo ombreggiatura 3D…</span>";
+  try{
+    const w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+    const off=document.createElement("canvas"); off.width=w; off.height=h;
+    const octx=off.getContext("2d"); octx.drawImage(img,0,0);
+    let src;
+    try{ src=octx.getImageData(0,0,w,h); }
+    catch(_){ $("reliefhint").innerHTML="<span style='color:var(--err)'>immagine non elaborabile (CORS): rilievo non disponibile</span>"; return; }
+    const d=src.data, n=w*h, lum=new Float32Array(n);
+    for(let i=0,p=0;i<d.length;i+=4,p++) lum[p]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];
+    const cLat=(imgBox.latMin+imgBox.latMax)/2, cLon=(imgBox.lonMin+imgBox.lonMax)/2;
+    const when=$("times").value?new Date($("times").value):new Date();
+    const sun=sunPosition(when,cLat,cLon);
+    // sotto l'orizzonte: luce quasi verticale, cosi' la texture IR notturna
+    // del Geo Colour resta leggibile invece di finire in ombra piatta.
+    const altR=Math.max(8,sun.altitude)*Math.PI/180, azR=sun.azimuth*Math.PI/180;
+    const lx=Math.cos(altR)*Math.sin(azR), ly=-Math.cos(altR)*Math.cos(azR), lz=Math.sin(altR);
+    const K=2.2*($("reliefStrength").value/100);
+    const out=new ImageData(w,h), od=out.data;
+    for(let y=0;y<h;y++){
+      const y0=y*w, yp=(y<h-1?y+1:y)*w, ym=(y>0?y-1:y)*w;
+      for(let x=0;x<w;x++){
+        const xp=x<w-1?x+1:x, xm=x>0?x-1:x;
+        const dx=(lum[y0+xp]-lum[y0+xm])*K/255, dy=(lum[yp+x]-lum[ym+x])*K/255;
+        let nx=-dx, ny=-dy, nz=1; const nn=1/Math.hypot(nx,ny,nz); nx*=nn; ny*=nn; nz*=nn;
+        let shade=0.5+0.85*Math.max(0, nx*lx+ny*ly+nz*lz);        // ambiente + diffusa, mai nero
+        const i4=(y0+x)*4;
+        od[i4]=Math.min(255,d[i4]*shade); od[i4+1]=Math.min(255,d[i4+1]*shade); od[i4+2]=Math.min(255,d[i4+2]*shade);
+        od[i4+3]=d[i4+3];
+      }
+    }
+    octx.putImageData(out,0,0);
+    const ri=new Image();
+    await new Promise(ok=>{ ri.onload=ok; ri.src=off.toDataURL(); });
+    reliefImg=ri; reliefForImg=img;
+    globeSrcCache={ img:null, data:null, w:0, h:0 };  // forza il globo a rileggere la nuova sorgente
+    $("reliefhint").innerHTML="<span style='color:var(--ok)'>attivo: illuminazione da sole reale, az "
+      +sun.azimuth.toFixed(0)+"° alt "+sun.altitude.toFixed(0)+"°</span>";
+    draw();
+  } finally { reliefBusy=false; }
+}
+function activeSourceImg(){
+  if($("relief").checked){
+    if(reliefForImg!==img) computeRelief();          // in corso: nel frattempo si vede l'originale
+    if(reliefImg && reliefForImg===img) return reliefImg;
+  }
+  return img;
 }
 
 // --------------------------------------------------------------------------
@@ -4088,13 +4174,12 @@ $("date").onchange=()=>{
   const min=yesterdayUTC(), max=todayUTC();
   if($("date").value<min) $("date").value=min;
   if($("date").value>max) $("date").value=max;
-  loadTimes();
+  loadTimes(); updateLiveHint();
 };
 $("bestProduct").onchange=()=>{ configureEuropeImage($("bestProduct").value); loadTimes(); };
-$("cloudRelief").onclick=configureCloudRelief;
 $("sat").onchange=populateProducts;
 $("cat").onchange=populateProducts;
-$("times").onchange=fetchImage;
+$("times").onchange=()=>{ fetchImage(); updateLiveHint(); };
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("borders").onchange=scheduleFetch;
 $("globe").onchange=()=>{ $("globehint").textContent=""; draw(); };
@@ -4113,17 +4198,61 @@ $("resetImage").onclick=()=>{
   $("saturation").value=100;
   updateImageControls();
 };
+$("relief").onchange=()=>{
+  globeSrcCache={img:null,data:null,w:0,h:0};
+  if($("relief").checked) computeRelief();
+  else { $("reliefhint").textContent="disponibile sui prodotti a colori reali (Geo Colour, True Colour, HRV…)"; draw(); }
+};
+$("reliefStrength").oninput=()=>{
+  $("reliefStrengthValue").textContent=$("reliefStrength").value+"%";
+  reliefForImg=null;                                  // forza il ricalcolo con la nuova intensita'
+  if($("relief").checked) computeRelief();
+};
 $("reset").onclick=()=>{ view={latMin:-60,lonMin:-180,latMax:80,lonMax:180}; draw(); scheduleFetch(); };
 document.querySelectorAll("button[data-bbox]").forEach(b=>b.onclick=()=>{
   const [a,lo,c,hi]=b.dataset.bbox.split(",").map(Number);
   view={latMin:a,lonMin:lo,latMax:c,lonMax:hi}; draw(); scheduleFetch();
 });
 $("quickEurope").onclick=()=>{ configureEuropeImage(); loadTimes(); };
-$("fetch").onclick=fetchImage;
+$("fetch").onclick=()=>fetchImage();
 $("save").onclick=()=>{ const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click(); };
 window.addEventListener("resize",()=>{ fitDPR(); draw(); });
 
-fitDPR(); draw(); initCatalog().then(configureEuropeImage);
+// --------------------------------------------------------------------------
+// Live: per i geostazionari (MSG/MTG) chiede periodicamente il catalogo dei
+// passaggi e riscarica se ne e' arrivato uno nuovo, sempre con un TIME
+// esplicito (loadTimes() lo risolve gia' da sola). MAI senza &time=: chiesta
+// "nuda" GeoServer compone la mosaico dell'ultimo disponibile pescando tile
+// con orari diversi fra loro (il lato non ancora aggiornato in questo ciclo
+// di scansione resta a quello vecchio) e il disco esce meta' vecchio/meta'
+// nuovo, con un taglio netto — non e' il confine giorno/notte, e' un bug di
+// composizione lato EUMETSAT che un TIME preciso evita del tutto.
+function isLiveGeo(){ return /^(msg|mtg)/i.test(curVal()); }
+function isFollowingLive(){
+  if(!isLiveGeo() || $("date").value!==todayUTC()) return false;
+  const t=$("times");
+  return !t.value || t.value===t.options[t.options.length-1].value;
+}
+function updateLiveHint(){
+  if(!isLiveGeo()){ $("livehint").textContent="disponibile solo per i satelliti geostazionari (MSG/MTG)"; return; }
+  $("livehint").textContent = $("live").checked
+    ? (isFollowingLive() ? "attivo: ricarica da sola la nuova immagine appena disponibile"
+                          : "in pausa: stai guardando un passaggio specifico, non l'ultimo")
+    : "disattivato";
+}
+let liveTimer=null;
+async function liveTick(){
+  if(document.hidden || !$("live").checked || !isFollowingLive()) return;
+  await loadTimes();                // trova il nuovo istante (se c'e') e ricarica con TIME esplicito
+}
+function scheduleLiveTimer(){
+  clearInterval(liveTimer);
+  liveTimer=setInterval(liveTick, 60*1000);
+}
+$("live").onchange=()=>{ updateLiveHint(); if($("live").checked) liveTick(); };
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) liveTick(); });
+
+fitDPR(); draw(); initCatalog().then(()=>{ configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });
 </script>
 `;
 // <<<METOP_HTML
@@ -4168,10 +4297,16 @@ async function load(){
  try{let failure;for(const sat of sats){const u=API+"/modis?sat="+sat+"&product="+product+"&date="+day+"&bbox="+bbox+"&w="+w+"&h="+h;const res=await fetch(u);if(!res.ok){failure=new Error("MODIS "+sat+" non disponibile");continue}const blob=await res.blob(),next=new Image();await new Promise((ok,no)=>{next.onload=ok;next.onerror=no;next.src=URL.createObjectURL(blob)});img=next;imgBox=reqView;$("source").textContent="MODIS "+sat.toUpperCase()+" · "+w+"x"+h;$("chip").textContent="MODIS "+sat.toUpperCase()+" · "+label+" · "+day;draw();return}throw failure||new Error("Mosaico non disponibile")}catch(e){$("message").textContent=e.message}finally{$("loading").classList.remove("on")}}
 function schedule(){clearTimeout(timer);timer=setTimeout(load,300)}
 function setView(box){view={...box};draw();schedule()}
+// Senza questo limite lo zoom ripetuto puo' far collassare lonMax-lonMin
+// (o latMax-latMin) a quasi zero: lonX()/latY() dividono per un numero
+// vicino allo zero, drawImage riceve coordinate degeneri e l'immagine
+// sparisce sul fondo scurissimo del canvas, senza che un altro giro di
+// rotellina la risani (stessa guardia gia' presente in metop-viewer.html).
+function clampView(){if(view.latMin<-90)view.latMin=-90;if(view.latMax>90)view.latMax=90;if(view.latMax-view.latMin<0.5)view.latMax=view.latMin+0.5;if(view.lonMax-view.lonMin<0.5)view.lonMax=view.lonMin+0.5}
 cv.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,view:{...view}};cv.setPointerCapture(e.pointerId);cv.classList.add("drag")});
-cv.addEventListener("pointermove",e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;$("cursor").textContent="lat "+(view.latMax-y*(view.latMax-view.latMin)).toFixed(3)+" lon "+(view.lonMin+x*(view.lonMax-view.lonMin)).toFixed(3);if(!drag)return;const dx=(e.clientX-drag.x)/r.width*(drag.view.lonMax-drag.view.lonMin),dy=(e.clientY-drag.y)/r.height*(drag.view.latMax-drag.view.latMin);view={lonMin:drag.view.lonMin-dx,lonMax:drag.view.lonMax-dx,latMin:drag.view.latMin+dy,latMax:drag.view.latMax+dy};draw()});
+cv.addEventListener("pointermove",e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;$("cursor").textContent="lat "+(view.latMax-y*(view.latMax-view.latMin)).toFixed(3)+" lon "+(view.lonMin+x*(view.lonMax-view.lonMin)).toFixed(3);if(!drag)return;const dx=(e.clientX-drag.x)/r.width*(drag.view.lonMax-drag.view.lonMin),dy=(e.clientY-drag.y)/r.height*(drag.view.latMax-drag.view.latMin);view={lonMin:drag.view.lonMin-dx,lonMax:drag.view.lonMax-dx,latMin:drag.view.latMin+dy,latMax:drag.view.latMax+dy};clampView();draw()});
 cv.addEventListener("pointerup",()=>{if(drag){drag=null;cv.classList.remove("drag");schedule()}});
-cv.addEventListener("wheel",e=>{e.preventDefault();const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height,lon=view.lonMin+x*(view.lonMax-view.lonMin),lat=view.latMax-y*(view.latMax-view.latMin),k=e.deltaY<0?.75:1.33;view={lonMin:lon-(lon-view.lonMin)*k,lonMax:lon+(view.lonMax-lon)*k,latMin:lat-(lat-view.latMin)*k,latMax:lat+(view.latMax-lat)*k};draw();schedule()},{passive:false});
+cv.addEventListener("wheel",e=>{e.preventDefault();const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height,lon=view.lonMin+x*(view.lonMax-view.lonMin),lat=view.latMax-y*(view.latMax-view.latMin),k=e.deltaY<0?.75:1.33;view={lonMin:lon-(lon-view.lonMin)*k,lonMax:lon+(view.lonMax-lon)*k,latMin:lat-(lat-view.latMin)*k,latMax:lat+(view.latMax-lat)*k};clampView();draw();schedule()},{passive:false});
 function updateImage(){["brightness","contrast","saturation"].forEach(id=>$(id+"Value").textContent=$(id).value+"%");draw()}
 const help={truecolor:"Resa fotografica naturale. Nuvole bianche e polvere chiara possono assomigliarsi.",bands721:"Usa infrarosso: aiuta a separare suolo, vegetazione e aree bruciate.",bands367:"Evidenzia vegetazione e caratteristiche della superficie in falsi colori."};
 $("sat").onchange=load;$("product").onchange=()=>{$("productHelp").textContent=help[$("product").value];load()};["brightness","contrast","saturation"].forEach(id=>$(id).oninput=updateImage);$("resetImage").onclick=()=>{$("brightness").value=100;$("contrast").value=100;$("saturation").value=100;updateImage()};$("europe").onclick=()=>setView(EUROPE);$("italy").onclick=()=>setView({latMin:35,lonMin:6,latMax:48,lonMax:19});$("fvg").onclick=()=>setView({latMin:45.3,lonMin:12,latMax:46.8,lonMax:14.1});$("reset").onclick=()=>setView(EUROPE);$("reload").onclick=load;$("fullscreen").onclick=()=>document.fullscreenElement?document.exitFullscreen():$("stage").requestFullscreen();$("save").onclick=()=>{const a=document.createElement("a");a.download="modis_"+day+".png";a.href=cv.toDataURL("image/png");a.click()};window.addEventListener("resize",()=>{fit();draw();schedule()});fit();draw();load();
@@ -4316,7 +4451,12 @@ export default {
                    + encodeURIComponent(layer.split(":")[0]);
       let times = [];
       try {
-        const r = await fetch(capUrl, { cf: { cacheTtl: 3600, cacheEverything: true } });
+        // TTL basso apposta: il live-refresh del viewer si appoggia su questa
+        // lista per trovare l'ultimo ISTANTE COERENTE (vedi nota su /metop
+        // piu' sotto: "nessun TIME" puo' mescolare tile con orari diversi).
+        // Con una cache di un'ora il viewer live avrebbe visto un orario
+        // vecchio fino a un'ora dopo un nuovo passaggio.
+        const r = await fetch(capUrl, { cf: { cacheTtl: 120, cacheEverything: true } });
         if (r.ok) {
           const xml = await r.text();
           // isola il blocco <Layer> del nostro layer, poi la sua <Dimension time>.
