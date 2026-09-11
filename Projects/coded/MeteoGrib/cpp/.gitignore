@@ -1,0 +1,12 @@
+# Binari e output di compilazione
+/build/
+*.o
+*.obj
+*.exe
+*.bmp
+*.csv
+meteogrib_cli
+# File utente di Visual Studio
+*.vcxproj.user
+*.suo
+.vs/
