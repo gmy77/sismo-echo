@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.9";
+const ECHO_VERSION = "3.11";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -794,7 +794,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 <div class="panel" id="suite" style="margin-top:28px">
   <div class="panel-header">
     <span>🚀 <span class="acc">ECHO SUITE</span> — app &amp; strumenti</span>
-    <span style="color:#455a64">6 moduli · Cloudflare AI · edge</span>
+    <span style="color:#455a64">7 moduli · Cloudflare AI · edge</span>
   </div>
   <div class="panel-body">
     <div class="suite-grid">
@@ -898,6 +898,17 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
         <div class="app-go">ESPLORA <span>→</span></div>
       </a>
 
+      <a href="/polar" class="app-card" style="--app:#00b8d4"
+         data-tt-title="METOP Polar" data-tt-badge="NUOVO"
+         data-tt="Visualizzatore satelliti polari EUMETSAT (Metop-B/C): AVHRR colore naturale, nubi/notte, IASI temperatura e ozono, ASCAT vento sul mare. Mappa navigabile su tutto il pianeta con scoperta automatica dei passaggi via EUMETView.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🛰️</div>
+        <div class="app-name">METOP Polar</div>
+        <div class="app-desc">satelliti polari · EUMETSAT</div>
+        <div class="app-tag">Earth Watch</div>
+        <div class="app-go">ESPLORA <span>→</span></div>
+      </a>
+
     </div>
   </div>
 </div>
@@ -937,6 +948,11 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
      data-tt-title="Forza 4" data-tt="Il classico gioco a gettoni, 2 giocatori sullo stesso schermo.">🔴</a>
   <a class="dock-item" href="/othello"
      data-tt-title="Othello" data-tt="Reversi contro un'IA che impara partita dopo partita.">⚫</a>
+  <div class="dock-sep"></div>
+  <a class="dock-item" href="https://sismo.gimmycloud.net" target="_blank"
+     data-tt-title="SISMO GLOBE" data-tt="Monitor globale 3D di terremoti in tempo reale — visualizzazione interattiva con dati USGS.">🌍</a>
+  <a class="dock-item" href="/polar"
+     data-tt-title="METOP Polar" data-tt="Visualizzatore satelliti polari EUMETSAT — Metop-B/C, AVHRR, IASI, ASCAT.">🛰️</a>
 </nav>
 
 <script>
@@ -1586,6 +1602,7 @@ function a0_0x26da(_0x517a64,_0x9c7876){_0x517a64=_0x517a64-0xb4;var _0x4861a5=a
   var rbtn=document.getElementById('rbtn');
   if(rbtn) rbtn.addEventListener('click',function(){ _prevML=0; _gameOver=false; });
 })();
+</script>
 <script>
 (function(){
   function _toast(msg,color){
@@ -2961,7 +2978,8 @@ body::after{
   <a class="lc" href="https://claude.ai" target="_blank">🤖 Claude</a>
   <a class="lc" href="https://gimmycloud.net" target="_blank">🌐 GimmyCloud</a>
   <a class="lc" href="https://www.youtube.com" target="_blank"><img src="https://www.youtube.com/favicon.ico" onerror="this.style.display='none'">YouTube</a>
-  <a class="lc" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">🌋 SISMO</a>
+  <a class="lc" href="https://sismo-fvg.gimmy077.workers.dev/" target="_blank">🌋 SISMO FVG</a>
+  <a class="lc" href="https://sismo.gimmycloud.net" target="_blank">🌍 SISMO GLOBE</a>
 </div>
 
 <!-- CENTER -->
@@ -2979,10 +2997,14 @@ body::after{
   <div class="apps">
     <a class="app" href="/chat" target="_blank" style="--ac:#26c6da"><span class="ai">🧠</span><span class="al">CHAT</span></a>
     <a class="app" href="/code" target="_blank" style="--ac:#66bb6a"><span class="ai">⌨️</span><span class="al">CODE</span></a>
-    <a class="app" href="/traduttore" target="_blank" style="--ac:#ffd600"><span class="ai">🌍</span><span class="al">TRANSLATE</span></a>
+    <a class="app" href="/traduttore" target="_blank" style="--ac:#ffd600"><span class="ai">🌐</span><span class="al">TRANSLATE</span></a>
     <a class="app" href="/pixeldrain" target="_blank" style="--ac:#ab47bc"><span class="ai">📁</span><span class="al">STORAGE</span></a>
     <a class="app" href="/forza4" target="_blank" style="--ac:#ff6d00"><span class="ai">🔴</span><span class="al">FORZA 4</span></a>
     <a class="app" href="/othello" target="_blank" style="--ac:#69f0ae"><span class="ai">⚫</span><span class="al">OTHELLO</span></a>
+    <a class="app" href="https://astro.gimmycloud.net" target="_blank" style="--ac:#7e57c2"><span class="ai">🪐</span><span class="al">ASTRO</span></a>
+    <a class="app" href="https://techno.gimmycloud.net" target="_blank" style="--ac:#ff6a00"><span class="ai">🎛️</span><span class="al">TECHNO</span></a>
+    <a class="app" href="https://sismo.gimmycloud.net" target="_blank" style="--ac:#f44336"><span class="ai">🌍</span><span class="al">SISMO</span></a>
+    <a class="app" href="/polar" target="_blank" style="--ac:#00b8d4"><span class="ai">🛰️</span><span class="al">METOP</span></a>
   </div>
 </div>
 
@@ -3339,10 +3361,11 @@ const METOP_HTML = `<!doctype html>
      C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
      proxy e cache verso il WMS di EUMETSAT EUMETView. -->
 <!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-     METOP Polar Viewer 1.1.2 — costruito con Claude Code (Anthropic). -->
+     METOP Polar Viewer 1.4.2 — costruito con Claude Code (Anthropic). -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>METOP · Polar Viewer 1.1.2</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d1b2a'/><text x='50' y='70' font-size='58' text-anchor='middle'>🛰️</text></svg>">
+<title>METOP · Polar Viewer 1.4.2</title>
 <style>
   :root{
     --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
@@ -3393,14 +3416,38 @@ const METOP_HTML = `<!doctype html>
 <div id="app">
   <div id="panel">
     <h1>METOP · POLARI</h1>
-    <div class="sub">EUMETSAT Metop-B / Metop-C · EUMETView · v1.1.2</div>
+    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.4.2</div>
 
-    <div class="sect">Satellite</div>
+    <div class="sect">Immagini migliori</div>
+    <select id="bestProduct">
+      <option value="geocolour">Geo Colour MTG-I · Europa live</option>
+      <option value="truecolour">True Colour MTG-I · colori naturali</option>
+      <option value="hrv">European HRV MSG · massima nitidezza diurna</option>
+      <option value="natural">Natural Colour MSG · colori naturali avanzati</option>
+      <option value="infrared">IR 10.5 MTG-I · nubi anche di notte</option>
+    </select>
+    <div class="sub" style="margin-top:6px">Copertura europea continua, senza mosaici a strisce.</div>
+
+    <div class="sect">Altri satelliti e prodotti</div>
     <select id="sat">
       <option value="" selected>Tutti</option>
-      <option value="metop-a">Metop-A</option>
-      <option value="metop-b">Metop-B</option>
-      <option value="metop-c">Metop-C</option>
+      <optgroup label="METOP · polari">
+        <option value="metop-a">Metop-A</option>
+        <option value="metop-b">Metop-B</option>
+        <option value="metop-c">Metop-C</option>
+      </optgroup>
+      <optgroup label="Sentinel-3 · polari">
+        <option value="sentinel3a">Sentinel-3A</option>
+        <option value="sentinel3b">Sentinel-3B</option>
+      </optgroup>
+      <optgroup label="METEOSAT · geostazionari">
+        <option value="msg-fes">MSG — 0° (Europa/Africa)</option>
+        <option value="msg-iodc">MSG — Oceano Indiano</option>
+        <option value="mtg">MTG-I — 0° (nuova generazione)</option>
+      </optgroup>
+      <optgroup label="Multi-missione · mondo">
+        <option value="mumi">Geo Ring (anche Himawari/GOES/Fengyun/Elektro-L)</option>
+      </optgroup>
     </select>
 
     <div class="sect">Canale / Prodotto</div>
@@ -3420,8 +3467,11 @@ const METOP_HTML = `<!doctype html>
     </div>
     <label>Passaggi noti per questa data</label>
     <select id="times"><option value="">— (usa la data intera) —</option></select>
+    <label class="chk"><input type="checkbox" id="live" checked> <span id="liveLabel">Aggiornamento automatico</span></label>
+    <div id="livehint" class="sub" style="margin:-4px 0 8px"></div>
 
     <div class="sect">Area</div>
+    <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
     <div class="row">
       <button data-bbox="-60,-180,80,180">Mondo</button>
       <button data-bbox="30,-15,72,45">Europa</button>
@@ -3432,12 +3482,24 @@ const METOP_HTML = `<!doctype html>
     </div>
 
     <div class="sect">Qualità immagine</div>
-    <label class="chk"><input type="checkbox" id="enhance" checked> Immagine brillante</label>
-    <label>Intensità</label>
-    <input id="enhamt" type="range" min="0" max="100" value="55">
+    <label>Luminosità <span id="brightnessValue">100%</span></label>
+    <input id="brightness" type="range" min="60" max="150" value="100">
+    <label>Contrasto <span id="contrastValue">100%</span></label>
+    <input id="contrast" type="range" min="70" max="170" value="100">
+    <label>Saturazione <span id="saturationValue">100%</span></label>
+    <input id="saturation" type="range" min="0" max="180" value="100">
+    <button id="resetImage" style="margin-top:8px">Ripristina immagine originale</button>
+
+    <label class="chk" style="margin-top:14px"><input type="checkbox" id="relief"> Rilievo nuvole (ombre 3D dal sole reale)</label>
+    <div id="reliefhint" class="sub" style="margin:-4px 0 8px">calcola l'ombreggiatura dalla posizione vera del sole sull'area/orario inquadrati — come nei prodotti professionali</div>
+    <label>Intensità rilievo <span id="reliefStrengthValue">100%</span></label>
+    <input id="reliefStrength" type="range" min="30" max="220" value="100">
 
     <div class="sect">Vista</div>
+    <label class="chk"><input type="checkbox" id="globe"> Globo (disco rotondo) invece di mappa piatta</label>
+    <div id="globehint" class="sub" style="margin:-4px 0 8px"></div>
     <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
+    <label class="chk"><input type="checkbox" id="borders" checked> Confini delle nazioni</label>
     <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
     <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
     <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
@@ -3447,7 +3509,7 @@ const METOP_HTML = `<!doctype html>
     <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
 
     <div class="cred">
-      METOP-Polar v1.1.2<br>
+      METOP-Polar v1.4.2<br>
       Costruito con Claude Code (Anthropic)<br>
       © 2026 Gimmy Pignolo · Tutti i diritti riservati
     </div>
@@ -3489,7 +3551,7 @@ const PRODUCTS = [
 // Stato della vista: un bbox in gradi (lat,lon) e nient'altro. Il canvas e'
 // una proiezione equirettangolare del bbox — la stessa che il WMS EPSG:4326
 // restituisce, quindi immagine e griglia combaciano senza conti.
-let view = { latMin:-60, lonMin:-180, latMax:80, lonMax:180 };
+let view = { latMin:30, lonMin:-15, latMax:72, lonMax:45 };
 let img = null;                 // Image scaricata per il bbox corrente
 let imgBox = null;              // bbox a cui l'immagine si riferisce
 const cv = document.getElementById("cv");
@@ -3505,30 +3567,34 @@ function yToLat(y){ return view.latMax - (y/cv.height)*(view.latMax-view.latMin)
 function lonToX(lon){ return (lon-view.lonMin)/(view.lonMax-view.lonMin)*cv.width; }
 function latToY(lat){ return (view.latMax-lat)/(view.latMax-view.latMin)*cv.height; }
 
-// Enhancement in sola visualizzazione: contrasto/saturazione/luminosita'
-// calibrati sull'intensita' scelta. Non inventa dati — rende piu' vivida
-// l'immagine gia' scaricata, come la maschera di contrasto del gemello C++.
+// Regolazioni locali del canvas: non modificano ne' ricaricano il dato EUMETSAT.
+// I valori neutri conservano il rendering originale del prodotto satellitare.
 function enhanceFilter(){
-  if(!document.getElementById("enhance").checked) return "none";
-  const t = (+document.getElementById("enhamt").value)/100;      // 0..1
-  const contrast   = (1 + 0.18*t).toFixed(3);
-  const saturate   = (1 + 0.55*t).toFixed(3);
-  const brightness = (1 + 0.05*t).toFixed(3);
-  return "contrast("+contrast+") saturate("+saturate+") brightness("+brightness+")";
+  return "brightness(" + $("brightness").value + "%) contrast(" + $("contrast").value
+       + "%) saturate(" + $("saturation").value + "%)";
 }
 function draw(){
   ctx.clearRect(0,0,cv.width,cv.height);
+  const globeOn = $("globe").checked;
   // immagine, se copre (anche in parte) la vista
   if(img && imgBox){
-    const dx0 = lonToX(imgBox.lonMin), dx1 = lonToX(imgBox.lonMax);
-    const dy0 = latToY(imgBox.latMax), dy1 = latToY(imgBox.latMin);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.filter = enhanceFilter();               // solo sull'immagine
-    ctx.drawImage(img, dx0, dy0, dx1-dx0, dy1-dy0);
-    ctx.filter = "none";                        // la griglia resta netta
+    if(globeOn){
+      // Il globo e' costoso (un ciclo per pixel con trigonometria): durante un
+      // trascinamento/zoom attivo si salta, si ridisegna appena l'utente si ferma
+      // (stesso spirito del debounce del fetch, cosi' l'interazione resta fluida).
+      if(!drag) scheduleGlobeRedraw();
+    } else {
+      const dx0 = lonToX(imgBox.lonMin), dx1 = lonToX(imgBox.lonMax);
+      const dy0 = latToY(imgBox.latMax), dy1 = latToY(imgBox.latMin);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.filter = enhanceFilter();               // solo sull'immagine
+      ctx.drawImage(activeSourceImg(), dx0, dy0, dx1-dx0, dy1-dy0);
+      ctx.filter = "none";                        // la griglia resta netta
+    }
   }
-  if(document.getElementById("grid").checked) drawGraticule();
+  if(document.getElementById("grid").checked && !globeOn) drawGraticule();
+  if(globeOn) drawGlobeOutline();
   document.getElementById("st-view").textContent =
     "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
     view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
@@ -3558,6 +3624,160 @@ function drawGraticule(){
 }
 
 // --------------------------------------------------------------------------
+// Vista a globo: riproietta l'immagine equirettangolare gia' scaricata su un
+// disco (proiezione ortografica), centrato sul centro lat/lon della vista
+// corrente. Non serve altro dato dal server: e' la STESSA immagine, solo
+// ridisegnata come la vedrebbe davvero un satellite geostazionario. Utile
+// soprattutto per i prodotti a disco intero (Meteosat, Geo Ring); su una
+// striscia polare stretta il globo mostra solo la fetta coperta dai dati.
+function globeParams(){
+  const W=cv.width, H=cv.height;
+  const lat0=(view.latMin+view.latMax)/2 * Math.PI/180;
+  const lon0=(view.lonMin+view.lonMax)/2 * Math.PI/180;
+  const latSpan=(view.latMax-view.latMin) * Math.PI/180;
+  const lonSpan=(view.lonMax-view.lonMin) * Math.PI/180;
+  // maxC = quanti gradi dal centro arrivano al bordo del disco. A vista mondo
+  // e' un emisfero intero (90°, come un vero satellite geostazionario);
+  // zoomando si restringe, cosi' lo zoom "zooma" anche sul globo — prima
+  // restava sempre alla stessa scala e mostrava solo una fetta minuscola.
+  let maxC = Math.max(latSpan, lonSpan*Math.cos(lat0)) / 2;
+  maxC = Math.min(Math.PI/2 - 1e-3, Math.max(0.01, maxC));
+  return {
+    W, H, cx:W/2, cy:H/2, R: Math.min(W,H)/2*0.94,
+    lat0, lon0, maxC, sinMaxC: Math.sin(maxC),
+  };
+}
+function drawGlobeOutline(){
+  const {cx,cy,R} = globeParams();
+  ctx.save();
+  ctx.strokeStyle = "rgba(150,170,190,.35)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+  if(document.getElementById("grid").checked) drawGraticuleGlobe();
+}
+// Proiezione IN AVANTI (lat/lon -> pixel), per disegnare le linee del reticolo
+// sul globo: economica (pochi punti a linea), a differenza del riempimento
+// dell'immagine che deve invece andare all'INDIETRO pixel per pixel.
+function geoToGlobe(latDeg, lonDeg, p){
+  const lat=latDeg*Math.PI/180, lon=lonDeg*Math.PI/180;
+  const dlon = lon-p.lon0;
+  const cosc = Math.sin(p.lat0)*Math.sin(lat) + Math.cos(p.lat0)*Math.cos(lat)*Math.cos(dlon);
+  if(cosc<0) return null;                      // dietro il globo: non visibile
+  // x,y = proiezione ortografica "vera" (raggio unitario = emisfero intero);
+  // /sinMaxC la riscala sul raggio dello zoom corrente (vedi globeParams).
+  const x = Math.cos(lat)*Math.sin(dlon) / p.sinMaxC;
+  const y = (Math.cos(p.lat0)*Math.sin(lat) - Math.sin(p.lat0)*Math.cos(lat)*Math.cos(dlon)) / p.sinMaxC;
+  return { x:p.cx+x*p.R, y:p.cy-y*p.R };
+}
+function drawGraticuleGlobe(){
+  const p=globeParams();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(p.cx,p.cy,p.R,0,Math.PI*2); ctx.clip();  // niente linee fuori dal disco
+  ctx.lineWidth = 1; ctx.strokeStyle = "rgba(150,170,190,.28)";
+  const latStep=30, lonStep=30;
+  for(let lat=-60; lat<=60; lat+=latStep){
+    ctx.beginPath(); let started=false;
+    for(let lon=-180; lon<=180; lon+=2){
+      const pt=geoToGlobe(lat,lon,p);
+      if(!pt){ started=false; continue; }
+      if(!started){ ctx.moveTo(pt.x,pt.y); started=true; } else ctx.lineTo(pt.x,pt.y);
+    }
+    ctx.stroke();
+  }
+  for(let lon=-180; lon<180; lon+=lonStep){
+    ctx.beginPath(); let started=false;
+    for(let lat=-90; lat<=90; lat+=2){
+      const pt=geoToGlobe(lat,lon,p);
+      if(!pt){ started=false; continue; }
+      if(!started){ ctx.moveTo(pt.x,pt.y); started=true; } else ctx.lineTo(pt.x,pt.y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+// Riempimento del disco: PER OGNI pixel di destinazione risale al lat/lon sul
+// globo (proiezione ortografica inversa) e va a leggere il pixel corrispondente
+// nell'immagine equirettangolare gia' scaricata. Lavora su una risoluzione
+// ridotta (max ~900px di lato) e poi scala sul canvas vero, per restare leggero.
+let globeTimer=null;
+function scheduleGlobeRedraw(){ clearTimeout(globeTimer); globeTimer=setTimeout(renderGlobeImage,60); }
+// getImageData su un'immagine fino a 2048x2048 e' pesante (letta/decodificata
+// di nuovo ogni volta): la cache la rifa' solo quando cambia davvero l'immagine
+// scaricata, non ad ogni singolo tick di zoom — prima veniva rifatta ogni
+// volta e con zoom ravvicinati la scheda si impuntava per secondi.
+let globeSrcCache={ img:null, data:null, w:0, h:0 };
+function renderGlobeImage(){
+  if(!img || !imgBox || !$("globe").checked) return;
+  const active=activeSourceImg();
+  const p=globeParams();
+  const scale=Math.min(1, 700/Math.max(p.W,p.H));
+  const w=Math.max(64,Math.round(p.W*scale)), h=Math.max(64,Math.round(p.H*scale));
+  let src, offW, offH;
+  if(globeSrcCache.img===active){
+    src=globeSrcCache.data; offW=globeSrcCache.w; offH=globeSrcCache.h;
+  } else {
+    offW=active.naturalWidth||active.width; offH=active.naturalHeight||active.height;
+    const off=document.createElement("canvas"); off.width=offW; off.height=offH;
+    const octx=off.getContext("2d"); octx.drawImage(active,0,0);
+    try{ src=octx.getImageData(0,0,offW,offH).data; }catch(_){ return; } // CORS: se capita, niente globo
+    globeSrcCache={ img:active, data:src, w:offW, h:offH };
+  }
+  const dst=new ImageData(w,h);
+  const cx=w/2, cy=h/2, R=Math.min(w,h)/2*0.94;
+  const sinLat0=Math.sin(p.lat0), cosLat0=Math.cos(p.lat0), sinMaxC=p.sinMaxC;
+  const bLonMin=imgBox.lonMin, bLonMax=imgBox.lonMax, bLatMin=imgBox.latMin, bLatMax=imgBox.latMax;
+  for(let py=0; py<h; py++){
+    const ny=(cy-py)/R;                         // nord positivo verso l'alto
+    for(let px=0; px<w; px++){
+      const nx=(px-cx)/R;
+      const rho2=nx*nx+ny*ny;
+      const di=(py*w+px)*4;
+      if(rho2>1) continue;                      // fuori dal disco: resta trasparente
+      const rho=Math.sqrt(rho2);
+      // rho e' la distanza SULLO SCHERMO (0..1); va riscalata con sinMaxC per
+      // ottenere il vero seno dell'angolo sulla sfera (vedi globeParams).
+      const sinc=rho*sinMaxC, cosc=Math.sqrt(Math.max(0,1-sinc*sinc));
+      const trueX=nx*sinMaxC, trueY=ny*sinMaxC;
+      const lat=Math.asin(Math.min(1,Math.max(-1, cosc*sinLat0 + trueY*cosLat0)));
+      const lon=p.lon0 + Math.atan2(trueX, cosc*cosLat0 - trueY*sinLat0);
+      const latDeg=lat*180/Math.PI, lonDeg=(((lon*180/Math.PI)+540)%360)-180;
+      if(latDeg<bLatMin || latDeg>bLatMax || lonDeg<bLonMin || lonDeg>bLonMax) continue;
+      const sx=Math.min(offW-1, Math.max(0, Math.round((lonDeg-bLonMin)/(bLonMax-bLonMin)*offW)));
+      const sy=Math.min(offH-1,Math.max(0, Math.round((bLatMax-latDeg)/(bLatMax-bLatMin)*offH)));
+      const si=(sy*offW+sx)*4;
+      dst.data[di]=src[si]; dst.data[di+1]=src[si+1]; dst.data[di+2]=src[si+2]; dst.data[di+3]=src[si+3];
+    }
+  }
+  const work=document.createElement("canvas"); work.width=w; work.height=h;
+  work.getContext("2d").putImageData(dst,0,0);
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+  ctx.filter=enhanceFilter();
+  ctx.drawImage(work,0,0,w,h,0,0,p.W,p.H);
+  ctx.filter="none";
+  drawGlobeOutline();                           // sopra l'immagine appena disegnata
+}
+
+// Punto (lat,lon) sotto un pixel del canvas (coordinate DEVICE, come cv.width).
+// Piatta: interpolazione lineare sul bbox. Globo: proiezione ortografica
+// inversa (stessa matematica di renderGlobeImage) — serve per far zoomare la
+// rotella sul punto giusto anche quando la vista e' curva. null = fuori dal
+// disco (nessun punto reale sotto il cursore, es. lo spazio attorno al globo).
+function screenToLatLon(devX, devY){
+  if(!$("globe").checked) return { lon:xToLon(devX), lat:yToLat(devY) };
+  const p=globeParams();
+  const nx=(devX-p.cx)/p.R, ny=(p.cy-devY)/p.R;
+  const rho2=nx*nx+ny*ny;
+  if(rho2>1) return null;
+  const rho=Math.sqrt(rho2);
+  const sinc=rho*p.sinMaxC, cosc=Math.sqrt(Math.max(0,1-sinc*sinc));
+  const trueX=nx*p.sinMaxC, trueY=ny*p.sinMaxC;
+  const sinLat0=Math.sin(p.lat0), cosLat0=Math.cos(p.lat0);
+  const lat=Math.asin(Math.min(1,Math.max(-1, cosc*sinLat0 + trueY*cosLat0)));
+  const lon=p.lon0 + Math.atan2(trueX, cosc*cosLat0 - trueY*sinLat0);
+  return { lon: lon*180/Math.PI, lat: lat*180/Math.PI };
+}
+
+// --------------------------------------------------------------------------
 // Interazione: trascinamento e zoom aggiornano SOLO il bbox della vista. Il
 // download avviene quando il gesto finisce (mouse fermo), non durante — cosi'
 // non si scatena una raffica di richieste, come da nota di progetto.
@@ -3576,8 +3796,14 @@ cv.addEventListener("pointerup",()=>{ if(drag){ drag=null; cv.classList.remove("
 cv.addEventListener("wheel",e=>{
   e.preventDefault();
   const r=cv.getBoundingClientRect();
-  const lon=xToLon((e.clientX-r.left)*cv.width/r.width);
-  const lat=yToLat((e.clientY-r.top)*cv.height/r.height);
+  const devX=(e.clientX-r.left)*cv.width/r.width, devY=(e.clientY-r.top)*cv.height/r.height;
+  // In vista globo il punto sotto il cursore va letto con la proiezione
+  // curva, non con la mappa piatta — altrimenti lo zoom si centra su un
+  // lat/lon sbagliato (tanto piu' sbagliato quanto piu' ci si allontana dal
+  // centro del disco) e con pochi click la vista "salta" altrove.
+  const pt = screenToLatLon(devX, devY);
+  const lon = pt ? pt.lon : (view.lonMin+view.lonMax)/2;
+  const lat = pt ? pt.lat : (view.latMin+view.latMax)/2;
   const k=e.deltaY<0?0.8:1.25;                 // zoom in / out
   view={ lonMin:lon-(lon-view.lonMin)*k, lonMax:lon+(view.lonMax-lon)*k,
          latMin:lat-(lat-view.latMin)*k, latMax:lat+(view.latMax-lat)*k };
@@ -3603,8 +3829,44 @@ const CURATED = [
   {name:"copernicus:daily_sentinel3ab_olci_l1_rgb_fulres", title:"OLCI Level 1B RGB Daily Accumulated - Sentinel-3", hasTime:true},
   {name:"copernicus:sentinel3a_olci_l1_rgb_fullres",       title:"OLCI Level 1B RGB - Sentinel-3A", hasTime:true},
   {name:"copernicus:sentinel3b_olci_l1_rgb_fullres",       title:"OLCI Level 1B RGB - Sentinel-3B", hasTime:true},
-  {name:"mtg_fd:rgb_geocolour", title:"Geo Colour RGB - MTG-I - 0 degree", hasTime:true},
+  // Meteosat (geostazionari): meno definiti dell'OLCI ma frescHissimi — disco
+  // intero ogni ~10-15 min, il Rapid Scan MSG ogni ~5 min sull'Europa.
+  {name:"mtg_fd:rgb_geocolour",       title:"Geo Colour RGB - MTG-I - 0 degree", hasTime:true},
+  {name:"mtg_fd:rgb_truecolour",      title:"True Colour RGB - MTG-I - 0 degree", hasTime:true},
+  {name:"mtg_fd:ir105_hrfi",          title:"FCI HRFI IR10.5 - MTG-I - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_eview",          title:"European HRV RGB - MSG - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_naturalenhncd",  title:"Natural Colour Enhanced RGB - MSG - 0 degree", hasTime:true},
+  {name:"msg_rss:rgb_natural_nrt",    title:"Rapid Scan High Rate SEVIRI RGB Natural Colour - MSG", hasTime:true},
+  // Composizioni "false colore" gia' pronte (ricette RGB standard EUMETSAT: IR/WV/VIS
+  // combinati e calibrati, le stesse dei vecchi tool tipo MSG Animator/satsignal —
+  // ma qui gia' fatte bene dal server, non un accostamento fai-da-te).
+  {name:"msg_fes:rgb_airmass",       title:"Airmass RGB - MSG - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_dust",          title:"Dust RGB - MSG - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_ash",           title:"Volcanic Ash RGB - MSG - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_convection",    title:"Convection RGB - MSG - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_microphysics",  title:"Day Microphysics RGB - MSG - 0 degree", hasTime:true},
+  {name:"msg_fes:rgb_snow",          title:"Snow RGB - MSG - 0 degree", hasTime:true},
+  {name:"mtg_fd:rgb_firetemperature",title:"Fire Temperature RGB - MTG-I - 0 degree", hasTime:true},
+  {name:"mtg_fd:rgb_cloudphase",     title:"Cloud Phase RGB - MTG-I - 0 degree", hasTime:true},
 ];
+// Spiegazione delle ricette RGB false-colore: cosa mostrano i colori, non il
+// nome tecnico del layer (che l'utente non conosce e non deve conoscere).
+const RECIPE_HINTS = [
+  [/airmass/i,        "masse d'aria, getti e vortici in quota: il rosso/arancio segna aria calda e secca (stratosferica)"],
+  [/tropicalairmass/i,"variante Airmass tarata sui tropici, per seguire i cicloni"],
+  [/\bdust\b/i,        "polvere/sabbia sollevata in rosa-magenta sul mare, marrone sulla terra"],
+  [/\bash\b/i,         "cenere vulcanica in verde/giallo — utile per seguire un'eruzione"],
+  [/convection/i,      "temporali e celle convettive severe: il giallo-rosso segna le cime piu' fredde/alte"],
+  [/microphys/i,       "nebbia e nubi basse in rosa/violetto, nubi alte ghiacciate in rosso-arancio"],
+  [/\bsnow\b/i,        "distingue neve/ghiaccio (rosso) dalle nubi (bianco-giallo)"],
+  [/firetemperature/i, "punti caldi e incendi attivi in rosso acceso"],
+  [/cloudphase/i,      "fase della nube: goccioline liquide vs cristalli di ghiaccio"],
+  [/cloudtype/i,       "classificazione del tipo di nube per colore"],
+];
+function recipeHint(title){
+  const hit = RECIPE_HINTS.find(([re])=>re.test(title));
+  return hit ? hit[1] : null;
+}
 const $ = id => document.getElementById(id);
 const sel = () => $("product");
 const curVal = () => sel().value;                 // layer vero (con ":") o id di PRODUCTS
@@ -3615,13 +3877,20 @@ function qParam(){ return isRealLayer(curVal()) ? "&layer="+encodeURIComponent(c
 async function fetchImage(){
   const date=$("date").value, time=$("times").value;
   const r=cv.getBoundingClientRect();
-  const w=Math.min(2048,Math.round(r.width)), h=Math.min(2048,Math.round(r.height));
+  // Richiede la risoluzione del canvas fisico, non i soli pixel CSS: su schermi
+  // HiDPI evita di ingrandire un'immagine piccola e mantiene nitidi costa e nubi.
+  const w=Math.min(2048,cv.width), h=Math.min(2048,cv.height);
   const bbox=[view.latMin,view.lonMin,view.latMax,view.lonMax].map(v=>v.toFixed(4)).join(",");
   let u=API+"/metop?bbox="+bbox+"&w="+w+"&h="+h+qParam();
-  // Passaggio scelto -> quell'istante. Nessun passaggio scelto -> nessun TIME,
-  // cosi' il Worker/GeoServer serve l'ultimo disponibile (evita il 502 da data nuda).
+  // SEMPRE un TIME esplicito sui geostazionari: senza, GeoServer compone la
+  // mosaico "ultimo disponibile" pescando tile con orari diversi (il lato
+  // ancora da aggiornare resta al ciclo di scansione precedente) e il disco
+  // esce a meta' vecchio/meta' nuovo, con un taglio netto invece del confine
+  // giorno/notte reale. loadTimes() risolve sempre l'ultimo istante COERENTE
+  // prima di chiamare questa funzione (vedi anche isFollowingLive()).
   if(time) u+="&time="+encodeURIComponent(time);
   if($("bg").checked) u+="&bg=1";
+  if($("borders").checked) u+="&borders=1";
 
   $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
@@ -3635,7 +3904,9 @@ async function fetchImage(){
     const blob=await resp.blob(), im=new Image();
     await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
     img=im; imgBox={...view};
-    $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""));
+    const now=new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""))
+      + (isFollowingLive()?" · 🔴 LIVE aggiornata alle "+now:"");
     draw();
   }catch(err){
     $("st-msg").innerHTML="<span style='color:var(--err)'>"+err.message+"</span>";
@@ -3645,33 +3916,61 @@ async function fetchImage(){
 // Passaggi (TIME) per il layer scelto. Trovato l'elenco, salta all'ultimo
 // istante disponibile e lo scarica: cosi' "Scarica" prende sempre qualcosa che
 // esiste davvero, invece di una data a caso senza copertura.
+let timesRequestId=0;
 async function loadTimes(){
+  const requestId=++timesRequestId;
   const t=$("times"); t.innerHTML='<option value="">— (ultima disponibile) —</option>';
   const date=$("date").value;
   try{
-    const r=await fetch(API+"/metop/times?"+qParam().slice(1)+(date?"&date="+date:""));
+    const r=await fetch(API+"/metop/times?"+qParam().slice(1)+(date?"&date="+date:"")+"&v="+Date.now(),
+      {cache:"no-store"});
+    if(requestId!==timesRequestId) return;
     if(!r.ok){ $("st-msg").textContent="catalogo tempi non disponibile"; scheduleFetch(); return; }
     const j=await r.json();
-    const times=j.times||[];
+    if(requestId!==timesRequestId) return;
+    // La galleria e' volutamente live: non propone immagini piu' vecchie
+    // di 24 ore, anche se EUMETView conserva passaggi storici.
+    const cutoff=Date.now()-24*3600*1000;
+    const times=(j.times||[]).filter(s=>Date.parse(s)>=cutoff);
     times.forEach(s=>{ const o=document.createElement("option"); o.value=s;
       o.textContent=s.replace("T"," ").replace("Z"," UTC"); t.appendChild(o); });
     if(times.length){
       t.value=times[times.length-1];               // il piu' recente
-      $("st-msg").innerHTML="<span style='color:var(--ok)'>"+times.length+" passaggi · ultimo "+t.value.replace("T"," ").replace("Z"," UTC")+"</span>";
+      $("st-msg").innerHTML="<span style='color:var(--ok)'>"+times.length+" immagini nelle ultime 24 ore · ultima "+t.value.replace("T"," ").replace("Z"," UTC")+"</span>";
     }else{
-      $("st-msg").textContent = date? "nessun passaggio il "+date+" — provo la data intera" : "nessun passaggio elencato";
+      $("st-msg").textContent = "nessuna immagine nelle ultime 24 ore — provo l'ultima disponibile";
     }
+    updateLiveHint();
     scheduleFetch();
-  }catch(_){ scheduleFetch(); }
+  }catch(_){ if(requestId===timesRequestId) scheduleFetch(); }
 }
 
 // --------------------------------------------------------------------------
 // popolamento prodotti dal catalogo, con filtro per satellite sui titoli
-function satMatch(title, sat){
+// Filtro per famiglia di satellite. name = layer EUMETView (es. "eps:m01_..."),
+// title = titolo umano. Le famiglie sono workspace EUMETView distinti, quindi
+// il filtro guarda soprattutto il prefisso del name; per METOP/Sentinel-3, se
+// il titolo non nomina una lettera specifica (prodotto "combinato" di piu'
+// satelliti) resta visibile per qualunque lettera scelta dentro la stessa famiglia.
+function satMatch(title, name, sat){
   if(!sat) return true;
-  const L=sat.slice(-1).toUpperCase();             // A / B / C
-  if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotti combinati: sempre
-  return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
+  if(sat==="metop-a"||sat==="metop-b"||sat==="metop-c"){
+    if(!/^eps:/i.test(name)) return false;
+    const L=sat.slice(-1).toUpperCase();
+    if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotto combinato: sempre
+    return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
+  }
+  if(sat==="sentinel3a"||sat==="sentinel3b"){
+    if(!/^copernicus:/i.test(name)) return false;
+    const L=sat.slice(-1).toUpperCase();
+    if(!/sentinel-?3[ab]\b/i.test(title)) return true;    // prodotto combinato: sempre
+    return new RegExp("sentinel-?3"+L+"\\b","i").test(title);
+  }
+  if(sat==="msg-fes")  return /^msg_(fes|rss):/i.test(name);
+  if(sat==="msg-iodc") return /^msg_iodc:/i.test(name);
+  if(sat==="mtg")      return /^mtg_fd:/i.test(name);
+  if(sat==="mumi")     return /^mumi:/i.test(name);
+  return true;
 }
 // Categoria del prodotto. Guardo PRIMA il nome del layer (inequivocabile) e poi
 // il titolo: cosi' OLCI/SLSTR RGB e Geo Colour finiscono sempre fra i colori reali.
@@ -3694,10 +3993,10 @@ function catMatch(l, cat){
 function populateProducts(){
   const s=sel(); s.innerHTML="";
   const sat=$("sat").value, cat=$("cat").value;
-  let list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,sat) && catMatch(l,cat))
+  let list = LAYERS.length ? LAYERS.filter(l=>satMatch(l.title,l.name,sat) && catMatch(l,cat))
                            : PRODUCTS.map(p=>({name:p.id,title:p.label,hint:p.hint}));
   // se una categoria resta vuota, non lasciare il menu spoglio: mostra tutto
-  if(LAYERS.length && !list.length) list = LAYERS.filter(l=>satMatch(l.title,sat));
+  if(LAYERS.length && !list.length) list = LAYERS.filter(l=>satMatch(l.title,l.name,sat));
   if(!list.length){ const o=document.createElement("option"); o.textContent="(nessun layer)"; s.appendChild(o); return; }
   list.forEach(l=>{ const o=document.createElement("option"); o.value=l.name; o.textContent=l.title; s.appendChild(o); });
   onProductChange();
@@ -3709,14 +4008,40 @@ function onProductChange(){
   // copre solo la fascia di un'orbita, il resto e' nero. Avvisa e suggerisci.
   const single = /sentinel-?3[ab]\b|metop[\s-]?[abc]\b/i.test(title)
               && !/accumulat|daily|giornalier|orbits/i.test(title);
+  // Meteosat (MSG/MTG): geostazionario, non un passaggio — ricorda la cadenza
+  // vera cosi' non sembra "meno buono", solo piu' frequente e meno definito.
+  const geo = /^(msg|mtg)/i.test(v);
+  const mumi = /^mumi:/i.test(v);
+  const fullDisk = geo || mumi;                 // disco intero: si presta al globo
+  const rapid = /rapid.?scan|_nrt\b/i.test(title) || /_rss:/i.test(v);
+  const freshness = geo ? " · aggiornato ogni "+(rapid?"~5 minuti (Rapid Scan)":"~10-15 minuti")
+                   : mumi ? " · mosaico mondiale quasi in tempo reale (piu' satelliti/agenzie)" : "";
+  const recipe = recipeHint(title);
   if(single)
     $("prodhint").innerHTML="<span style='color:var(--warn)'>striscia di una singola orbita — usa una versione "
       +"<b>Daily / Accumulated</b> per coprire tutta la mappa</span>";
+  else if(recipe)
+    $("prodhint").innerHTML="<span style='color:var(--acc)'>RGB false-colore: "+recipe+"</span>"
+      +(freshness?"<br><span style='color:var(--ok)'>"+freshness.replace(" · ","")+"</span>":"");
+  else if(fullDisk)
+    $("prodhint").innerHTML="<span style='color:var(--ok)'>satellite geostazionario — disco intero"+freshness+"</span>"
+      // non e' un difetto dell'immagine: sul lato in ombra il prodotto passa da colore
+      // vero a infrarosso notturno (molto piu' scuro, spesso solo luci di citta'), quindi
+      // il confine giorno/notte puo' sembrare un "taglio" netto sull'immagine.
+      +"<br><span class='sub' style='margin:2px 0 0'>il lato in ombra e' piu' scuro (infrarosso notturno): "
+      +"non e' un'immagine tagliata, e' il confine giorno/notte reale</span>";
   else
     $("prodhint").textContent = isRealLayer(v) ? v
         : (PRODUCTS.find(p=>p.id===v)||{}).hint || "";
   $("st-prod").textContent = title;
-  loadTimes();
+  // Vista globo: si presta bene a un disco intero, per niente a una striscia
+  // polare — la ri-suggerisco ad ogni cambio prodotto, l'utente puo' comunque
+  // toglierla a mano.
+  $("globe").checked = fullDisk;
+  $("globe").disabled = single;
+  $("globehint").textContent = single ? "non disponibile su una striscia a singola orbita"
+    : fullDisk ? "consigliata per questo prodotto (disco intero)" : "";
+  loadTimes(); draw(); updateLiveHint();
 }
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
@@ -3732,34 +4057,262 @@ async function initCatalog(){
   populateProducts();
 }
 function yesterdayUTC(){ return new Date(Date.now()-24*3600*1000).toISOString().slice(0,10); }
+function todayUTC(){ return new Date().toISOString().slice(0,10); }
+const BEST_IMAGES = {
+  geocolour:  { layer:"mtg_fd:rgb_geocolour",      sat:"mtg",     cat:"real" },
+  truecolour: { layer:"mtg_fd:rgb_truecolour",     sat:"mtg",     cat:"real" },
+  hrv:        { layer:"msg_fes:rgb_eview",         sat:"msg-fes", cat:"all"  },
+  natural:    { layer:"msg_fes:rgb_naturalenhncd", sat:"msg-fes", cat:"real" },
+  infrared:   { layer:"mtg_fd:ir105_hrfi",         sat:"mtg",     cat:"all"  },
+};
+function configureEuropeImage(id="geocolour"){
+  const preset=BEST_IMAGES[id] || BEST_IMAGES.geocolour;
+  view={ latMin:30, lonMin:-15, latMax:72, lonMax:45 };
+  $("bestProduct").value=id in BEST_IMAGES ? id : "geocolour";
+  $("sat").value=preset.sat;
+  $("cat").value=preset.cat;
+  populateProducts();
+  if([...sel().options].some(o=>o.value===preset.layer))
+    sel().value=preset.layer;
+  $("bg").checked=false;
+  $("borders").checked=true;
+  $("grid").checked=false;
+  $("labels").checked=false;
+  onProductChange();
+  $("globe").checked=false;
+  draw();
+}
+// --------------------------------------------------------------------------
+// Rilievo nuvole: non e' un filtro finto (contrasto/saturazione), ma un vero
+// ombreggiamento 3D. Il gradiente di luminanza dell'immagine gia' scaricata
+// fa da "altezza" della superficie nuvolosa (nubi piu' chiare/dense = piu'
+// alte), e la illuminiamo con la posizione REALE del sole per l'orario e il
+// centro geografico inquadrati: le ombre cadono dalla parte giusta, come nei
+// prodotti professionali (es. RAMMB SLIDER 3D), non con una luce finta fissa.
+function sunPosition(date, latDeg, lonDeg){
+  const rad=Math.PI/180;
+  const d=(date.getTime()-Date.UTC(2000,0,1,12,0,0))/86400000;   // giorni da J2000.0
+  const g=(357.529+0.98560028*d)%360;                             // anomalia media
+  const q=(280.459+0.98564736*d)%360;                             // longitudine media
+  const L=(q+1.915*Math.sin(g*rad)+0.020*Math.sin(2*g*rad))%360;  // longitudine eclittica
+  const e=23.439-0.00000036*d;                                    // obliquita' dell'eclittica
+  const ra=Math.atan2(Math.cos(e*rad)*Math.sin(L*rad),Math.cos(L*rad))/rad;
+  const dec=Math.asin(Math.sin(e*rad)*Math.sin(L*rad))/rad;
+  const gmst=(280.46061837+360.98564736629*d)%360;
+  const lst=(gmst+lonDeg)%360;
+  const ha=(((lst-ra+540)%360)-180)*rad;
+  const latR=latDeg*rad, decR=dec*rad;
+  const sinAlt=Math.sin(latR)*Math.sin(decR)+Math.cos(latR)*Math.cos(decR)*Math.cos(ha);
+  const alt=Math.asin(Math.min(1,Math.max(-1,sinAlt)))/rad;
+  const cosAz=(Math.sin(decR)-Math.sin(latR)*sinAlt)/(Math.cos(latR)*Math.cos(alt*rad));
+  let az=Math.acos(Math.min(1,Math.max(-1,cosAz)))/rad;
+  if(Math.sin(ha)>0) az=360-az;                                   // azimut da nord, verso est
+  return { altitude:alt, azimuth:az };
+}
+let reliefImg=null, reliefForImg=null, reliefBusy=false;
+async function computeRelief(){
+  if(!img || !imgBox || reliefBusy) return;
+  reliefBusy=true;
+  $("reliefhint").innerHTML="<span style='color:var(--acc)'>calcolo ombreggiatura 3D…</span>";
+  try{
+    const w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+    const off=document.createElement("canvas"); off.width=w; off.height=h;
+    const octx=off.getContext("2d"); octx.drawImage(img,0,0);
+    let src;
+    try{ src=octx.getImageData(0,0,w,h); }
+    catch(_){ $("reliefhint").innerHTML="<span style='color:var(--err)'>immagine non elaborabile (CORS): rilievo non disponibile</span>"; return; }
+    const d=src.data, n=w*h, lum=new Float32Array(n);
+    for(let i=0,p=0;i<d.length;i+=4,p++) lum[p]=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];
+    const cLat=(imgBox.latMin+imgBox.latMax)/2, cLon=(imgBox.lonMin+imgBox.lonMax)/2;
+    const when=$("times").value?new Date($("times").value):new Date();
+    const sun=sunPosition(when,cLat,cLon);
+    // sotto l'orizzonte: luce quasi verticale, cosi' la texture IR notturna
+    // del Geo Colour resta leggibile invece di finire in ombra piatta.
+    const altR=Math.max(8,sun.altitude)*Math.PI/180, azR=sun.azimuth*Math.PI/180;
+    const lx=Math.cos(altR)*Math.sin(azR), ly=-Math.cos(altR)*Math.cos(azR), lz=Math.sin(altR);
+    const K=2.2*($("reliefStrength").value/100);
+    const out=new ImageData(w,h), od=out.data;
+    for(let y=0;y<h;y++){
+      const y0=y*w, yp=(y<h-1?y+1:y)*w, ym=(y>0?y-1:y)*w;
+      for(let x=0;x<w;x++){
+        const xp=x<w-1?x+1:x, xm=x>0?x-1:x;
+        const dx=(lum[y0+xp]-lum[y0+xm])*K/255, dy=(lum[yp+x]-lum[ym+x])*K/255;
+        let nx=-dx, ny=-dy, nz=1; const nn=1/Math.hypot(nx,ny,nz); nx*=nn; ny*=nn; nz*=nn;
+        let shade=0.5+0.85*Math.max(0, nx*lx+ny*ly+nz*lz);        // ambiente + diffusa, mai nero
+        const i4=(y0+x)*4;
+        od[i4]=Math.min(255,d[i4]*shade); od[i4+1]=Math.min(255,d[i4+1]*shade); od[i4+2]=Math.min(255,d[i4+2]*shade);
+        od[i4+3]=d[i4+3];
+      }
+    }
+    octx.putImageData(out,0,0);
+    const ri=new Image();
+    await new Promise(ok=>{ ri.onload=ok; ri.src=off.toDataURL(); });
+    reliefImg=ri; reliefForImg=img;
+    globeSrcCache={ img:null, data:null, w:0, h:0 };  // forza il globo a rileggere la nuova sorgente
+    $("reliefhint").innerHTML="<span style='color:var(--ok)'>attivo: illuminazione da sole reale, az "
+      +sun.azimuth.toFixed(0)+"° alt "+sun.altitude.toFixed(0)+"°</span>";
+    draw();
+  } finally { reliefBusy=false; }
+}
+function activeSourceImg(){
+  if($("relief").checked){
+    if(reliefForImg!==img) computeRelief();          // in corso: nel frattempo si vede l'originale
+    if(reliefImg && reliefForImg===img) return reliefImg;
+  }
+  return img;
+}
 
 // --------------------------------------------------------------------------
 // wiring UI
-$("date").value=yesterdayUTC();
+$("date").min=yesterdayUTC();
+$("date").max=todayUTC();
+$("date").value=todayUTC();
 sel().onchange=onProductChange;
-$("today").onclick=()=>{ $("date").value=yesterdayUTC(); loadTimes(); };
-$("date").onchange=loadTimes;
+$("today").textContent="oggi UTC";
+$("today").onclick=()=>{ $("date").value=todayUTC(); loadTimes(); };
+$("date").onchange=()=>{
+  const min=yesterdayUTC(), max=todayUTC();
+  if($("date").value<min) $("date").value=min;
+  if($("date").value>max) $("date").value=max;
+  loadTimes(); updateLiveHint();
+};
+$("bestProduct").onchange=()=>{ configureEuropeImage($("bestProduct").value); loadTimes(); };
 $("sat").onchange=populateProducts;
 $("cat").onchange=populateProducts;
-$("times").onchange=fetchImage;
+$("times").onchange=()=>{ fetchImage(); updateLiveHint(); };
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
+$("borders").onchange=scheduleFetch;
+$("globe").onchange=()=>{ $("globehint").textContent=""; draw(); };
 $("grid").onchange=draw;
 $("labels").onchange=draw;
-$("enhance").onchange=draw;
-$("enhamt").oninput=draw;
+function updateImageControls(){
+  $("brightnessValue").textContent=$("brightness").value+"%";
+  $("contrastValue").textContent=$("contrast").value+"%";
+  $("saturationValue").textContent=$("saturation").value+"%";
+  draw();
+}
+["brightness","contrast","saturation"].forEach(id=>$(id).oninput=updateImageControls);
+$("resetImage").onclick=()=>{
+  $("brightness").value=100;
+  $("contrast").value=100;
+  $("saturation").value=100;
+  updateImageControls();
+};
+$("relief").onchange=()=>{
+  globeSrcCache={img:null,data:null,w:0,h:0};
+  if($("relief").checked) computeRelief();
+  else { $("reliefhint").textContent="disponibile sui prodotti a colori reali (Geo Colour, True Colour, HRV…)"; draw(); }
+};
+$("reliefStrength").oninput=()=>{
+  $("reliefStrengthValue").textContent=$("reliefStrength").value+"%";
+  reliefForImg=null;                                  // forza il ricalcolo con la nuova intensita'
+  if($("relief").checked) computeRelief();
+};
 $("reset").onclick=()=>{ view={latMin:-60,lonMin:-180,latMax:80,lonMax:180}; draw(); scheduleFetch(); };
 document.querySelectorAll("button[data-bbox]").forEach(b=>b.onclick=()=>{
   const [a,lo,c,hi]=b.dataset.bbox.split(",").map(Number);
   view={latMin:a,lonMin:lo,latMax:c,lonMax:hi}; draw(); scheduleFetch();
 });
-$("fetch").onclick=fetchImage;
+$("quickEurope").onclick=()=>{ configureEuropeImage(); loadTimes(); };
+$("fetch").onclick=()=>fetchImage();
 $("save").onclick=()=>{ const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click(); };
 window.addEventListener("resize",()=>{ fitDPR(); draw(); });
 
-fitDPR(); draw(); initCatalog();
+// --------------------------------------------------------------------------
+// Live: per i geostazionari (MSG/MTG) chiede periodicamente il catalogo dei
+// passaggi e riscarica se ne e' arrivato uno nuovo, sempre con un TIME
+// esplicito (loadTimes() lo risolve gia' da sola). MAI senza &time=: chiesta
+// "nuda" GeoServer compone la mosaico dell'ultimo disponibile pescando tile
+// con orari diversi fra loro (il lato non ancora aggiornato in questo ciclo
+// di scansione resta a quello vecchio) e il disco esce meta' vecchio/meta'
+// nuovo, con un taglio netto — non e' il confine giorno/notte, e' un bug di
+// composizione lato EUMETSAT che un TIME preciso evita del tutto.
+function isLiveGeo(){ return /^(msg|mtg)/i.test(curVal()); }
+function isFollowingLive(){
+  if(!isLiveGeo() || $("date").value!==todayUTC()) return false;
+  const t=$("times");
+  return !t.value || t.value===t.options[t.options.length-1].value;
+}
+function updateLiveHint(){
+  if(!isLiveGeo()){ $("livehint").textContent="disponibile solo per i satelliti geostazionari (MSG/MTG)"; return; }
+  $("livehint").textContent = $("live").checked
+    ? (isFollowingLive() ? "attivo: ricarica da sola la nuova immagine appena disponibile"
+                          : "in pausa: stai guardando un passaggio specifico, non l'ultimo")
+    : "disattivato";
+}
+let liveTimer=null;
+async function liveTick(){
+  if(document.hidden || !$("live").checked || !isFollowingLive()) return;
+  await loadTimes();                // trova il nuovo istante (se c'e') e ricarica con TIME esplicito
+}
+function scheduleLiveTimer(){
+  clearInterval(liveTimer);
+  liveTimer=setInterval(liveTick, 60*1000);
+}
+$("live").onchange=()=>{ updateLiveHint(); if($("live").checked) liveTick(); };
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) liveTick(); });
+
+fitDPR(); draw(); initCatalog().then(()=>{ configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });
 </script>
 `;
 // <<<METOP_HTML
+
+// >>>MODIS_HTML (generato da build-metop.mjs — NON editare a mano: modifica modis-viewer.html)
+const MODIS_HTML = `<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23073b3f'/><text x='50' y='70' font-size='58' text-anchor='middle'>🌐</text></svg>">
+<title>MODIS Europe v1.1.0</title>
+<style>
+:root{--bg:#0d0f13;--panel:#161a20;--card:#1f242c;--edge:#2c333d;--txt:#e9eef4;--sub:#94a0aa;--acc:#38cee2;--acc2:#2b90a8}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font:14px/1.4 "Segoe UI",system-ui,sans-serif}
+#app{display:grid;grid-template-columns:300px 1fr;grid-template-rows:1fr 30px;height:100%}#panel{grid-row:1/3;background:var(--panel);border-right:1px solid var(--edge);padding:14px;overflow-y:auto}h1{margin:0;color:var(--acc);font-size:20px}.sub{margin:2px 0 15px;color:var(--sub);font-size:12px}.sect{margin:16px 0 6px;color:var(--sub);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}select,button{width:100%;border:1px solid var(--edge);border-radius:7px;padding:8px 9px;background:var(--card);color:var(--txt);font:inherit}button{cursor:pointer;font-weight:600}button:hover{border-color:var(--acc);color:var(--acc)}button.primary{border-color:var(--acc2);background:var(--acc2);color:#04121a}.row{display:flex;gap:8px}.row>*{flex:1}#stage{position:relative;overflow:hidden;background:#080b0f}canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}canvas.drag{cursor:grabbing}#chip,#loading{position:absolute;top:12px;padding:7px 12px;border:1px solid var(--edge);border-radius:10px;background:rgba(8,12,18,.76);font-size:12px;pointer-events:none}#chip{left:12px}#loading{right:12px;display:none;color:var(--acc)}#loading.on{display:block}#status{grid-column:2;display:flex;align-items:center;gap:14px;padding:0 12px;border-top:1px solid var(--edge);background:var(--panel);color:var(--sub);font-size:12px}.tag{padding:1px 7px;border:1px solid var(--edge);border-radius:6px;background:var(--card)}
+</style>
+<div id="app"><aside id="panel">
+<h1>MODIS · EUROPA</h1><div class="sub">True Color NASA · mosaico completo di ieri UTC · v1.1.0</div>
+<div class="sect">Satellite</div><select id="sat"><option value="auto">Automatico: Terra, poi Aqua</option><option value="terra">MODIS Terra</option><option value="aqua">MODIS Aqua</option></select>
+<div class="sect">Prodotto</div><select id="product"><option value="truecolor">True Color · immagine naturale</option><option value="bands721">Falsi colori 721 · suolo e bruciature</option><option value="bands367">Falsi colori 367 · vegetazione e superficie</option></select><div id="productHelp" class="sub" style="margin-top:6px">Per distinguere nubi e polvere, confronta True Color con 721.</div>
+<div class="sect">Mosaico</div><div id="date" class="sub"></div><div class="sub">Una singola composizione giornaliera: le nubi e la superficie hanno resa fotografica ad alta definizione.</div>
+<div class="sect">Area</div><div class="row"><button id="europe" class="primary">Europa</button><button id="italy">Italia</button></div><div class="row" style="margin-top:8px"><button id="fvg">FVG</button><button id="reset">Reset Europa</button></div>
+<div class="sect">Regolazioni locali</div><div class="sub">Luminosità <span id="brightnessValue">100%</span></div><input id="brightness" type="range" min="60" max="150" value="100"><div class="sub">Contrasto <span id="contrastValue">100%</span></div><input id="contrast" type="range" min="70" max="170" value="100"><div class="sub">Saturazione <span id="saturationValue">100%</span></div><input id="saturation" type="range" min="0" max="180" value="100"><button id="resetImage" style="margin-top:8px">Ripristina immagine originale</button>
+<div class="sect">Immagine</div><div class="row"><button id="reload">Ricarica mosaico</button><button id="fullscreen">Schermo intero</button></div><button id="save" style="margin-top:8px">Salva vista (PNG)</button>
+<div class="sub" style="margin-top:22px">MODIS Terra/Aqua · zoom fino a 4096 px per lato<br>NASA GIBS · dati fino a ieri UTC</div>
+</aside><main id="stage"><canvas id="cv"></canvas><div id="chip">Caricamento mosaico MODIS...</div><div id="loading">scarico alta definizione...</div></main>
+<footer id="status"><span id="view" class="tag">bbox -</span><span id="cursor" class="tag">lat/lon -</span><span id="source" class="tag">-</span><span id="message"></span></footer></div>
+<script>
+const API=location.origin;
+const cv=document.getElementById("cv"),ctx=cv.getContext("2d"),$=id=>document.getElementById(id);
+const EUROPE={latMin:30,lonMin:-15,latMax:72,lonMax:45};
+let view={...EUROPE},img=null,imgBox=null,drag=null,timer=null;
+const day=new Date(Date.now()-24*3600000).toISOString().slice(0,10);
+$("date").textContent="Data fissa: "+day+" (ultimo giorno completo)";
+function fit(){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d)}
+function lonX(v){return(v-view.lonMin)/(view.lonMax-view.lonMin)*cv.width}function latY(v){return(view.latMax-v)/(view.latMax-view.latMin)*cv.height}
+function draw(){ctx.clearRect(0,0,cv.width,cv.height);if(img&&imgBox){const dx0=lonX(imgBox.lonMin),dx1=lonX(imgBox.lonMax),dy0=latY(imgBox.latMax),dy1=latY(imgBox.latMin);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.filter="brightness("+$("brightness").value+"%) contrast("+$("contrast").value+"%) saturate("+$("saturation").value+"%)";ctx.drawImage(img,dx0,dy0,dx1-dx0,dy1-dy0);ctx.filter="none"}$("view").textContent="bbox "+view.latMin.toFixed(2)+","+view.lonMin.toFixed(2)+" - "+view.latMax.toFixed(2)+","+view.lonMax.toFixed(2)}
+async function load(){
+ clearTimeout(timer);$("loading").classList.add("on");$("message").textContent="";
+ const reqView={...view},w=Math.min(4096,cv.width),h=Math.min(4096,cv.height);
+ const bbox=[reqView.latMin,reqView.lonMin,reqView.latMax,reqView.lonMax].map(v=>v.toFixed(4)).join(",");
+ const requested=$("sat").value,product=$("product").value,sats=requested==="auto"?["terra","aqua"]:[requested],label=$("product").selectedOptions[0].text;
+ try{let failure;for(const sat of sats){const u=API+"/modis?sat="+sat+"&product="+product+"&date="+day+"&bbox="+bbox+"&w="+w+"&h="+h;const res=await fetch(u);if(!res.ok){failure=new Error("MODIS "+sat+" non disponibile");continue}const blob=await res.blob(),next=new Image();await new Promise((ok,no)=>{next.onload=ok;next.onerror=no;next.src=URL.createObjectURL(blob)});img=next;imgBox=reqView;$("source").textContent="MODIS "+sat.toUpperCase()+" · "+w+"x"+h;$("chip").textContent="MODIS "+sat.toUpperCase()+" · "+label+" · "+day;draw();return}throw failure||new Error("Mosaico non disponibile")}catch(e){$("message").textContent=e.message}finally{$("loading").classList.remove("on")}}
+function schedule(){clearTimeout(timer);timer=setTimeout(load,300)}
+function setView(box){view={...box};draw();schedule()}
+// Senza questo limite lo zoom ripetuto puo' far collassare lonMax-lonMin
+// (o latMax-latMin) a quasi zero: lonX()/latY() dividono per un numero
+// vicino allo zero, drawImage riceve coordinate degeneri e l'immagine
+// sparisce sul fondo scurissimo del canvas, senza che un altro giro di
+// rotellina la risani (stessa guardia gia' presente in metop-viewer.html).
+function clampView(){if(view.latMin<-90)view.latMin=-90;if(view.latMax>90)view.latMax=90;if(view.latMax-view.latMin<0.5)view.latMax=view.latMin+0.5;if(view.lonMax-view.lonMin<0.5)view.lonMax=view.lonMin+0.5}
+cv.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,view:{...view}};cv.setPointerCapture(e.pointerId);cv.classList.add("drag")});
+cv.addEventListener("pointermove",e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;$("cursor").textContent="lat "+(view.latMax-y*(view.latMax-view.latMin)).toFixed(3)+" lon "+(view.lonMin+x*(view.lonMax-view.lonMin)).toFixed(3);if(!drag)return;const dx=(e.clientX-drag.x)/r.width*(drag.view.lonMax-drag.view.lonMin),dy=(e.clientY-drag.y)/r.height*(drag.view.latMax-drag.view.latMin);view={lonMin:drag.view.lonMin-dx,lonMax:drag.view.lonMax-dx,latMin:drag.view.latMin+dy,latMax:drag.view.latMax+dy};clampView();draw()});
+cv.addEventListener("pointerup",()=>{if(drag){drag=null;cv.classList.remove("drag");schedule()}});
+cv.addEventListener("wheel",e=>{e.preventDefault();const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height,lon=view.lonMin+x*(view.lonMax-view.lonMin),lat=view.latMax-y*(view.latMax-view.latMin),k=e.deltaY<0?.75:1.33;view={lonMin:lon-(lon-view.lonMin)*k,lonMax:lon+(view.lonMax-lon)*k,latMin:lat-(lat-view.latMin)*k,latMax:lat+(view.latMax-lat)*k};clampView();draw();schedule()},{passive:false});
+function updateImage(){["brightness","contrast","saturation"].forEach(id=>$(id+"Value").textContent=$(id).value+"%");draw()}
+const help={truecolor:"Resa fotografica naturale. Nuvole bianche e polvere chiara possono assomigliarsi.",bands721:"Usa infrarosso: aiuta a separare suolo, vegetazione e aree bruciate.",bands367:"Evidenzia vegetazione e caratteristiche della superficie in falsi colori."};
+$("sat").onchange=load;$("product").onchange=()=>{$("productHelp").textContent=help[$("product").value];load()};["brightness","contrast","saturation"].forEach(id=>$(id).oninput=updateImage);$("resetImage").onclick=()=>{$("brightness").value=100;$("contrast").value=100;$("saturation").value=100;updateImage()};$("europe").onclick=()=>setView(EUROPE);$("italy").onclick=()=>setView({latMin:35,lonMin:6,latMax:48,lonMax:19});$("fvg").onclick=()=>setView({latMin:45.3,lonMin:12,latMax:46.8,lonMax:14.1});$("reset").onclick=()=>setView(EUROPE);$("reload").onclick=load;$("fullscreen").onclick=()=>document.fullscreenElement?document.exitFullscreen():$("stage").requestFullscreen();$("save").onclick=()=>{const a=document.createElement("a");a.download="modis_"+day+".png";a.href=cv.toDataURL("image/png");a.click()};window.addEventListener("resize",()=>{fit();draw();schedule()});fit();draw();load();
+</script>
+`;
+// <<<MODIS_HTML
 
 // Base WMS di EUMETSAT EUMETView (GeoServer pubblico, senza autenticazione per
 // le immagini). E' l'analogo di NASA GIBS ma per i satelliti polari europei.
@@ -3810,8 +4363,16 @@ export default {
     //   /polar, /metop-viewer, /metop/  → la pagina del visualizzatore.
     //   (/metop SENZA slash resta il proxy immagini qui sotto.)
     if (url.pathname === "/polar" || url.pathname === "/metop-viewer" || url.pathname === "/metop/") {
+      // no-cache (non "niente cache": forza solo la rivalidazione) cosi' un
+      // redeploy si vede subito, invece di restare nascosto fino a 5 minuti
+      // dietro la cache del browser — capitato durante lo sviluppo del globo.
       return new Response(METOP_HTML || "<h1>METOP</h1><p>Pagina non ancora generata: esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
-        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
+    }
+
+    if (url.pathname === "/modis-europa" || url.pathname === "/modis-viewer") {
+      return new Response(MODIS_HTML || "<h1>MODIS Europa</h1><p>Esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
+        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
     }
 
     // Catalogo: elenca i layer realmente offerti da EUMETView (name+title+time).
@@ -3845,6 +4406,16 @@ export default {
           "eps:m01_rgb_natural_fog", "eps:m03_rgb_natural_fog", "eps:m02_rgb_natural_fog",
           "copernicus:sentinel3a_olci_l1_rgb_fullres", "copernicus:sentinel3b_olci_l1_rgb_fullres",
           "mumi:wideareacoverage_rgb_natural",
+          // Meteosat: meno definiti dell'OLCI ma freschissimi (disco intero ogni
+          // ~10-15 min, Rapid Scan ogni ~5 min) — meritano un posto in vista.
+          "mtg_fd:rgb_geocolour", "mtg_fd:rgb_truecolour",
+          "msg_fes:rgb_naturalenhncd", "msg_rss:rgb_natural_nrt",
+          // Ricette RGB false-colore standard (IR/WV/VIS combinati e calibrati
+          // da EUMETSAT): stessa idea dei vecchi tool tipo MSG Animator/satsignal,
+          // ma gia' fatte bene lato server. In testa alla categoria "nubi".
+          "msg_fes:rgb_airmass", "msg_fes:rgb_dust", "msg_fes:rgb_ash",
+          "msg_fes:rgb_convection", "msg_fes:rgb_microphysics", "msg_fes:rgb_snow",
+          "mtg_fd:rgb_firetemperature", "mtg_fd:rgb_cloudphase",
         ];
         const feat = n => { const i = FEATURED.indexOf(n); return i < 0 ? 999 : i; };
         // Progetto = METOP POLARE: i workspace polari "eps:"/Sentinel-3 "copernicus:"
@@ -3880,7 +4451,12 @@ export default {
                    + encodeURIComponent(layer.split(":")[0]);
       let times = [];
       try {
-        const r = await fetch(capUrl, { cf: { cacheTtl: 3600, cacheEverything: true } });
+        // TTL basso apposta: il live-refresh del viewer si appoggia su questa
+        // lista per trovare l'ultimo ISTANTE COERENTE (vedi nota su /metop
+        // piu' sotto: "nessun TIME" puo' mescolare tile con orari diversi).
+        // Con una cache di un'ora il viewer live avrebbe visto un orario
+        // vecchio fino a un'ora dopo un nuovo passaggio.
+        const r = await fetch(capUrl, { cf: { cacheTtl: 120, cacheEverything: true } });
         if (r.ok) {
           const xml = await r.text();
           // isola il blocco <Layer> del nostro layer, poi la sua <Dimension time>.
@@ -3891,15 +4467,34 @@ export default {
           if (i >= 0) {
             const seg = xml.slice(i, i + 6000);
             const m = seg.match(/<Dimension[^>]*name="time"[^>]*>([\s\S]*?)<\/Dimension>/i);
-            if (m) times = m[1].split(",").map(s => s.trim()).filter(Boolean);
+            if (m) {
+              const dimension = m[1].trim();
+              const interval = dimension.split("/");
+              // I layer MTG/MSG espongono un intervallo ISO (inizio/fine/PT10M)
+              // invece di una lista di istanti. Generiamo solo la finestra
+              // recente richiesta: espandere l'intera serie sarebbe enorme.
+              if (interval.length === 3 && /^PT\d+M$/i.test(interval[2])) {
+                const start = Date.parse(interval[0]), end = Date.parse(interval[1]);
+                const step = parseInt(interval[2].slice(2, -1), 10) * 60000;
+                const requestedStart = date ? Date.parse(date + "T00:00:00Z") : end - 24 * 3600000;
+                const requestedEnd = date ? Math.min(end, Date.parse(date + "T23:59:59.999Z")) : end;
+                if (Number.isFinite(start) && Number.isFinite(end) && step > 0 && requestedEnd >= start) {
+                  const first = Math.max(start, requestedStart);
+                  for (let n = Math.ceil((first - start) / step), t = start + n * step; t <= requestedEnd; n++, t = start + n * step)
+                    times.push(new Date(t).toISOString());
+                }
+              } else {
+                times = dimension.split(",").map(s => s.trim()).filter(Boolean);
+              }
+            }
           }
         }
       } catch (_) { /* la data intera funziona comunque */ }
       if (date) times = times.filter(t => t.startsWith(date));
-      // troppi istanti sono inutili: tieni gli ultimi ~40
-      if (times.length > 40) times = times.slice(-40);
+      // Al massimo un giorno di immagini: per MTG a 10 minuti sono 144 frame.
+      if (times.length > 144) times = times.slice(-144);
       return new Response(JSON.stringify({ layer, times }),
-        { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=1800" } });
+        { headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "no-store" } });
     }
 
     //   GET /metop?sat=metopb|metopc&product=avhrr_natural|...&bbox=lat,lon,lat,lon
@@ -3930,12 +4525,22 @@ export default {
       // Sfondo Terra opzionale: sotto ai dati (trasparenti) mettiamo la mappa
       // NaturalEarth, cosi' si vedono coste e continenti come un globo.
       const bg = url.searchParams.get("bg") === "1";
-      const layersArg = bg ? ("backgrounds:ne_gray," + layer) : layer;
+      const borders = url.searchParams.get("borders") === "1";
+      const imageLayers = bg ? ("backgrounds:ne_gray," + layer) : layer;
+      // Il layer vettoriale e' l'ultimo della composizione WMS, quindi i
+      // confini restano nitidi sopra l'immagine satellitare.
+      const layersArg = borders ? (imageLayers + ",backgrounds:ne_boundary_lines_land") : imageLayers;
 
       const wms = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + encodeURIComponent(layersArg)
         + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox + "&WIDTH=" + w + "&HEIGHT=" + h
         + "&FORMAT=image/png&TRANSPARENT=true" + (time ? "&TIME=" + encodeURIComponent(time) : "");
 
+      // "ultima disponibile" (nessun &time=) cambia ogni ~10-15 minuti (Rapid
+      // Scan MSG ogni ~5): tenerla in cache 24h come un passaggio storico
+      // significa restare incollati per un giorno intero a un mosaico rotto
+      // (tile non ancora arrivati lato EUMETSAT) anche dopo che si e' corretto
+      // da solo. Un &time= esplicito e' invece immutabile: quello si', 24h.
+      const ttl = time ? 86400 : 300;
       const cache = caches.default;
       const cacheKey = new Request(url.origin + "/metop?k=" + encodeURIComponent(layersArg+"|"+(time||"latest")+"|"+bbox+"|"+w+"x"+h));
       const hit = await cache.match(cacheKey);
@@ -3947,7 +4552,7 @@ export default {
       const big = areaDeg > 20000; // ~mezzo pianeta o piu'
 
       let resp;
-      try { resp = await fetch(wms, { cf: { cacheTtl: 86400, cacheEverything: true } }); }
+      try { resp = await fetch(wms, { cf: { cacheTtl: ttl, cacheEverything: true } }); }
       catch (e) { return new Response(JSON.stringify({
         error: "EUMETView non ha risposto (rete/timeout)" + (big ? " — l'area e' molto ampia: prova a restringere (Europa/Italia)" : " — riprova"),
         detail: String(e), layer }), { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
@@ -3980,7 +4585,7 @@ export default {
         return new Response(JSON.stringify({ error: "Nessun passaggio per questa area/orario: prova un'altra zona o un altro passaggio", layer, time, bbox }),
           { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
 
-      const headers = { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age=86400",
+      const headers = { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age="+ttl,
                         "X-Cache": "MISS", "X-METOP-Layer": layer, "X-METOP-Time": time };
       const out = new Response(buf, { headers });
       try { await cache.put(cacheKey, out.clone()); } catch (_) {}
@@ -4366,4 +4971,3 @@ export default {
     }
   },
 };
-

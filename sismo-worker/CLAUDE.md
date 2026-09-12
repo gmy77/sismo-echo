@@ -2,14 +2,40 @@
 
 Visualizzatore web dei satelliti **polari EUMETSAT** + imager geostazionari, servito
 dal Worker Cloudflare `sismo-worker/index.js`. **Zero build lato utente, zero
-dipendenze**: HTML+JS puro. Versione attuale **1.1.2**. Autori: Claude Code
-(Anthropic) · © 2026 Gimmy Pignolo.
+dipendenze**: HTML+JS puro. Versione attuale **1.4.2** (pannello) — il changelog
+in `METOP.md` è fermo a v1.2.2, aggiornalo quando tocchi di nuovo il file.
+Autori: Claude Code (Anthropic) · © 2026 Gimmy Pignolo.
 
 Gemello web e minimale del C++ `MODIS-FVG-Viewer` (vedi
 `Projects/coded/MODIS-FVG-Viewer/CLAUDE.md`): nato per evitare la fatica di
-compilazione, si apre da un URL.
+compilazione, si apre da un URL. **Esiste ora anche un `modis-viewer.html`**
+(web, MODIS geostazionario/polare stile METOP) accanto al C++, iniettato in
+`index.js` come `MODIS_HTML` — vedi `sismo-worker/MODIS.md`.
 
 Branch di lavoro: `claude/modis-fvg-viewer-winui-2fnm3y`.
+
+## Fusione col ramo `main` (12/09/2026)
+
+Il 12/09/2026 `main` conteneva **una v1.2.2→1.4.2 sviluppata in parallelo**
+(altra sessione/lavoro diretto dell'utente), partita dallo stesso punto
+(v1.1.0, col mio filtro a categorie 🌍/☁️/🔬 già dentro) e proseguita con:
+- **Vista a globo 3D** (proiezione ortografica del disco geostazionario) e
+  **rilievo nuvole** con ombreggiatura calcolata dalla posizione reale del sole.
+- Controlli **luminosità / contrasto / saturazione** separati (al posto
+  dell'unico slider "Immagine brillante").
+- Pannello **"Immagini migliori"**: 5 preset geostazionari pronti (Geo Colour,
+  True Colour, European HRV, Natural Colour, IR 10.5), vista Europa, ultime 24h.
+- Overlay confini internazionali, risoluzione HiDPI fino a 2048px, fix su
+  cache/race condition del catalogo orario MTG/MSG.
+
+**Verificato che nessun mio fix fosse perso** prima di risolvere (bug OLCI
+nascosta dai "Colori reali", `catOf` per nome layer, `CURATED`, avviso
+striscia singola, errori parlanti, niente TIME nudo): erano tutti già presenti
+in `main`, quindi la fusione ha preso **interamente la versione di `main`**
+per `index.js` / `metop-viewer.html` / `METOP.md` (superset verificato, non
+scelta arbitraria) e solo `build-metop.mjs` di main (generalizzato per
+iniettare anche `MODIS_HTML`). MODIS-FVG-Viewer (C++) non tocca questi file,
+quindi non ha risentito della fusione.
 
 ---
 
