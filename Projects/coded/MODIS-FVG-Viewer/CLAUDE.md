@@ -28,9 +28,28 @@ Deploy: `cd sismo-worker && npx wrangler deploy` (se il token OAuth è scaduto:
 ## Ambiente di sviluppo
 
 - Il repo dell'utente è clonato **direttamente in `C:\Users\gimmy`** (la home
-  *è* la radice del repo), non in una sottocartella.
-- L'utente compila con **MSYS2 / MinGW GCC 15.1.0**; qui si compila in
-  cross con `x86_64-w64-mingw32-g++`. Stesso risultato, dimensioni diverse.
+  *è* la radice del repo), non in una sottocartella. Conseguenze pratiche:
+  - Qualunque comando git dato **senza scoping esplicito** (`git stash push -u`,
+    `git add -A`, `git clean`, una `Get-ChildItem -Recurse` di ricerca) scansiona
+    l'intera home: file di sistema con permessi negati (`AppData`, `OneDrive`,
+    cache varie) lo rallentano o lo fanno abortire silenziosamente **senza
+    completare l'operazione** — es. `git stash push -u` è arrivato fino in fondo
+    solo dopo averlo ristretto con `-- Projects/coded/MODIS-FVG-Viewer`. Dare
+    sempre un path esplicito quando si opera su questo repo dal lato utente.
+  - L'utente ha file personali sensibili non tracciati sparsi nella home
+    (`.ssh/`, token, credenziali varie): il `.gitignore` di radice è stato
+    rinforzato (v. commit `a149f54` su `main`) per coprirli, ma resta un'area
+    da trattare con cautela — mai proporre `git add -A` a cuor leggero qui.
+- L'utente compila con **MSYS2 / MinGW GCC 15.1.0** in locale, ma anche con
+  **Visual Studio / MSVC** tramite la solution generata da CMake (`.slnx`).
+  Verificare *entrambi* i compilatori conta: si comportano diversamente su
+  cose non ovvie. Esempio reale (v1.0.3): i sorgenti sono UTF-8 **senza BOM**
+  — MinGW li legge correttamente di default, **MSVC no** (usa la codepage di
+  sistema e corrompe accenti/simboli nelle stringhe) finché non si aggiunge
+  `/utf-8` a `CMAKE_CXX_FLAGS` per quel compilatore. Il cross-compile MinGW su
+  Linux (l'unica verifica disponibile in questo ambiente) **non avrebbe mai
+  fatto emergere questo bug**: qualunque cosa riguardi caratteri non-ASCII in
+  stringhe va controllata a mente anche se il cross-build passa pulito.
 - **NASA GIBS e `*.workers.dev` sono bloccati in uscita da questo ambiente**:
   i nomi dei layer non sono verificabili da qui, solo dall'utente.
 
