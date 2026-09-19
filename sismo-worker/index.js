@@ -4262,21 +4262,21 @@ const MODIS_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23073b3f'/><text x='50' y='70' font-size='58' text-anchor='middle'>🌐</text></svg>">
-<title>MODIS Europe v1.1.0</title>
+<title>MODIS Europe v1.2.0</title>
 <style>
 :root{--bg:#0d0f13;--panel:#161a20;--card:#1f242c;--edge:#2c333d;--txt:#e9eef4;--sub:#94a0aa;--acc:#38cee2;--acc2:#2b90a8}
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font:14px/1.4 "Segoe UI",system-ui,sans-serif}
 #app{display:grid;grid-template-columns:300px 1fr;grid-template-rows:1fr 30px;height:100%}#panel{grid-row:1/3;background:var(--panel);border-right:1px solid var(--edge);padding:14px;overflow-y:auto}h1{margin:0;color:var(--acc);font-size:20px}.sub{margin:2px 0 15px;color:var(--sub);font-size:12px}.sect{margin:16px 0 6px;color:var(--sub);font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}select,button{width:100%;border:1px solid var(--edge);border-radius:7px;padding:8px 9px;background:var(--card);color:var(--txt);font:inherit}button{cursor:pointer;font-weight:600}button:hover{border-color:var(--acc);color:var(--acc)}button.primary{border-color:var(--acc2);background:var(--acc2);color:#04121a}.row{display:flex;gap:8px}.row>*{flex:1}#stage{position:relative;overflow:hidden;background:#080b0f}canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}canvas.drag{cursor:grabbing}#chip,#loading{position:absolute;top:12px;padding:7px 12px;border:1px solid var(--edge);border-radius:10px;background:rgba(8,12,18,.76);font-size:12px;pointer-events:none}#chip{left:12px}#loading{right:12px;display:none;color:var(--acc)}#loading.on{display:block}#status{grid-column:2;display:flex;align-items:center;gap:14px;padding:0 12px;border-top:1px solid var(--edge);background:var(--panel);color:var(--sub);font-size:12px}.tag{padding:1px 7px;border:1px solid var(--edge);border-radius:6px;background:var(--card)}
 </style>
 <div id="app"><aside id="panel">
-<h1>MODIS · EUROPA</h1><div class="sub">True Color NASA · mosaico completo di ieri UTC · v1.1.0</div>
-<div class="sect">Satellite</div><select id="sat"><option value="auto">Automatico: Terra, poi Aqua</option><option value="terra">MODIS Terra</option><option value="aqua">MODIS Aqua</option></select>
+<h1>MODIS · EUROPA</h1><div class="sub">True Color NASA + Geo Colour EUMETSAT · v1.2.0</div>
+<div class="sect">Satellite</div><select id="sat"><option value="auto">Automatico: Terra, poi Aqua</option><option value="terra">MODIS Terra</option><option value="aqua">MODIS Aqua</option><option value="geocolour">EUMETSAT Geo Colour · tempo reale</option></select>
 <div class="sect">Prodotto</div><select id="product"><option value="truecolor">True Color · immagine naturale</option><option value="bands721">Falsi colori 721 · suolo e bruciature</option><option value="bands367">Falsi colori 367 · vegetazione e superficie</option></select><div id="productHelp" class="sub" style="margin-top:6px">Per distinguere nubi e polvere, confronta True Color con 721.</div>
-<div class="sect">Mosaico</div><div id="date" class="sub"></div><div class="sub">Una singola composizione giornaliera: le nubi e la superficie hanno resa fotografica ad alta definizione.</div>
+<div class="sect">Mosaico</div><div id="date" class="sub"></div><div class="sub" id="mosaicHelp">Una singola composizione giornaliera: le nubi e la superficie hanno resa fotografica ad alta definizione.</div>
 <div class="sect">Area</div><div class="row"><button id="europe" class="primary">Europa</button><button id="italy">Italia</button></div><div class="row" style="margin-top:8px"><button id="fvg">FVG</button><button id="reset">Reset Europa</button></div>
 <div class="sect">Regolazioni locali</div><div class="sub">Luminosità <span id="brightnessValue">100%</span></div><input id="brightness" type="range" min="60" max="150" value="100"><div class="sub">Contrasto <span id="contrastValue">100%</span></div><input id="contrast" type="range" min="70" max="170" value="100"><div class="sub">Saturazione <span id="saturationValue">100%</span></div><input id="saturation" type="range" min="0" max="180" value="100"><button id="resetImage" style="margin-top:8px">Ripristina immagine originale</button>
 <div class="sect">Immagine</div><div class="row"><button id="reload">Ricarica mosaico</button><button id="fullscreen">Schermo intero</button></div><button id="save" style="margin-top:8px">Salva vista (PNG)</button>
-<div class="sub" style="margin-top:22px">MODIS Terra/Aqua · zoom fino a 4096 px per lato<br>NASA GIBS · dati fino a ieri UTC</div>
+<div class="sub" style="margin-top:22px">MODIS Terra/Aqua · zoom fino a 4096 px per lato · NASA GIBS, dati fino a ieri UTC<br>Geo Colour · EUMETSAT MTG, ultimo passaggio (quasi tempo reale)</div>
 </aside><main id="stage"><canvas id="cv"></canvas><div id="chip">Caricamento mosaico MODIS...</div><div id="loading">scarico alta definizione...</div></main>
 <footer id="status"><span id="view" class="tag">bbox -</span><span id="cursor" class="tag">lat/lon -</span><span id="source" class="tag">-</span><span id="message"></span></footer></div>
 <script>
@@ -4289,10 +4289,26 @@ $("date").textContent="Data fissa: "+day+" (ultimo giorno completo)";
 function fit(){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d)}
 function lonX(v){return(v-view.lonMin)/(view.lonMax-view.lonMin)*cv.width}function latY(v){return(view.latMax-v)/(view.latMax-view.latMin)*cv.height}
 function draw(){ctx.clearRect(0,0,cv.width,cv.height);if(img&&imgBox){const dx0=lonX(imgBox.lonMin),dx1=lonX(imgBox.lonMax),dy0=latY(imgBox.latMax),dy1=latY(imgBox.latMin);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.filter="brightness("+$("brightness").value+"%) contrast("+$("contrast").value+"%) saturate("+$("saturation").value+"%)";ctx.drawImage(img,dx0,dy0,dx1-dx0,dy1-dy0);ctx.filter="none"}$("view").textContent="bbox "+view.latMin.toFixed(2)+","+view.lonMin.toFixed(2)+" - "+view.latMax.toFixed(2)+","+view.lonMax.toFixed(2)}
+// Geo Colour EUMETSAT non e' un "prodotto MODIS": e' un'altra fonte dati
+// (rotta /metop, non /modis), senza data fissa - prende sempre l'ultimo
+// passaggio disponibile (nessun &time=/&date= -> il server serve il piu'
+// recente, stessa logica robusta di metop-viewer.html).
+async function loadGeoColour(reqView,w,h,bbox){
+ const u=API+"/metop?layer=mtg_fd:rgb_geocolour&bbox="+bbox+"&w="+w+"&h="+h;
+ const res=await fetch(u);
+ if(!res.ok) throw new Error("Geo Colour non disponibile");
+ const blob=await res.blob(),next=new Image();
+ await new Promise((ok,no)=>{next.onload=ok;next.onerror=no;next.src=URL.createObjectURL(blob)});
+ img=next;imgBox=reqView;$("source").textContent="EUMETSAT MTG · "+w+"x"+h;$("chip").textContent="Geo Colour MTG · ultimo passaggio";
+}
 async function load(){
  clearTimeout(timer);$("loading").classList.add("on");$("message").textContent="";
  const reqView={...view},w=Math.min(4096,cv.width),h=Math.min(4096,cv.height);
  const bbox=[reqView.latMin,reqView.lonMin,reqView.latMax,reqView.lonMax].map(v=>v.toFixed(4)).join(",");
+ if($("sat").value==="geocolour"){
+   try{await loadGeoColour(reqView,w,h,bbox);draw()}catch(e){$("message").textContent=e.message}finally{$("loading").classList.remove("on")}
+   return;
+ }
  const requested=$("sat").value,product=$("product").value,sats=requested==="auto"?["terra","aqua"]:[requested],label=$("product").selectedOptions[0].text;
  try{let failure;for(const sat of sats){const u=API+"/modis?sat="+sat+"&product="+product+"&date="+day+"&bbox="+bbox+"&w="+w+"&h="+h;const res=await fetch(u);if(!res.ok){failure=new Error("MODIS "+sat+" non disponibile");continue}const blob=await res.blob(),next=new Image();await new Promise((ok,no)=>{next.onload=ok;next.onerror=no;next.src=URL.createObjectURL(blob)});img=next;imgBox=reqView;$("source").textContent="MODIS "+sat.toUpperCase()+" · "+w+"x"+h;$("chip").textContent="MODIS "+sat.toUpperCase()+" · "+label+" · "+day;draw();return}throw failure||new Error("Mosaico non disponibile")}catch(e){$("message").textContent=e.message}finally{$("loading").classList.remove("on")}}
 function schedule(){clearTimeout(timer);timer=setTimeout(load,300)}
@@ -4309,7 +4325,15 @@ cv.addEventListener("pointerup",()=>{if(drag){drag=null;cv.classList.remove("dra
 cv.addEventListener("wheel",e=>{e.preventDefault();const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height,lon=view.lonMin+x*(view.lonMax-view.lonMin),lat=view.latMax-y*(view.latMax-view.latMin),k=e.deltaY<0?.75:1.33;view={lonMin:lon-(lon-view.lonMin)*k,lonMax:lon+(view.lonMax-lon)*k,latMin:lat-(lat-view.latMin)*k,latMax:lat+(view.latMax-lat)*k};clampView();draw();schedule()},{passive:false});
 function updateImage(){["brightness","contrast","saturation"].forEach(id=>$(id+"Value").textContent=$(id).value+"%");draw()}
 const help={truecolor:"Resa fotografica naturale. Nuvole bianche e polvere chiara possono assomigliarsi.",bands721:"Usa infrarosso: aiuta a separare suolo, vegetazione e aree bruciate.",bands367:"Evidenzia vegetazione e caratteristiche della superficie in falsi colori."};
-$("sat").onchange=load;$("product").onchange=()=>{$("productHelp").textContent=help[$("product").value];load()};["brightness","contrast","saturation"].forEach(id=>$(id).oninput=updateImage);$("resetImage").onclick=()=>{$("brightness").value=100;$("contrast").value=100;$("saturation").value=100;updateImage()};$("europe").onclick=()=>setView(EUROPE);$("italy").onclick=()=>setView({latMin:35,lonMin:6,latMax:48,lonMax:19});$("fvg").onclick=()=>setView({latMin:45.3,lonMin:12,latMax:46.8,lonMax:14.1});$("reset").onclick=()=>setView(EUROPE);$("reload").onclick=load;$("fullscreen").onclick=()=>document.fullscreenElement?document.exitFullscreen():$("stage").requestFullscreen();$("save").onclick=()=>{const a=document.createElement("a");a.download="modis_"+day+".png";a.href=cv.toDataURL("image/png");a.click()};window.addEventListener("resize",()=>{fit();draw();schedule()});fit();draw();load();
+// Il prodotto (true color/721/367) esiste solo per MODIS: Geo Colour e' gia'
+// una ricetta RGB fissa di EUMETSAT, non ha varianti da scegliere.
+function syncSatUI(){
+  const isGeo=$("sat").value==="geocolour";
+  $("product").disabled=isGeo;
+  if(isGeo){$("productHelp").textContent="Geo Colour: ricetta RGB fissa EUMETSAT, niente varianti di banda.";$("date").textContent="Ultimo passaggio disponibile (quasi tempo reale)";$("mosaicHelp").textContent="Immagine geostazionaria aggiornata ogni 10-15 minuti, non un mosaico giornaliero.";}
+  else{$("productHelp").textContent=help[$("product").value];$("date").textContent="Data fissa: "+day+" (ultimo giorno completo)";$("mosaicHelp").textContent="Una singola composizione giornaliera: le nubi e la superficie hanno resa fotografica ad alta definizione.";}
+}
+$("sat").onchange=()=>{syncSatUI();load()};$("product").onchange=()=>{$("productHelp").textContent=help[$("product").value];load()};["brightness","contrast","saturation"].forEach(id=>$(id).oninput=updateImage);$("resetImage").onclick=()=>{$("brightness").value=100;$("contrast").value=100;$("saturation").value=100;updateImage()};$("europe").onclick=()=>setView(EUROPE);$("italy").onclick=()=>setView({latMin:35,lonMin:6,latMax:48,lonMax:19});$("fvg").onclick=()=>setView({latMin:45.3,lonMin:12,latMax:46.8,lonMax:14.1});$("reset").onclick=()=>setView(EUROPE);$("reload").onclick=load;$("fullscreen").onclick=()=>document.fullscreenElement?document.exitFullscreen():$("stage").requestFullscreen();$("save").onclick=()=>{const a=document.createElement("a");a.download="modis_"+day+".png";a.href=cv.toDataURL("image/png");a.click()};window.addEventListener("resize",()=>{fit();draw();schedule()});fit();draw();load();
 </script>
 `;
 // <<<MODIS_HTML
