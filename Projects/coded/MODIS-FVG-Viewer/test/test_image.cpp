@@ -95,21 +95,58 @@ int main(int argc, char** argv) {
     check(img::coverage(img::Image{}) == 0.0, "coverage di un'immagine vuota = 0");
     check(img::coverage(nat) > 0.5, "il granulo di esempio ha copertura reale");
 
-    // mutedClouds: appiattisce il chiaro-senza-colore, non tocca il colorato.
-    img::Image mix; mix.w = 3; mix.h = 1; mix.px.resize(3);
-    mix.px[0] = img::packARGB(238, 240, 242);   // nuvola: chiara e neutra
-    mix.px[1] = img::packARGB(40, 120, 40);     // prato: colorato
-    mix.px[2] = img::NODATA;
-    img::Image mc = img::mutedClouds(mix, 1.0);
-    check(mc.px[0] != mix.px[0], "la nuvola viene appiattita");
-    check(mc.px[1] == mix.px[1], "il terreno colorato resta intatto");
-    check(mc.px[2] == img::NODATA, "il no-data resta no-data");
-    check(img::mutedClouds(mix, 0.0).px == mix.px, "strength=0 non altera nulla");
-    auto sat = [](uint32_t p) {
-        int r=(p>>16)&0xff, g=(p>>8)&0xff, b=p&0xff;
-        return std::max(r,std::max(g,b)) - std::min(r,std::min(g,b));
-    };
-    check(sat(mc.px[0]) <= sat(mix.px[0]), "la nuvola non guadagna colore");
+    // meanLuma(): serve a capire se gli overlay finiranno su una scena chiara.
+    // Deve guardare solo i pixel osservati, altrimenti il grigio del no-data
+    // trascinerebbe la media e una tessera mezza vuota sembrerebbe sempre media.
+    img::Image white; white.w = 4; white.h = 4;
+    white.px.assign(16, img::packARGB(255, 255, 255));
+    check(std::abs(img::meanLuma(white) - 1.0) < 1e-9, "meanLuma di un'immagine bianca = 1");
+    white.px[0] = img::NODATA; white.px[1] = img::NODATA;
+    check(std::abs(img::meanLuma(white) - 1.0) < 1e-9, "meanLuma ignora i pixel no-data");
+    check(img::meanLuma(dark) < 0.01, "meanLuma di una scena nera ~ 0");
+    check(img::meanLuma(empty) == 0.0, "meanLuma senza pixel osservati = 0");
+
+    // clusters(): due macchie separate su uno strato altrimenti trasparente.
+    // Il conteggio degli incendi vive o muore qui.
+    img::Image layer; layer.w = 10; layer.h = 10;
+    layer.px.assign(100, img::NODATA);
+    auto set = [&](int x, int y) { layer.px[(size_t)y * 10 + x] = img::packARGB(255, 60, 0); };
+    set(1, 1); set(2, 1); set(1, 2);          // macchia A, 3 pixel
+    set(8, 8); set(7, 7);                     // macchia B, 2 pixel in diagonale
+    set(5, 0);                                // pixel isolato, sotto la soglia
+    std::vector<img::Blob> bl = img::clusters(layer, 2, 64);
+    check(bl.size() == 2, "clusters trova due macchie e scarta il pixel isolato");
+    check(bl[0].n == 3 && bl[1].n == 2, "clusters ordina dalla macchia piu' grande");
+    check(std::abs(bl[0].cx - 4.0 / 3.0) < 1e-9 && std::abs(bl[0].cy - 4.0 / 3.0) < 1e-9,
+          "centroide della macchia corretto");
+    check(bl[1].x0 == 7 && bl[1].x1 == 8, "la diagonale resta una macchia sola (8-connesso)");
+    check(img::clusters(layer, 1, 1).size() == 1, "clusters rispetta il tetto massimo");
+    check(img::clusters(empty, 1, 64).empty(), "clusters su strato vuoto non trova niente");
+
+    // fillGaps(): il caso HLS Sentinel-2 + Landsat. primary copre solo meta'
+    // immagine (l'altra meta' e' NODATA, come una fascia di ripresa stretta
+    // che non arriva a coprire tutto il FVG); secondary copre tutto.
+    img::Image primary; primary.w = 6; primary.h = 4;
+    primary.px.assign(24, img::NODATA);
+    for (int y = 0; y < 4; ++y) for (int x = 0; x < 3; ++x) primary.px[y * 6 + x] = img::packARGB(10, 20, 30);
+    img::Image secondary; secondary.w = 6; secondary.h = 4;
+    secondary.px.assign(24, img::packARGB(200, 210, 220));
+    img::Image filled = img::fillGaps(primary, secondary);
+    check(filled.w == 6 && filled.h == 4, "fillGaps conserva le dimensioni");
+    bool anyNodataLeft = false;
+    for (uint32_t p : filled.px) if (p == img::NODATA) { anyNodataLeft = true; break; }
+    check(!anyNodataLeft, "fillGaps tappa tutti i buchi quando secondary li copre");
+    check(filled.px[0 * 6 + 0] == primary.px[0], "un pixel lontano dal confine, gia' osservato, resta intatto");
+    // Il confine (colonna 2 = ultima di primary, colonna 3 = prima riempita)
+    // deve essere tinto, quindi diverso sia dal primary puro sia dal secondary puro.
+    uint32_t edgeFromPrimary = filled.px[1 * 6 + 2], edgeFromSecondary = filled.px[1 * 6 + 3];
+    check(edgeFromPrimary != img::packARGB(10, 20, 30), "il lato primary del confine e' marcato, non il colore grezzo");
+    check(edgeFromSecondary != img::packARGB(200, 210, 220), "il lato secondary del confine e' marcato, non il colore grezzo");
+    check(filled.px[3 * 6 + 5] == img::packARGB(200, 210, 220), "lontano dal confine, il riempimento resta il colore puro di secondary");
+    img::Image untouched = img::fillGaps(primary, img::Image{});
+    check(untouched.px == primary.px, "secondary vuota -> primary intatta");
+    img::Image wrongSize; wrongSize.w = 3; wrongSize.h = 4; wrongSize.px.assign(12, img::packARGB(1, 2, 3));
+    check(img::fillGaps(primary, wrongSize).px == primary.px, "secondary di misura diversa -> primary intatta");
 
     std::printf(fails ? "\nRESULT: %d FAIL\n" : "\nRESULT: all tests passed\n", fails);
     return fails ? 1 : 0;

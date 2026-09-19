@@ -4,6 +4,7 @@
 #include "image.h"
 #include <cmath>
 #include <algorithm>
+#include <utility>
 
 namespace img {
 
@@ -221,6 +222,112 @@ double coverage(const Image& im) {
     size_t seen = 0;
     for (uint32_t p : im.px) if (p != NODATA) ++seen;
     return (double)seen / (double)im.px.size();
+}
+
+double meanLuma(const Image& im) {
+    if (im.empty()) return 0.0;
+    double acc = 0.0; size_t n = 0;
+    for (uint32_t p : im.px) {
+        if (p == NODATA) continue;
+        double r = ((p >> 16) & 0xff) / 255.0;
+        double g = ((p >> 8) & 0xff) / 255.0;
+        double b = (p & 0xff) / 255.0;
+        acc += 0.299 * r + 0.587 * g + 0.114 * b;
+        ++n;
+    }
+    return n ? acc / n : 0.0;
+}
+
+std::vector<Blob> clusters(const Image& layer, int minPixels, int maxBlobs) {
+    std::vector<Blob> out;
+    if (layer.empty()) return out;
+    const int w = layer.w, h = layer.h;
+    std::vector<uint8_t> visited((size_t)w * h, 0);
+    std::vector<std::pair<int, int>> stack;
+
+    for (int y0 = 0; y0 < h; ++y0) {
+        for (int x0 = 0; x0 < w; ++x0) {
+            size_t i0 = (size_t)y0 * w + x0;
+            if (visited[i0] || layer.px[i0] == NODATA) continue;
+
+            // Flood fill 8-connesso della macchia che parte da qui.
+            Blob b; b.x0 = b.x1 = x0; b.y0 = b.y1 = y0;
+            double sx = 0, sy = 0; int n = 0;
+            stack.clear(); stack.push_back({ x0, y0 }); visited[i0] = 1;
+            while (!stack.empty()) {
+                int x = stack.back().first, y = stack.back().second;
+                stack.pop_back();
+                sx += x; sy += y; ++n;
+                if (x < b.x0) b.x0 = x; if (x > b.x1) b.x1 = x;
+                if (y < b.y0) b.y0 = y; if (y > b.y1) b.y1 = y;
+                for (int dy = -1; dy <= 1; ++dy)
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        if (!dx && !dy) continue;
+                        int nx = x + dx, ny = y + dy;
+                        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                        size_t ni = (size_t)ny * w + nx;
+                        if (visited[ni] || layer.px[ni] == NODATA) continue;
+                        visited[ni] = 1;
+                        stack.push_back({ nx, ny });
+                    }
+            }
+            if (n < minPixels) continue;             // rumore isolato: scartato
+            b.n = n; b.cx = sx / n; b.cy = sy / n;
+            out.push_back(b);
+        }
+    }
+    std::sort(out.begin(), out.end(), [](const Blob& a, const Blob& c) { return a.n > c.n; });
+    if ((int)out.size() > maxBlobs) out.resize(maxBlobs);
+    return out;
+}
+
+Image fillGaps(const Image& primary, const Image& secondary) {
+    if (secondary.empty() || secondary.w != primary.w || secondary.h != primary.h)
+        return primary;
+    const int w = primary.w, h = primary.h;
+    Image out = primary;
+    std::vector<uint8_t> fromSecondary((size_t)w * h, 0);
+    for (size_t i = 0; i < out.px.size(); ++i)
+        if (out.px[i] == NODATA && secondary.px[i] != NODATA) {
+            out.px[i] = secondary.px[i];
+            fromSecondary[i] = 1;
+        }
+
+    // Marca la cucitura fra le due fonti: un pixel adiacente (4-connesso) a
+    // uno di provenienza diversa si mescola coi vicini "dall'altra parte",
+    // cosi' il confine si legge invece di sembrare un taglio netto o un dato
+    // inventato lontano dal bordo vero.
+    auto originAt = [&](int x, int y) -> int {        // -1 = fuori mappa o no-data
+        if (x < 0 || x >= w || y < 0 || y >= h) return -1;
+        size_t i = (size_t)y * w + x;
+        if (out.px[i] == NODATA) return -1;
+        return fromSecondary[i];
+    };
+    static const int dx[4] = { -1, 1, 0, 0 }, dy[4] = { 0, 0, -1, 1 };
+    Image seamed = out;
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            size_t i = (size_t)y * w + x;
+            if (out.px[i] == NODATA) continue;
+            int here = fromSecondary[i];
+            uint32_t sumR = 0, sumG = 0, sumB = 0; int nOther = 0;
+            for (int k = 0; k < 4; ++k) {
+                int o = originAt(x + dx[k], y + dy[k]);
+                if (o < 0 || o == here) continue;
+                size_t ni = (size_t)(y + dy[k]) * w + (x + dx[k]);
+                uint32_t p = out.px[ni];
+                sumR += (p >> 16) & 0xff; sumG += (p >> 8) & 0xff; sumB += p & 0xff;
+                ++nOther;
+            }
+            if (!nOther) continue;
+            uint32_t p = out.px[i];
+            double r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            double or_ = (double)sumR / nOther, og = (double)sumG / nOther, ob = (double)sumB / nOther;
+            auto blend = [](double a, double c) { return (uint8_t)std::lround((a + c) / 2.0); };
+            seamed.px[i] = packARGB(blend(r, or_), blend(g, og), blend(b, ob));
+        }
+    }
+    return seamed;
 }
 
 } // namespace img

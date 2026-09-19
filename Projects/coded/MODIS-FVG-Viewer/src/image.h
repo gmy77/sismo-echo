@@ -77,4 +77,29 @@ Image composite(const Image& base, const Image& over);
 // sotto: quel dato non esiste.
 Image mutedClouds(const Image& src, double strength = 1.0);
 
+// Luminanza media (0..1) dei soli pixel OSSERVATI (non NODATA). Serve a capire
+// se un overlay finira' su una scena chiara o scura senza farsi trascinare
+// dal grigio del no-data: una tessera mezza vuota non deve sembrare sempre
+// "medio grigio" solo perche' meta' dei pixel sono di riempimento.
+double meanLuma(const Image& im);
+
+// Una macchia connessa di pixel osservati (non NODATA) su uno strato "a
+// punti" come gli incendi: conteggio, centroide e riquadro di inviluppo.
+struct Blob { int n = 0; double cx = 0, cy = 0; int x0 = 0, y0 = 0, x1 = 0, y1 = 0; };
+
+// Trova le macchie 8-connesse di `layer` con almeno `minPixels` pixel,
+// ordinate dalla piu' grande, fino a `maxBlobs`. Alla base del conteggio
+// incendi: senza una soglia minima ogni pixel isolato (rumore) diventerebbe
+// un "incendio" a se stante.
+std::vector<Blob> clusters(const Image& layer, int minPixels, int maxBlobs);
+
+// Tappa i buchi NODATA di `primary` con i pixel corrispondenti di `secondary`
+// (stessa dimensione). Il caso reale: HLS Sentinel-2 e Landsat coprono spesso
+// solo una fascia del riquadro, non l'intero FVG; l'altro satellite completa
+// il resto. La cucitura fra le due fonti viene marcata (mescolata col vicino
+// di provenienza diversa) cosi' il confine si legge invece di sembrare un
+// taglio netto o, peggio, un dato inventato. Se `secondary` e' vuota o di
+// misura diversa, `primary` torna intatta.
+Image fillGaps(const Image& primary, const Image& secondary);
+
 } // namespace img
