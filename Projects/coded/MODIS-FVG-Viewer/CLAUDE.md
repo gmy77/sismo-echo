@@ -191,8 +191,21 @@ permessi del disco. `build.bat` ora lo verifica e lo dice.
 
 **Attenzione a quale exe si sta lanciando.** L'utente ne aveva tre copie sparse
 e per ore ha guardato una build vecchia, credendo che una correzione non fosse
-stata applicata. La barra del titolo porta la versione apposta: se non dice
-`1.0.0`, è vecchio.
+stata applicata. La barra del titolo porta la versione apposta: se non dice la
+versione corrente (vedi cima file), è vecchio. **Ricapitato il 19/09/2026**:
+un `MODIS-FVG-VIEWER-nuovo.exe` (nome fuorviante — era vecchissimo) mostrava
+ancora "1.0" e il suo log usava lo schema di cache pre-storico `g_T_0_2.png`/
+`s_T_0_2.png` (senza data), abbandonato da tempo in favore di
+`gibs_T_0_<data>.png`/`strip_T_0_<data>.png`. L'unico modo sicuro: compilare
+ed **avviare dall'IDE** (F5), mai un `.exe` trovato per caso sul disco.
+
+**`gen-sln.bat` può generare un `.slnx`, non un `.sln`.** Con CMake e Visual
+Studio recenti il generatore Visual Studio produce il nuovo formato XML
+"slim" `.slnx` invece del vecchio `.sln` — stesso contenuto, si apre allo
+stesso modo in VS. Se l'utente cerca un `.sln` e non lo trova, è probabile
+che ci sia un `.slnx` dentro `build\` che ha semplicemente ignorato perché
+cercava l'estensione sbagliata (o il filtro "Apri file" di VS non lo mostra
+finché non si sceglie "Tutti i file").
 
 **Cambiare un prodotto richiede due file**: `src/gibs.h` (app) e
 `sismo-worker/index.js` (Worker). Dimenticare il secondo dà `400 prodotto
