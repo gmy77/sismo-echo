@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.2 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.3 - vedi LICENSE nella radice del repository.
 // Auto-generated FVG geography (source: openpolis/geojson-italy, ISTAT). Simplified RDP eps=0.006 deg.
 #pragma once
 struct GeoPt { float lon, lat; };

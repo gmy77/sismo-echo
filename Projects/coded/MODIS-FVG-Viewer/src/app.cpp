@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.2 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.3 - vedi LICENSE nella radice del repository.
 // app.cpp — MODIS FVG Viewer. Win32 + GDI+ desktop dashboard.
 //
 // Layout:  [ control panel | image canvas ]  +  [ filmstrip ]  +  [ status bar ]
@@ -68,9 +68,9 @@ using namespace Gdiplus;
 #endif
 
 // ----------------------------- constants ----------------------------------
-static const wchar_t* APP_VERSION = L"1.0.2";
-static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.2";
-static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.2";
+static const wchar_t* APP_VERSION = L"1.0.3";
+static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.3";
+static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.3";
 static const wchar_t* APP_CREDIT_2 = L"Anthropic  \u00b7  PIGNOLO GIMMY";
 static const wchar_t* APP_CREDIT_3 = L"\u00a9 2026 Gimmy Pignolo \u00b7 Tutti i diritti riservati";
 static const int PANEL_W  = 304;

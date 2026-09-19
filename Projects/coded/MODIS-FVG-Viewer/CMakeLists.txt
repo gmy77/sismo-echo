@@ -4,6 +4,14 @@ project(MODIS-FVG-Viewer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# I sorgenti sono UTF-8 senza BOM (accenti, ·, ↑, ☀ nelle stringhe wide). MinGW
+# li legge cosi' di default; MSVC no - senza /utf-8 usa la codepage di sistema
+# e li corrompe (es. "·" diventa "Â·"). /utf-8 imposta sia il source-charset
+# sia l'execution-charset, coprendo entrambi i casi in un colpo solo.
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 # ---------------------------------------------------------------------------
 # The GUI application is Windows-only (Win32 + GDI+ + WinHTTP + Media
 # Foundation + DWM). The decoding/compositing core (modis/image/colormap) is

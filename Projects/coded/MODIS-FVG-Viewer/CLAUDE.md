@@ -1,7 +1,7 @@
 # MODIS-FVG Viewer — contesto per Claude Code
 
 Visualizzatore MODIS/HLS per il Friuli Venezia Giulia. **C++ Win32 + GDI+, zero
-dipendenze esterne** (niente GDAL, HDF, ffmpeg, vcpkg). Versione **1.0.2**.
+dipendenze esterne** (niente GDAL, HDF, ffmpeg, vcpkg). Versione **1.0.3**.
 Autori: Anthropic · PIGNOLO GIMMY.
 
 Branch di lavoro: `claude/modis-fvg-viewer-winui-2fnm3y` — PR **#15** (pronta,
@@ -35,6 +35,19 @@ Deploy: `cd sismo-worker && npx wrangler deploy` (se il token OAuth è scaduto:
   i nomi dei layer non sono verificabili da qui, solo dall'utente.
 
 ---
+
+## Fatto in v1.0.3 (19/09/2026)
+
+Segnalato dall'utente dopo la prima build reale in Visual Studio: gli accenti
+e i simboli (`·`, `☀`, `→`) apparivano storpiati nell'interfaccia (es. "Â·",
+"â—¤"). **Causa**: i sorgenti sono UTF-8 senza BOM — MinGW li legge così di
+default (per questo la verifica di cross-build su Linux non l'aveva mai
+mostrato), ma **MSVC senza `/utf-8` li interpreta con la codepage di
+sistema**, corrompendo ogni carattere non-ASCII nelle stringhe.
+
+- Aggiunto `add_compile_options(/utf-8)` sotto `if(MSVC)` in
+  `CMakeLists.txt`: imposta sia il source-charset sia l'execution-charset,
+  risolvendo il problema alla radice senza toccare i sorgenti.
 
 ## Fatto in v1.0.2 (19/09/2026)
 

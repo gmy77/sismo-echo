@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.2 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.3 - vedi LICENSE nella radice del repository.
 // image.cpp — portable band compositing. See image.h.
 #include "image.h"
 #include <cmath>

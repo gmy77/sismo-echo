@@ -305,4 +305,4 @@ riguarda il codice di questo visualizzatore, non le immagini.
 
 ---
 
-**MODIS-FVG v1.0.2** — **Anthropic** · **PIGNOLO GIMMY**
+**MODIS-FVG v1.0.3** — **Anthropic** · **PIGNOLO GIMMY**

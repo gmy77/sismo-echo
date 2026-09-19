@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.2 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.3 - vedi LICENSE nella radice del repository.
 // mf_encoder.h — H.264/MP4 timelapse encoding via Media Foundation (native
 // Windows, no ffmpeg). Windows-only; the portable modules never include this.
 #pragma once
