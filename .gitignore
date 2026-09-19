@@ -149,11 +149,42 @@ secrets.json
 credentials.json
 *.key
 *.pem
+*.pfx
+*.p12
+*.ppk
+id_rsa*
+id_ed25519*
+id_ecdsa*
+*.token
+token.txt
+*_token.txt
+.netrc
+.npmrc
+.pypirc
+.aws/
+.azure/
+.gcloud/
+.kube/
+.docker/config.json
+
+# API/servizi specifici che finiscono nella home per errore
+.cdsapirc
+.eumdac/
+
+# ===== Chiavi SSH/GPG =====
+# La home ESSENDO la radice del repo, senza questa regola un `git add -A`
+# distratto aggiungerebbe l'intera cartella .ssh (chiavi private!) al repo.
+.ssh/
+.gnupg/
 
 # ===== Claude Code =====
-# Claude config (già tracciati globalmente)
-# .claude/
-# .claude.json
+# Il commento precedente ("già tracciati globalmente") era sbagliato: questi
+# file NON sono ignorati automaticamente e contengono credenziali vere
+# (sessione/API). Vanno esclusi esplicitamente, non solo commentati via.
+.claude.json
+.claude.json.tmp*
+.claude/.credentials.json
+.mcp.json
 
 # ===== Directories Temporanee =====
 temp/
