@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.0 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.1 - vedi LICENSE nella radice del repository.
 // app.cpp — MODIS FVG Viewer. Win32 + GDI+ desktop dashboard.
 //
 // Layout:  [ control panel | image canvas ]  +  [ filmstrip ]  +  [ status bar ]
@@ -68,9 +68,9 @@ using namespace Gdiplus;
 #endif
 
 // ----------------------------- constants ----------------------------------
-static const wchar_t* APP_VERSION = L"1.0.0";
-static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.0";
-static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.0";
+static const wchar_t* APP_VERSION = L"1.0.1";
+static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.1";
+static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.1";
 static const wchar_t* APP_CREDIT_2 = L"Anthropic  \u00b7  PIGNOLO GIMMY";
 static const wchar_t* APP_CREDIT_3 = L"\u00a9 2026 Gimmy Pignolo \u00b7 Tutti i diritti riservati";
 static const int PANEL_W  = 304;
@@ -139,7 +139,7 @@ struct GranuleView {
 
     // REMOTE image (already-rendered RGB from GIBS) + its metadata.
     img::Image  rimg;
-    std::string rSat, rProduct, rTimeText, rSortKey;
+    std::string rSat, rProduct, rProductId, rTimeText, rSortKey;
     double rLatMin = 0, rLatMax = 0, rLonMin = 0, rLonMax = 0;
     bool   rStrip = false;   // "blocco" swath (FVG parallel down to the equator)
     std::wstring cacheFile;  // PNG su disco da rimuovere se l'utente lo cestina
@@ -239,6 +239,15 @@ static std::string vSat(const GranuleView& v)      { return v.remote ? v.rSat   
 static std::string vTimeText(const GranuleView& v) { return v.remote ? v.rTimeText : v.g.timeText(); }
 static std::string vSortKey(const GranuleView& v)  { return v.remote ? v.rSortKey  : v.g.sortKey(); }
 static bool vHasBands(const GranuleView& v)         { return !v.remote; }
+// Etichetta della miniatura in filmstrip. Per un granulo GIBS include l'id del
+// prodotto oltre alla data: la stessa data scaricata in piu' prodotti (es.
+// True Color e poi Bande 7-2-1) produce due miniature diverse ma con la STESSA
+// etichetta "<data> (blocco)" — cestinandone una l'altra resta e sembra che il
+// cestino non abbia funzionato, mentre in realta' e' un granulo diverso.
+static std::wstring vFilmLabel(const GranuleView& v) {
+    if (v.remote && !v.rProductId.empty()) return toW(v.rProductId) + L" · " + toW(v.rTimeText);
+    return toW(vTimeText(v));
+}
 
 static cmap::Ramp rampFor(const modis::Granule& gr, int band) {
     const modis::Band* b = gr.bandByNumber(band);
@@ -322,10 +331,28 @@ static void refreshBandUI() {
     SendMessageW(g.gCombo, CB_RESETCONTENT, 0, 0);
     SendMessageW(g.bCombo, CB_RESETCONTENT, 0, 0);
     bool bands = g.cur >= 0 && vHasBands(g.seq[g.cur]);
-    EnableWindow(g.bandList, bands); EnableWindow(g.rgbChk, bands);
+    // La composizione RGB per banda non si applica a un'immagine GIBS gia'
+    // composita: quella spunta e le tre tendine restano disabilitate. La
+    // lista canali pero' resta ATTIVA (solo non interattiva, vedi
+    // IDC_BANDLIST/LBN_SELCHANGE) cosi' il testo non appare grigio: e' lo
+    // spazio giusto per mostrare i metadati veri del granulo selezionato,
+    // invece di una frase fissa sempre uguale su ogni immagine remota.
+    EnableWindow(g.bandList, TRUE); EnableWindow(g.rgbChk, bands);
     EnableWindow(g.rCombo, bands && g.rgbMode); EnableWindow(g.gCombo, bands && g.rgbMode); EnableWindow(g.bCombo, bands && g.rgbMode);
     if (!bands) {
-        SendMessageW(g.bandList, LB_ADDSTRING, 0, (LPARAM)L"(immagine GIBS reale — canale già composto)");
+        if (g.cur >= 0 && g.seq[g.cur].remote) {
+            const GranuleView& v = g.seq[g.cur];
+            wchar_t line[160];
+            SendMessageW(g.bandList, LB_ADDSTRING, 0, (LPARAM)toW(v.rProduct).c_str());
+            swprintf(line, 160, L"%s · %s", toW(v.rSat).c_str(), toW(v.rTimeText).c_str());
+            SendMessageW(g.bandList, LB_ADDSTRING, 0, (LPARAM)line);
+            swprintf(line, 160, L"Area: %s", v.rStrip ? L"fascia FVG → equatore" : L"ritaglio FVG");
+            SendMessageW(g.bandList, LB_ADDSTRING, 0, (LPARAM)line);
+            swprintf(line, 160, L"Risoluzione: %d × %d px", v.rimg.w, v.rimg.h);
+            SendMessageW(g.bandList, LB_ADDSTRING, 0, (LPARAM)line);
+        } else {
+            SendMessageW(g.bandList, LB_ADDSTRING, 0, (LPARAM)L"Nessun granulo selezionato.");
+        }
         return;
     }
     const modis::Granule& gr = g.seq[g.cur].g;
@@ -416,8 +443,17 @@ static void removeIndex(int i) {
     if (i < 0 || i >= (int)g.seq.size()) return;
     GranuleView& gv = g.seq[i];
     if (!gv.cacheFile.empty()) {
-        if (DeleteFileW(gv.cacheFile.c_str())) logLine(L"cache rimossa: " + gv.cacheFile);
-        else logLine(L"cache NON rimossa: " + gv.cacheFile);
+        bool ok = DeleteFileW(gv.cacheFile.c_str());
+        if (!ok) {
+            // Un antivirus o l'indicizzazione di Explorer possono marcare il
+            // file come sola-lettura per un istante mentre lo scansionano:
+            // un secondo tentativo dopo aver tolto l'attributo copre questo
+            // caso, invece di lasciare orfano un file che riapparirebbe al
+            // prossimo avvio facendo credere che il cestino non funzioni.
+            SetFileAttributesW(gv.cacheFile.c_str(), FILE_ATTRIBUTE_NORMAL);
+            ok = DeleteFileW(gv.cacheFile.c_str());
+        }
+        logLine(ok ? (L"cache rimossa: " + gv.cacheFile) : (L"cache NON rimossa: " + gv.cacheFile));
     }
     if (gv.thumb) { delete gv.thumb; gv.thumb = nullptr; }
     g.seq.erase(g.seq.begin() + i);
@@ -522,6 +558,7 @@ static void addRemote(img::Image&& im, int satIdx, int prodIdx, const std::strin
     // HLS is Landsat/Sentinel-2, not a Terra/Aqua product — don't mislabel it.
     gv.rSat = pr.ignoresSat ? "HLS" : ((satIdx == 1) ? "Aqua" : "Terra");
     gv.rProduct = toU8(pr.label);
+    gv.rProductId = pr.id ? pr.id : "";
     gv.rTimeText = date + (strip ? " (blocco)" : " (GIBS)");
     gv.rLatMin = bx.latMin; gv.rLatMax = bx.latMax;
     gv.rLonMin = bx.lonMin; gv.rLonMax = bx.lonMax;
@@ -1196,7 +1233,7 @@ static void paintFilm(Graphics& gfx) {
         if (g.seq[i].thumb)
             gfx.DrawImage(g.seq[i].thumb, (INT)(c.left + 4), (INT)(c.top + 4),
                           (INT)(FILM_CELLW - 8), (INT)(cellH - 22));
-        std::wstring lab = toW(vTimeText(g.seq[i]));
+        std::wstring lab = vFilmLabel(g.seq[i]);
         gfx.DrawString(lab.c_str(), -1, &font, PointF((REAL)(c.left + 6), (REAL)(c.top + cellH - 16)), &txt);
 
         // Pulsante di rimozione: pastiglia scura con una x, in alto a destra.

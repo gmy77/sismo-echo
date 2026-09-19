@@ -1,10 +1,11 @@
 # MODIS-FVG Viewer — contesto per Claude Code
 
 Visualizzatore MODIS/HLS per il Friuli Venezia Giulia. **C++ Win32 + GDI+, zero
-dipendenze esterne** (niente GDAL, HDF, ffmpeg, vcpkg). Versione **1.0.0**.
+dipendenze esterne** (niente GDAL, HDF, ffmpeg, vcpkg). Versione **1.0.1**.
 Autori: Anthropic · PIGNOLO GIMMY.
 
-Branch di lavoro: `claude/modis-fvg-viewer-winui-2fnm3y` — PR **#15** (bozza).
+Branch di lavoro: `claude/modis-fvg-viewer-winui-2fnm3y` — PR **#15** (pronta,
+non più bozza dal 12/09/2026).
 
 ---
 
@@ -34,6 +35,33 @@ Deploy: `cd sismo-worker && npx wrangler deploy` (se il token OAuth è scaduto:
   i nomi dei layer non sono verificabili da qui, solo dall'utente.
 
 ---
+
+## Fatto in v1.0.1 (19/09/2026)
+
+Segnalato dall'utente: cancellando una miniatura dalla filmstrip (×), al
+riavvio riappariva — sembrava che il cestino non cancellasse davvero il PNG
+in cache. **Causa reale**: non era un bug di cancellazione — `removeIndex()`
+cancellava correttamente il file giusto. Il problema era che **la stessa data
+scaricata in più prodotti** (es. True Color e poi Bande 7-2-1) produce due
+file di cache diversi, ma la filmstrip li etichettava entrambi allo stesso
+modo ("2026-09-03 (blocco)"): cancellandone uno restava l'altro, visivamente
+quasi identico, dando l'impressione che la cancellazione non avesse
+funzionato.
+
+- **Etichetta filmstrip disambiguata**: ora include l'id del prodotto
+  (`vFilmLabel()`), es. "bands721 · 2026-09-03 (blocco)" invece del solo
+  "2026-09-03 (blocco)" — miniature diverse hanno ora etichette diverse.
+- **Cancellazione più robusta**: se `DeleteFileW` fallisce (es. attributo
+  sola-lettura impostato momentaneamente da un antivirus), un secondo
+  tentativo dopo `SetFileAttributesW(FILE_ATTRIBUTE_NORMAL)` copre il caso.
+- **Casella "CANALE / BANDA" non più morta per le immagini GIBS**: prima
+  mostrava sempre la stessa frase fissa e disabilitata per ogni granulo
+  remoto (la composizione per banda si applica solo a un `.mgr` locale, non
+  a un'immagine GIBS già composita). Ora, per un granulo remoto, mostra
+  prodotto, satellite, data/ora, area (FVG o blocco) e risoluzione reali —
+  uno spazio prima inutilizzato ora dà informazioni vere.
+- Verificato con cross-build MinGW completa (`MODIS-FVG-Viewer.exe`, 1.4 MB)
+  e CTest sul nucleo portabile (2/2 verde) da un ambiente senza Windows.
 
 ## Fatto in v1.0.0
 
