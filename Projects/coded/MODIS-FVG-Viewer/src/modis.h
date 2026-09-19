@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.1 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.2 - vedi LICENSE nella radice del repository.
 // modis.h — Portable reader for the MODIS-FVG simplified granule format.
 //
 // Real MODIS L1B/L2 products (MOD021KM, MOD09, MOD11 …) ship as HDF-EOS / HDF4

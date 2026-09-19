@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.1 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.2 - vedi LICENSE nella radice del repository.
 // colormap.h — value -> RGB ramps for single-band MODIS display. Portable.
 // Reflectance bands read best as grayscale; the thermal (LST) band reads best
 // on a temperature ramp. Ramps are control colours interpolated linearly so

@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-// MODIS-FVG Viewer 1.0.1 - vedi LICENSE nella radice del repository.
+// MODIS-FVG Viewer 1.0.2 - vedi LICENSE nella radice del repository.
 // app.cpp — MODIS FVG Viewer. Win32 + GDI+ desktop dashboard.
 //
 // Layout:  [ control panel | image canvas ]  +  [ filmstrip ]  +  [ status bar ]
@@ -68,9 +68,9 @@ using namespace Gdiplus;
 #endif
 
 // ----------------------------- constants ----------------------------------
-static const wchar_t* APP_VERSION = L"1.0.1";
-static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.1";
-static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.1";
+static const wchar_t* APP_VERSION = L"1.0.2";
+static const wchar_t* APP_TITLE   = L"MODIS FVG Viewer 1.0.2";
+static const wchar_t* APP_CREDIT_1 = L"MODIS-FVG  \u00b7  v1.0.2";
 static const wchar_t* APP_CREDIT_2 = L"Anthropic  \u00b7  PIGNOLO GIMMY";
 static const wchar_t* APP_CREDIT_3 = L"\u00a9 2026 Gimmy Pignolo \u00b7 Tutti i diritti riservati";
 static const int PANEL_W  = 304;
@@ -81,7 +81,8 @@ enum {
     IDC_OPEN = 1001, IDC_SAT, IDC_PRODUCT, IDC_DATE, IDC_FETCH, IDC_LATEST, IDC_WORKER,
     IDC_BANDLIST, IDC_RGB, IDC_RCOMBO, IDC_GCOMBO, IDC_BCOMBO,
     IDC_CITIES, IDC_BORDERS, IDC_DIFF, IDC_RESET, IDC_FPS, IDC_MOVIE,
-    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG, IDC_RAWLAYER, IDC_CLOUDGREY, IDC_VIEWMODE
+    IDC_STRIP, IDC_SHARP, IDC_SAVEPNG, IDC_RAWLAYER, IDC_CLOUDGREY, IDC_VIEWMODE,
+    IDC_CLEAREST
 };
 
 // ----------------------------- theme --------------------------------------
@@ -805,6 +806,27 @@ static void fetchGibsCore(int satIdx, int prodIdx, const std::string& date, bool
     }
 }
 
+// Sonda leggera (256 px) per un giorno, senza toccare la cache: serve solo a
+// rispondere "che aria tira quel giorno", non a produrre un'immagine da
+// mostrare. Stessa logica del ramo "probe" di fetchGibsCore, ma senza il
+// compositing degli overlay (qui interessa la base, non i punti sopra).
+static bool probeOneDate(int satIdx, int prodIdx, const std::string& date, bool strip, img::Image& out) {
+    int nProd; const gibs::Product* P = gibs::products(nProd);
+    const gibs::Product& pr = P[prodIdx < nProd ? prodIdx : 0];
+    std::string layer = (satIdx == 1) ? pr.aquaLayer : pr.terraLayer;
+    Box bx = boxFor(strip);
+    int fw = 256;
+    int fh = std::max(64, (int)std::lround(256.0 * (bx.latMax - bx.latMin) / (bx.lonMax - bx.lonMin)));
+    std::wstring err;
+    HCURSOR prevCur = SetCursor(LoadCursor(nullptr, IDC_WAIT));
+    bool ok = g.viaWorker
+        ? gibs::downloadViaWorker(gibs::workerHost(), (satIdx == 1) ? "aqua" : "terra",
+              pr.id, date, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, out, &err, L"")
+        : gibs::download(layer, date, bx.latMin, bx.latMax, bx.lonMin, bx.lonMax, fw, fh, out, &err, L"");
+    SetCursor(prevCur);
+    return ok;
+}
+
 // Current UI selection, shared by every fetch entry point.
 static void currentSelection(int& satIdx, int& prodIdx) {
     satIdx  = (int)SendMessageW(g.satCombo,  CB_GETCURSEL, 0, 0);
@@ -838,6 +860,44 @@ static void doFetchLatest() {
     std::string date = toU8(dateMinusDays(1));
     SetWindowTextW(g.dateEdit, toW(date).c_str());
     fetchGibsCore(satIdx, prodIdx, date);
+}
+
+// "Giornata piu' limpida": prova gli ultimi giorni con una sonda leggera (256
+// px, niente cache) e sceglie quella con la luminanza media (meanLuma) piu'
+// bassa fra quelle con dati reali. Le nuvole sono quasi sempre l'elemento piu'
+// chiaro della scena, quindi una media piu' bassa e' un'euristica semplice ma
+// efficace per "poco nuvoloso" — guarda solo la luminosita' complessiva, non
+// la forma delle nuvole (per quello servirebbe clusters(), volutamente non
+// usato qui: si parte semplice).
+static void doFetchClearest() {
+    int satIdx, prodIdx; currentSelection(satIdx, prodIdx);
+    wchar_t dbuf[32] = L""; GetWindowTextW(g.dateEdit, dbuf, 32);
+    std::string anchor = toU8(dbuf);
+    if (anchor.size() != 10) anchor = toU8(dateMinusDays(1));
+
+    const int WINDOW_DAYS = 12;
+    std::string bestDate; double bestLuma = 2.0;   // 2.0 = nessuna trovata (luma sta in 0..1)
+
+    flashStatus(L"Cerco la giornata piu' limpida negli ultimi "
+                + std::to_wstring(WINDOW_DAYS) + L" giorni…");
+    std::string tryDate = anchor;
+    for (int i = 0; i < WINDOW_DAYS; ++i, tryDate = dateBack(tryDate, 1)) {
+        img::Image probe;
+        if (!probeOneDate(satIdx, prodIdx, tryDate, g.stripMode, probe)) continue;
+        if (img::coverage(probe) < MIN_COVERAGE) continue;   // nessun passaggio quel giorno
+        double luma = img::meanLuma(probe);
+        if (luma < bestLuma) { bestLuma = luma; bestDate = tryDate; }
+    }
+
+    if (bestDate.empty()) {
+        MessageBoxW(g.hwnd, (L"Nessun giorno con dati negli ultimi " + std::to_wstring(WINDOW_DAYS)
+            + L" giorni (dal " + toW(dateBack(anchor, WINDOW_DAYS - 1)) + L" al " + toW(anchor) + L").").c_str(),
+            APP_TITLE, MB_OK | MB_ICONWARNING);
+        return;
+    }
+    flashStatus(L"Giornata piu' limpida: " + toW(bestDate) + L" — scarico a piena risoluzione…");
+    SetWindowTextW(g.dateEdit, toW(bestDate).c_str());
+    fetchGibsCore(satIdx, prodIdx, bestDate);
 }
 
 // ----------------------------- timelapse ----------------------------------
@@ -964,6 +1024,7 @@ static void doLayout() {
     MoveWindow(g.dateEdit, x, y, 110, 26, TRUE);
     MoveWindow(GetDlgItem(g.hwnd, IDC_FETCH), x + 118, y, w - 118, 28, TRUE); y += 32;
     MoveWindow(GetDlgItem(g.hwnd, IDC_LATEST), x, y, w, 28, TRUE); y += 30;
+    MoveWindow(GetDlgItem(g.hwnd, IDC_CLEAREST), x, y, w, 28, TRUE); y += 30;
     MoveWindow(g.workerChk, x, y, w, 22, TRUE); y += 22;
     MoveWindow(g.stripChk,  x, y, w, 22, TRUE); y += 28;
 
@@ -1427,6 +1488,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             WS_CHILD | WS_VISIBLE | ES_CENTER, 0,0,10,10, hwnd, (HMENU)IDC_DATE, nullptr, nullptr);
         mkButton(hwnd, L"Scarica reale", IDC_FETCH);
         mkButton(hwnd, L"⤓ Ultima (al volo)", IDC_LATEST);
+        mkButton(hwnd, L"☀ Giornata più limpida", IDC_CLEAREST);
         g.workerChk = mkCheck(hwnd, L"Via Cloudflare (cache edge)", IDC_WORKER, true);
         g.stripChk  = mkCheck(hwnd, L"Blocco: FVG → equatore", IDC_STRIP, false);
 
@@ -1473,6 +1535,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case IDC_OPEN:  doOpenDialog(); return 0;
         case IDC_FETCH: doFetchGibs(); return 0;
         case IDC_LATEST: doFetchLatest(); return 0;
+        case IDC_CLEAREST: doFetchClearest(); return 0;
         case IDC_WORKER: return 0;   // stato gia' invertito in WM_COMMAND, sopra
         case IDC_STRIP:
             applySelection(); return 0;

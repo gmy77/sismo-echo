@@ -1,7 +1,7 @@
 # MODIS-FVG Viewer — contesto per Claude Code
 
 Visualizzatore MODIS/HLS per il Friuli Venezia Giulia. **C++ Win32 + GDI+, zero
-dipendenze esterne** (niente GDAL, HDF, ffmpeg, vcpkg). Versione **1.0.1**.
+dipendenze esterne** (niente GDAL, HDF, ffmpeg, vcpkg). Versione **1.0.2**.
 Autori: Anthropic · PIGNOLO GIMMY.
 
 Branch di lavoro: `claude/modis-fvg-viewer-winui-2fnm3y` — PR **#15** (pronta,
@@ -35,6 +35,28 @@ Deploy: `cd sismo-worker && npx wrangler deploy` (se il token OAuth è scaduto:
   i nomi dei layer non sono verificabili da qui, solo dall'utente.
 
 ---
+
+## Fatto in v1.0.2 (19/09/2026)
+
+Recuperate due funzionalità che esistevano solo come lavoro locale non
+committato dell'utente (test in `test/test_image.cpp`, mai arrivati
+nell'implementazione reale) — a rischio di essere persi per sempre a un
+prossimo `git checkout`.
+
+- **`img::meanLuma`, `img::Blob`, `img::clusters`, `img::fillGaps`**
+  implementate in `image.h`/`image.cpp` seguendo esattamente le assert del
+  test dell'utente (usato come specifica comportamentale): luminanza media
+  Rec.601 sui soli pixel osservati, macchie 8-connesse con soglia minima e
+  tetto massimo (per il conteggio incendi), riempimento buchi NODATA tra due
+  immagini con cucitura marcata al confine (per il mosaico HLS
+  Sentinel-2/Landsat). Tutte e 39 le asserzioni del test passano.
+- **Nuovo bottone "☀ Giornata più limpida"** (`IDC_CLEAREST`): scandisce gli
+  ultimi giorni con lo stesso pattern "sonda a bassa risoluzione" già usato
+  da "Ultima (al volo)" (`probeOneDate()`), ma senza fermarsi al primo giorno
+  con dati — li confronta tutti e scarica a piena risoluzione quello con
+  `meanLuma` più bassa (euristica: meno nuvole = scena più scura/pulita).
+  Volutamente semplice: non usa ancora `clusters()`, si parte da una sola
+  metrica.
 
 ## Fatto in v1.0.1 (19/09/2026)
 

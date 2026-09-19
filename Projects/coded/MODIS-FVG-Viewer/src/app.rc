@@ -4,8 +4,8 @@
 1 RT_MANIFEST "app.manifest"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,1,0
- PRODUCTVERSION 1,0,1,0
+ FILEVERSION 1,0,2,0
+ PRODUCTVERSION 1,0,2,0
  FILEOS VOS__WINDOWS32
  FILETYPE VFT_APP
 BEGIN
@@ -15,9 +15,9 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Gimmy (gmy77)"
       VALUE "FileDescription", "MODIS FVG Viewer - visualizzatore MODIS per il Friuli Venezia Giulia"
-      VALUE "FileVersion", "1.0.1.0"
+      VALUE "FileVersion", "1.0.2.0"
       VALUE "ProductName", "MODIS FVG Viewer"
-      VALUE "ProductVersion", "1.0.1.0"
+      VALUE "ProductVersion", "1.0.2.0"
       VALUE "LegalCopyright", "Copyright (C) 2026 Gimmy (gmy77). Tutti i diritti riservati."
       VALUE "OriginalFilename", "MODIS-FVG-Viewer.exe"
     END
