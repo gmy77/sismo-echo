@@ -10,6 +10,29 @@ const ECHO_VERSION = "3.11";
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
 const NOAA_WIND   = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json";
+// Radiazione spaziale — GOES (protoni/elettroni fascia di Van Allen) + scala tempeste di radiazione NOAA
+// Dati pubblici, nessuna chiave richiesta. Sostituto "open" ai dati NORM/ASBM2 (accesso riservato, vedi README).
+const NOAA_PROTON  = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json";
+const NOAA_ELECTRON= "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-1-day.json";
+const NOAA_SCALES  = "https://services.swpc.noaa.gov/products/noaa-scales.json";
+const NOAA_XRAY    = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json";
+
+// Aggiunge una colonna se manca — D1/SQLite non supporta ADD COLUMN IF NOT EXISTS,
+// quindi tentiamo e ignoriamo l'errore "duplicate column" se esiste già (tabelle già in produzione).
+async function addColIfMissing(db, table, colDef) {
+  try { await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${colDef}`).run(); }
+  catch(e) { if (!/duplicate column/i.test(e.message||'')) throw e; }
+}
+
+// Classificazione flare X-ray GOES (canale lungo 0.1-0.8nm) — standard NOAA A/B/C/M/X
+function flareClassSrv(f) {
+  if (f==null || Number.isNaN(f)) return null;
+  if (f>=1e-4) return 'X'+(f/1e-4).toFixed(1);
+  if (f>=1e-5) return 'M'+(f/1e-5).toFixed(1);
+  if (f>=1e-6) return 'C'+(f/1e-6).toFixed(1);
+  if (f>=1e-7) return 'B'+(f/1e-7).toFixed(1);
+  return 'A'+(f/1e-8).toFixed(1);
+}
 function getUpdateSecret(env) { return env?.UPDATE_SECRET || ""; }
 
 const FVG = { lat_min:45.5, lat_max:46.8, lon_min:12.4, lon_max:14.1 };
@@ -114,10 +137,110 @@ async function salvaSolare(db, kpData) {
 }
 
 // ============================================================
+// NOAA — radiazione spaziale (GOES protoni/elettroni + scala tempeste S)
+// ============================================================
+async function fetchRadiazione(kpData, windData) {
+  try {
+    const [pRes, eRes, sRes, xRes] = await Promise.allSettled([
+      fetch(NOAA_PROTON),
+      fetch(NOAA_ELECTRON),
+      fetch(NOAA_SCALES),
+      fetch(NOAA_XRAY),
+    ]);
+
+    // Raggruppa per time_tag: ogni record GOES ha {time_tag, energy, flux, satellite}
+    const byTime = {};
+    const pick = (raw, energyMatch, field) => {
+      if (!Array.isArray(raw)) return;
+      for (const r of raw) {
+        const energy = String(r.energy||'');
+        if (!energy.includes(energyMatch)) continue;
+        const t = r.time_tag; if (!t) continue;
+        byTime[t] = byTime[t] || {};
+        const flux = parseFloat(r.flux);
+        if (!Number.isNaN(flux)) byTime[t][field] = flux;
+      }
+    };
+    if (pRes.status === 'fulfilled' && pRes.value.ok) {
+      const protonRaw = await pRes.value.json();
+      pick(protonRaw, '10 MeV', 'proton10');
+      pick(protonRaw, '100 MeV', 'proton100');
+    }
+    if (eRes.status === 'fulfilled' && eRes.value.ok) pick(await eRes.value.json(), '2 MeV', 'electron2');
+
+    let radData = Object.entries(byTime)
+      .map(([time, v]) => ({ time, proton10:v.proton10??null, proton100:v.proton100??null, electron2:v.electron2??null }))
+      .sort((a,b)=> a.time.localeCompare(b.time))
+      .slice(-100);
+
+    // Scala tempeste di radiazione S (0-5). Formato NOAA: oggetto con chiavi "-1".."2" = giorni relativi, "0" = oggi.
+    let sScale = null;
+    if (sRes.status === 'fulfilled' && sRes.value.ok) {
+      try {
+        const raw = await sRes.value.json();
+        const today = raw?.['0'];
+        const s = today?.S?.Scale;
+        sScale = (s!=null && s!=='') ? parseInt(s) : 0;
+      } catch(_) { sScale = null; }
+    }
+    if (sScale!=null && radData.length>0) radData[radData.length-1].s_scale = sScale;
+
+    // Raggi X (canale lungo 0.1-0.8nm) — classe flare, contesto causale
+    let xrayFlux = null;
+    if (xRes.status === 'fulfilled' && xRes.value.ok) {
+      try {
+        const raw = await xRes.value.json();
+        const longChannel = (raw||[]).filter(r => String(r.energy||'').includes('0.1-0.8'));
+        const last = longChannel[longChannel.length-1];
+        const f = parseFloat(last?.flux);
+        if (!Number.isNaN(f)) xrayFlux = f;
+      } catch(_) { xrayFlux = null; }
+    }
+
+    // Contesto: Kp e vento solare già scaricati altrove (evita un secondo round-trip), scritti solo sull'ultimo campione
+    if (radData.length>0) {
+      const lastKp = Array.isArray(kpData) && kpData.length>0 ? kpData[kpData.length-1].kp : null;
+      radData[radData.length-1].kp_now      = (lastKp!=null && !Number.isNaN(lastKp)) ? lastKp : null;
+      radData[radData.length-1].wind_speed  = windData?.speed   ?? null;
+      radData[radData.length-1].wind_density= windData?.density ?? null;
+      radData[radData.length-1].xray_flux   = xrayFlux;
+      radData[radData.length-1].flare_class = flareClassSrv(xrayFlux);
+    }
+
+    return radData;
+  } catch(e) {
+    return [];
+  }
+}
+
+async function salvaRadiazione(db, radData) {
+  for (const r of radData) {
+    await db.prepare(
+      `INSERT INTO radiazione_spaziale
+         (time_tag, proton_10mev, proton_100mev, electron_2mev, s_scale, kp_now, wind_speed, wind_density, xray_flux, flare_class)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(time_tag) DO UPDATE SET
+         proton_10mev  = COALESCE(excluded.proton_10mev,  radiazione_spaziale.proton_10mev),
+         proton_100mev = COALESCE(excluded.proton_100mev, radiazione_spaziale.proton_100mev),
+         electron_2mev = COALESCE(excluded.electron_2mev, radiazione_spaziale.electron_2mev),
+         s_scale       = COALESCE(excluded.s_scale,       radiazione_spaziale.s_scale),
+         kp_now        = COALESCE(excluded.kp_now,        radiazione_spaziale.kp_now),
+         wind_speed    = COALESCE(excluded.wind_speed,    radiazione_spaziale.wind_speed),
+         wind_density  = COALESCE(excluded.wind_density,  radiazione_spaziale.wind_density),
+         xray_flux     = COALESCE(excluded.xray_flux,     radiazione_spaziale.xray_flux),
+         flare_class   = COALESCE(excluded.flare_class,   radiazione_spaziale.flare_class)`
+    ).bind(
+      r.time, r.proton10, r.proton100, r.electron2, r.s_scale??null,
+      r.kp_now??null, r.wind_speed??null, r.wind_density??null, r.xray_flux??null, r.flare_class??null
+    ).run();
+  }
+}
+
+// ============================================================
 // DATI PER DASHBOARD
 // ============================================================
 async function getDashboardData(db) {
-  const [ultimi, stats, mensile, top, solare30, kpMax7] = await Promise.all([
+  const [ultimi, stats, mensile, top, solare30, kpMax7, rad30, radUltimo] = await Promise.all([
     db.prepare("SELECT * FROM terremoti ORDER BY data_ora DESC LIMIT 100").all(),
     db.prepare("SELECT COUNT(*) as totale, MAX(magnitudine) as max_mag, AVG(magnitudine) as avg_mag, MIN(data_ora) as primo FROM terremoti").all(),
     db.prepare(`SELECT strftime('%Y-%m', data_ora) as mese, COUNT(*) as n, MAX(magnitudine) as max_m
@@ -128,6 +251,11 @@ async function getDashboardData(db) {
                 WHERE time_tag >= datetime('now','-30 days')
                 GROUP BY giorno ORDER BY giorno ASC`).all(),
     db.prepare(`SELECT MAX(kp_index) as kp_max FROM dati_solari WHERE time_tag >= datetime('now','-7 days')`).all(),
+    db.prepare(`SELECT date(time_tag) as giorno, MAX(s_scale) as s_max, MAX(proton_10mev) as proton10_max, MAX(electron_2mev) as electron2_max
+                FROM radiazione_spaziale
+                WHERE time_tag >= datetime('now','-30 days')
+                GROUP BY giorno ORDER BY giorno ASC`).all(),
+    db.prepare(`SELECT * FROM radiazione_spaziale ORDER BY time_tag DESC LIMIT 1`).all(),
   ]);
 
   const sismi30 = await db.prepare(`
@@ -145,6 +273,8 @@ async function getDashboardData(db) {
     solare30: solare30.results,
     sismi30:  sismi30.results,
     kpMax7:   kpMax7.results[0],
+    rad30:    rad30.results,
+    radUltimo:radUltimo.results[0] || null,
   };
 }
 
@@ -201,12 +331,14 @@ const magColor = m => m>=4.0?'#ff1744':m>=3.0?'#ff6d00':m>=2.0?'#ffd600':'#69f0a
 const magBg    = m => m>=4.0?'rgba(255,23,68,.15)':m>=3.0?'rgba(255,109,0,.12)':m>=2.0?'rgba(255,214,0,.1)':'rgba(105,240,174,.08)';
 const kpColor  = k => k>=7?'#ff1744':k>=5?'#ff6d00':k>=4?'#ffd600':k>=2?'#26c6da':'#546e7a';
 const kpLabel  = k => k>=7?'TEMPESTA FORTE':k>=5?'TEMPESTA MODERATA':k>=4?'ATTIVA':k>=2?'QUIETE':'CALMA';
+const sColor   = s => s>=4?'#ff1744':s>=3?'#ff6d00':s>=2?'#ffd600':s>=1?'#26c6da':'#546e7a';
+const sLabel   = s => s>=4?`S${s} TEMPESTA SEVERA`:s>=3?`S${s} FORTE`:s>=2?`S${s} MODERATA`:s>=1?`S${s} MINORE`:'S0 QUIETA';
 
 // ============================================================
 // HTML DASHBOARD v2
 // ============================================================
 function renderDashboard(data, cfData, ingvStatus) {
-  const { ultimi, stats, mensile, top, solare30, sismi30, kpMax7 } = data;
+  const { ultimi, stats, mensile, top, solare30, sismi30, kpMax7, rad30, radUltimo } = data;
   const now = new Date().toLocaleString("it-IT",{timeZone:"Europe/Rome"});
 
   const ultiRows = ultimi.slice(0,50).map(e => {
@@ -277,6 +409,26 @@ function renderDashboard(data, cfData, ingvStatus) {
   const totGiorni   = allDays.filter(day=>(sismiMap[day]?.n||0)>0).length;
   const hitRate     = totGiorni>0?Math.round((coincidenze.length/totGiorni)*100):0;
   const kpNow       = kpMax7?.kp_max?parseFloat(kpMax7.kp_max).toFixed(1):'—';
+
+  // Radiazione spaziale — timeline scala S (NOAA GOES), stessa griglia giorni della sezione solare
+  const radDays  = rad30.map(r=>r.giorno);
+  const radNDays = radDays.length||1;
+  const radBarW  = Math.max(2, Math.floor((W-PAD*2)/radNDays)-2);
+  const sMap     = Object.fromEntries(rad30.map(r=>[r.giorno, parseInt(r.s_max)||0]));
+  const radBars  = radDays.map((day,i)=>{
+    const s=sMap[day]||0;
+    const h=Math.max(2,Math.round((s/5)*H_KP));
+    const x=PAD+i*((W-PAD*2)/radNDays);
+    return `<rect x="${x}" y="${H_KP-h}" width="${radBarW}" height="${h}" fill="${sColor(s)}" rx="2" opacity="0.9"/>`;
+  }).join("");
+  const radXLabels = radDays.filter((_,i)=>i%5===0||i===radDays.length-1).map(day=>{
+    const idx=radDays.indexOf(day);
+    const x=PAD+idx*((W-PAD*2)/radNDays)+radBarW/2;
+    return `<text x="${x}" y="${H_KP+16}" text-anchor="middle" fill="#455a64" font-size="9" font-family="monospace">${day.slice(5)}</text>`;
+  }).join("");
+  const proton10Now  = radUltimo?.proton_10mev!=null  ? Number(radUltimo.proton_10mev).toExponential(2)  : '—';
+  const electron2Now = radUltimo?.electron_2mev!=null ? Number(radUltimo.electron_2mev).toExponential(2) : '—';
+  const sScaleNow     = radUltimo?.s_scale!=null ? parseInt(radUltimo.s_scale) : null;
 
   const maxMens=Math.max(...mensile.map(m=>m.n),1);
   const bH=100,bW2=mensile.length>0?Math.floor(480/mensile.length)-3:20;
@@ -752,6 +904,65 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- SEZIONE RADIAZIONE SPAZIALE — NOAA GOES                      -->
+<!-- ============================================================ -->
+<div class="panel" id="radiazione" style="margin-top:28px;border-color:rgba(124,199,255,.25);scroll-margin-top:20px">
+  <div class="panel-header" style="color:#7cc7ff;border-bottom-color:rgba(124,199,255,.2)">
+    🛰 <span style="color:#7cc7ff">RADIAZIONE SPAZIALE</span> — GOES protoni/elettroni · fasce di Van Allen
+    <a href="/radiazione" style="margin-left:auto;color:#7cc7ff;font-size:.72em;font-family:'Share Tech Mono',monospace;border:1px solid rgba(124,199,255,.35);padding:4px 10px;border-radius:20px;text-decoration:none">apri dettaglio →</a>
+  </div>
+  <div class="panel-body">
+    <div class="stats-grid" style="margin-bottom:20px">
+      <div class="stat-card" style="border-color:rgba(124,199,255,.15)">
+        <div class="stat-label" style="color:#7cc7ff">🚨 Scala tempeste (S)</div>
+        <div class="stat-value" style="color:${sScaleNow!=null?sColor(sScaleNow):'#546e7a'}">${sScaleNow!=null?sLabel(sScaleNow):'—'}</div>
+        <div class="stat-sub">livello attuale NOAA · 0=quieto, 5=severo</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(124,199,255,.15)">
+        <div class="stat-label" style="color:#7cc7ff">☢ Protoni &gt;10 MeV</div>
+        <div class="stat-value">${proton10Now}</div>
+        <div class="stat-sub">pfu · GOES, ultimo campione</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(124,199,255,.15)">
+        <div class="stat-label" style="color:#7cc7ff">⚡ Elettroni &gt;2 MeV</div>
+        <div class="stat-value">${electron2Now}</div>
+        <div class="stat-sub">pfu · fascia esterna, GOES</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(124,199,255,.15)">
+        <div class="stat-label" style="color:#7cc7ff">📖 Fonte</div>
+        <div class="stat-value" style="font-size:1.1em">NOAA SWPC</div>
+        <div class="stat-sub">dato pubblico, no auth — sostituto open a NORM/ASBM2</div>
+      </div>
+    </div>
+
+    <div style="font-size:.73em;font-weight:600;color:#7cc7ff;text-transform:uppercase;letter-spacing:.12em;font-family:'Share Tech Mono',monospace;margin-bottom:10px">
+      📡 TIMELINE SCALA S — max giornaliero, ultimi 30 giorni
+    </div>
+    <div style="overflow-x:auto">
+      <svg width="100%" viewBox="0 0 ${W} ${H_KP+30}" style="overflow:visible;min-width:520px">
+        <line x1="${PAD}" y1="${H_KP}" x2="${W-PAD}" y2="${H_KP}" stroke="rgba(124,199,255,.15)" stroke-width="1"/>
+        ${radBars}
+        ${radXLabels}
+      </svg>
+      <div style="display:flex;gap:18px;margin-top:10px;font-size:.7em;font-family:'Share Tech Mono',monospace;flex-wrap:wrap;color:#546e7a">
+        <span><span style="color:#546e7a">■</span> S0 quieto</span>
+        <span><span style="color:#26c6da">■</span> S1 minore</span>
+        <span><span style="color:#ffd600">■</span> S2 moderata</span>
+        <span><span style="color:#ff6d00">■</span> S3 forte</span>
+        <span><span style="color:#ff1744">■</span> S4-S5 severa</span>
+      </div>
+      <div style="margin-top:14px;padding:12px 16px;background:rgba(124,199,255,.04);border-radius:8px;border-left:3px solid rgba(124,199,255,.25)">
+        <div style="font-size:.72em;color:#546e7a;font-family:'Share Tech Mono',monospace;line-height:1.9">
+          ℹ Dato reale ma non è la fonte NORM/ASBM2 (Norwegian Radiation Monitor, accesso riservato via GSC).<br>
+          È il proxy pubblico NOAA GOES — stesse fasce di radiazione osservate, satellite diverso, nessuna richiesta d'accesso.<br>
+          Grafico dettagliato con soglie S1-S5 e serie temporale ad alta risoluzione → <a href="/radiazione" style="color:#7cc7ff">/radiazione</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="grid-2">
   <div class="panel" style="margin-bottom:0">
     <div class="panel-header">📊 <span class="acc">Attività mensile FVG</span></div>
@@ -784,6 +995,8 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
     <div><span style="color:#26c6da">GET</span> /api/events?giorni=7&mag=2.0</div>
     <div><span style="color:#26c6da">GET</span> /api/solar — dati Kp giornalieri (JSON)</div>
     <div><span style="color:#26c6da">GET</span> /api/stats — statistiche generali</div>
+    <div><span style="color:#26c6da">GET</span> /api/radiation — flusso protoni/elettroni GOES + scala S (JSON)</div>
+    <div><span style="color:#7cc7ff">GET</span> /radiazione — dashboard dedicata radiazione spaziale</div>
     <div><span style="color:#69f0ae">GET</span> /update?token=*** — forza aggiornamento INGV + NOAA</div>
   </div>
 </div>
@@ -794,10 +1007,21 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
 <div class="panel" id="suite" style="margin-top:28px">
   <div class="panel-header">
     <span>🚀 <span class="acc">ECHO SUITE</span> — app &amp; strumenti</span>
-    <span style="color:#455a64">7 moduli · Cloudflare AI · edge</span>
+    <span style="color:#455a64">8 moduli · Cloudflare AI · edge</span>
   </div>
   <div class="panel-body">
     <div class="suite-grid">
+
+      <a href="/radiazione" class="app-card" style="--app:#7cc7ff"
+         data-tt-title="Echo Radiazione" data-tt-badge="NUOVO"
+         data-tt="Radiazione spaziale in tempo reale — flusso protoni/elettroni GOES (NOAA SWPC) e scala tempeste S1-S5, lo standard internazionale usato da NOAA/ESA/ISES. Serie storica log-scale con soglie di riferimento.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🛰</div>
+        <div class="app-name">Echo Radiazione</div>
+        <div class="app-desc">protoni/elettroni · scala S</div>
+        <div class="app-tag">NOAA GOES</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
 
       <a href="/chat" class="app-card" style="--app:#26c6da"
          data-tt-title="Echo Chat" data-tt-badge="MODELLO NUOVO"
@@ -1062,6 +1286,251 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
     card.addEventListener('pointerleave',function(){card.style.transform=''});
   });
 })();
+</script>
+</body>
+</html>`;
+}
+
+// ============================================================
+// RADIAZIONE SPAZIALE — pagina dedicata (NOAA GOES)
+// ============================================================
+function renderRadiazione() {
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🛰 Radiazione Spaziale — ECHO Suite</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0e14;color:#eceff1;font-family:'Inter',system-ui,sans-serif;padding:20px}
+  .topbar{max-width:1320px;margin:0 auto}
+  .back{color:#7cc7ff;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.85em}
+  h1{font-size:1.5em;margin:14px 0 4px;color:#7cc7ff}
+  .sub{color:#78909c;font-size:.85em;margin-bottom:24px;font-family:'Share Tech Mono',monospace}
+  .layout{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:210px minmax(0,1fr) 210px;gap:18px;align-items:start}
+  @media(max-width:1100px){.layout{grid-template-columns:1fr}}
+  .aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:20px}
+  @media(max-width:1100px){.aside{position:static}}
+  .aside-title{font-size:.68em;color:#546e7a;text-transform:uppercase;letter-spacing:.12em;font-family:'Share Tech Mono',monospace;margin-bottom:2px;padding-left:2px}
+  .mini{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px 14px}
+  .mini .lbl{font-size:.66em;color:#78909c;font-family:'Share Tech Mono',monospace;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
+  .mini .val{font-size:1.35em;font-weight:800;margin-top:5px}
+  .mini .sub{font-size:.68em;color:#546e7a;margin-top:2px;font-family:'Share Tech Mono',monospace}
+  .panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;margin-bottom:20px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:10px}
+  .card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px}
+  .card .lbl{font-size:.72em;color:#78909c;font-family:'Share Tech Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
+  .card .val{font-size:1.7em;font-weight:800;margin-top:4px}
+  .gauge{display:flex;gap:6px;margin-top:10px}
+  .gauge div{flex:1;height:10px;border-radius:4px;background:rgba(255,255,255,.06)}
+  .gauge div.on{filter:none}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.72em;font-family:'Share Tech Mono',monospace;color:#546e7a;margin-top:12px}
+  .note{margin-top:14px;padding:12px 16px;background:rgba(124,199,255,.05);border-radius:8px;border-left:3px solid rgba(124,199,255,.3);font-size:.78em;color:#90a4ae;line-height:1.8;font-family:'Share Tech Mono',monospace}
+  .trend{display:inline-flex;align-items:center;gap:4px;font-size:.62em;padding:2px 8px;border-radius:20px;font-family:'Share Tech Mono',monospace;margin-top:6px}
+  a{color:#7cc7ff}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/#radiazione" class="back">← torna alla dashboard ECHO</a>
+  <h1>🛰 Radiazione Spaziale</h1>
+  <div class="sub">GOES protoni/elettroni · scala tempeste S (standard NOAA/ESA/ISES) · fonte pubblica NOAA SWPC</div>
+</div>
+
+<div class="layout">
+
+  <aside class="aside">
+    <div class="aside-title">☀ Contesto — causa</div>
+    <div class="mini">
+      <div class="lbl">🧭 Kp index</div>
+      <div class="val" id="ctxKp" style="color:#546e7a">—</div>
+      <div class="sub">attività geomagnetica ora</div>
+    </div>
+    <div class="mini">
+      <div class="lbl">💨 Vento solare</div>
+      <div class="val" id="ctxWindSpeed" style="font-size:1.1em">—</div>
+      <div class="sub" id="ctxWindDensity">densità —</div>
+    </div>
+    <div class="mini">
+      <div class="lbl">⚡ Raggi X (flare)</div>
+      <div class="val" id="ctxFlare" style="color:#546e7a">—</div>
+      <div class="sub">classe GOES A/B/C/M/X — spesso precede un evento protonico</div>
+    </div>
+  </aside>
+
+  <main>
+  <div class="panel">
+    <div class="grid">
+      <div class="card">
+        <div class="lbl">Scala S attuale</div>
+        <div class="val" id="sVal" style="color:#546e7a">—</div>
+        <div class="gauge" id="sGauge">
+          <div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="lbl">Protoni &gt;10 MeV</div>
+        <div class="val" id="p10Val">—</div>
+        <div class="lbl" style="margin-top:6px">pfu</div>
+      </div>
+      <div class="card">
+        <div class="lbl">Protoni &gt;100 MeV</div>
+        <div class="val" id="p100Val">—</div>
+        <div class="lbl" style="margin-top:6px">pfu</div>
+      </div>
+      <div class="card">
+        <div class="lbl">Elettroni &gt;2 MeV</div>
+        <div class="val" id="e2Val">—</div>
+        <div class="lbl" style="margin-top:6px">pfu</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">📈 FLUSSO PROTONI &gt;10 MeV — scala logaritmica, soglie S1-S5</div>
+    <div id="chartP" style="overflow-x:auto"></div>
+    <div class="legend">
+      <span><span style="color:#26c6da">▬</span> S1 = 10 pfu</span>
+      <span><span style="color:#ffd600">▬</span> S2 = 100 pfu</span>
+      <span><span style="color:#ff6d00">▬</span> S3 = 1.000 pfu</span>
+      <span><span style="color:#ff1744">▬</span> S4 = 10.000 pfu</span>
+      <span><span style="color:#d500f9">▬</span> S5 = 100.000 pfu</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">📈 FLUSSO ELETTRONI &gt;2 MeV — scala logaritmica</div>
+    <div id="chartE" style="overflow-x:auto"></div>
+    <div class="legend">
+      <span><span style="color:#7cc7ff">▬</span> soglia rischio "surface charging" ≈ 1.000 pfu (convenzione operativa satelliti)</span>
+    </div>
+  </div>
+
+  <div class="note">
+    ℹ METODOLOGIA: la scala S (Solar Radiation Storm) è lo standard internazionale NOAA/ISES per classificare
+    l'intensità delle tempeste di radiazione da protoni solari energetici, adottato anche da ESA. Soglie fisse
+    in pfu (particle flux units, particelle/cm²·s·sr) sul canale &gt;10 MeV: è lo stesso schema con cui NOAA
+    disegna il pannello "Space Weather Overview" su spaceweather.gov.<br><br>
+    Questo è il dato pubblico GOES — proxy aperto rispetto a NORM/ASBM2 (Norwegian Radiation Monitor,
+    fasce di Van Allen, accesso riservato via GSC). Stessa fisica osservata, satellite e provider diversi.
+  </div>
+  </main>
+
+  <aside class="aside">
+    <div class="aside-title">📊 Derivati — statistiche</div>
+    <div class="mini">
+      <div class="lbl">☢ Protoni &gt;10 MeV — 24h</div>
+      <div class="val" id="derP10Range" style="font-size:1.05em">—</div>
+      <div class="sub">min – max, pfu</div>
+      <div id="derP10Trend"></div>
+    </div>
+    <div class="mini">
+      <div class="lbl">⚡ Elettroni &gt;2 MeV — 24h</div>
+      <div class="val" id="derE2Range" style="font-size:1.05em">—</div>
+      <div class="sub">min – max, pfu</div>
+    </div>
+    <div class="mini">
+      <div class="lbl">🟢 Giorni consecutivi quieti</div>
+      <div class="val" id="derStreak" style="color:#69f0ae">—</div>
+      <div class="sub">S0, dal giorno più recente a ritroso</div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const sColor = s => s>=4?'#ff1744':s>=3?'#ff6d00':s>=2?'#ffd600':s>=1?'#26c6da':'#546e7a';
+const sLabel = s => s>=4?('S'+s+' — TEMPESTA SEVERA'):s>=3?('S'+s+' — FORTE'):s>=2?('S'+s+' — MODERATA'):s>=1?('S'+s+' — MINORE'):'S0 — QUIETA';
+const fmt = v => v==null?'—':(v>=1||v===0?v.toFixed(v>=100?0:1):v.toExponential(2));
+const kpColor = k => k>=7?'#ff1744':k>=5?'#ff6d00':k>=4?'#ffd600':k>=2?'#26c6da':'#546e7a';
+const flareColor = c => !c?'#546e7a':c[0]==='X'?'#ff1744':c[0]==='M'?'#ff6d00':c[0]==='C'?'#ffd600':'#546e7a';
+const trendLabel = t => t==='up'?'▲ in salita':t==='down'?'▼ in calo':t==='stable'?'▬ stabile':'—';
+const trendColor = t => t==='up'?'#ff6d00':t==='down'?'#26c6da':'#546e7a';
+
+function logChart(rows, field, thresholds, mainColor){
+  const vals = rows.map(r=>r[field]).filter(v=>v!=null && v>0);
+  if(vals.length<2) return '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Dati insufficienti — attendere il prossimo ciclo di aggiornamento (cron 5×/giorno)</div>';
+  const W=860,H=200,PAD=46;
+  const allVals = vals.concat(thresholds||[]);
+  const logMin = Math.floor(Math.log10(Math.max(Math.min(...allVals),1e-3)));
+  const logMax = Math.ceil(Math.log10(Math.max(...allVals)))+0.3;
+  const yOf = v => H - ((Math.log10(Math.max(v,1e-3))-logMin)/(logMax-logMin))*H;
+  const pts = rows.map(r=>r[field]);
+  const step = (W-PAD*2)/Math.max(1,pts.length-1);
+  let path='', started=false;
+  pts.forEach((v,i)=>{
+    if(v==null){started=false;return;}
+    const x=PAD+i*step, y=yOf(v);
+    path += (started?'L':'M')+x.toFixed(1)+','+y.toFixed(1)+' ';
+    started=true;
+  });
+  const thrLines = (thresholds||[]).map((t,i)=>{
+    const y=yOf(t);
+    const colors=['#26c6da','#ffd600','#ff6d00','#ff1744','#d500f9'];
+    if(y<0||y>H) return '';
+    return '<line x1="'+PAD+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+y.toFixed(1)+'" stroke="'+colors[i]+'" stroke-width="1" stroke-dasharray="5,4" opacity="0.5"/>';
+  }).join('');
+  const last = pts.filter(v=>v!=null).slice(-1)[0];
+  const lastY = last!=null ? yOf(last) : null;
+  return '<svg width="100%" viewBox="0 0 '+W+' '+(H+24)+'" style="overflow:visible;min-width:560px">'
+    + thrLines
+    + '<path d="'+path+'" fill="none" stroke="'+mainColor+'" stroke-width="2"/>'
+    + (lastY!=null ? '<circle cx="'+(PAD+(pts.length-1)*step)+'" cy="'+lastY.toFixed(1)+'" r="4" fill="'+mainColor+'"/>' : '')
+    + '<text x="'+PAD+'" y="'+(H+18)+'" fill="#455a64" font-size="9" font-family="monospace">meno recente</text>'
+    + '<text x="'+(W-PAD)+'" y="'+(H+18)+'" text-anchor="end" fill="#455a64" font-size="9" font-family="monospace">ora</text>'
+    + '</svg>';
+}
+
+async function load(){
+  try{
+    const res = await fetch('/api/radiation');
+    const data = await res.json();
+    const rows = data.rows||[];
+    const ctx = data.context||{};
+    const der = data.derived||{};
+
+    const sNow = ctx.s_scale;
+    if(sNow!=null){
+      $('sVal').textContent = sLabel(sNow);
+      $('sVal').style.color = sColor(sNow);
+      document.querySelectorAll('#sGauge div').forEach((el,i)=>{
+        el.style.background = i<=sNow ? sColor(sNow) : 'rgba(255,255,255,.06)';
+      });
+    }
+    const lastRow = rows.slice(-1)[0]||{};
+    $('p10Val').textContent = fmt(lastRow.proton_10mev);
+    $('p100Val').textContent = fmt(lastRow.proton_100mev);
+    $('e2Val').textContent = fmt(lastRow.electron_2mev);
+    $('chartP').innerHTML = logChart(rows, 'proton_10mev', [10,100,1000,10000,100000], '#7cc7ff');
+    $('chartE').innerHTML = logChart(rows, 'electron_2mev', [], '#66bb6a');
+
+    // Contesto — sinistra
+    if(ctx.kp_now!=null){
+      $('ctxKp').textContent = Number(ctx.kp_now).toFixed(1);
+      $('ctxKp').style.color = kpColor(ctx.kp_now);
+    }
+    if(ctx.wind_speed!=null) $('ctxWindSpeed').textContent = Math.round(ctx.wind_speed)+' km/s';
+    if(ctx.wind_density!=null) $('ctxWindDensity').textContent = 'densità '+ctx.wind_density.toFixed(1)+' n/cc';
+    if(ctx.flare_class){
+      $('ctxFlare').textContent = ctx.flare_class;
+      $('ctxFlare').style.color = flareColor(ctx.flare_class);
+    }
+
+    // Derivati — destra
+    if(der.proton10_24h && der.proton10_24h.min!=null) $('derP10Range').textContent = fmt(der.proton10_24h.min)+' – '+fmt(der.proton10_24h.max);
+    if(der.electron2_24h && der.electron2_24h.min!=null) $('derE2Range').textContent = fmt(der.electron2_24h.min)+' – '+fmt(der.electron2_24h.max);
+    if(der.proton10_trend){
+      $('derP10Trend').innerHTML = '<span class="trend" style="background:'+trendColor(der.proton10_trend)+'22;color:'+trendColor(der.proton10_trend)+';border:1px solid '+trendColor(der.proton10_trend)+'44">'+trendLabel(der.proton10_trend)+'</span>';
+    }
+    if(der.s0_streak_days!=null) $('derStreak').textContent = der.s0_streak_days;
+  }catch(e){
+    $('chartP').innerHTML = '<div style="color:#ff6d00;font-size:.85em">Errore caricamento dati: '+e.message+'</div>';
+  }
+}
+load();
 </script>
 </body>
 </html>`;
@@ -4683,12 +5152,28 @@ export default {
 
     if (!db) return new Response(JSON.stringify({error:"DB binding non trovato"}),{status:500,headers:{"Content-Type":"application/json"}});
 
-    // Crea tabella solari se non esiste
-    const initDB = () => db.prepare(`CREATE TABLE IF NOT EXISTS dati_solari (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      time_tag TEXT UNIQUE NOT NULL,
-      kp_index REAL
-    )`).run();
+    // Crea tabelle solari + radiazione se non esistono
+    const initDB = () => Promise.all([
+      db.prepare(`CREATE TABLE IF NOT EXISTS dati_solari (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        time_tag TEXT UNIQUE NOT NULL,
+        kp_index REAL
+      )`).run(),
+      db.prepare(`CREATE TABLE IF NOT EXISTS radiazione_spaziale (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        time_tag TEXT UNIQUE NOT NULL,
+        proton_10mev REAL,
+        proton_100mev REAL,
+        electron_2mev REAL,
+        s_scale INTEGER
+      )`).run(),
+    ]).then(() => Promise.all([
+      addColIfMissing(db, 'radiazione_spaziale', 'kp_now REAL'),
+      addColIfMissing(db, 'radiazione_spaziale', 'wind_speed REAL'),
+      addColIfMissing(db, 'radiazione_spaziale', 'wind_density REAL'),
+      addColIfMissing(db, 'radiazione_spaziale', 'xray_flux REAL'),
+      addColIfMissing(db, 'radiazione_spaziale', 'flare_class TEXT'),
+    ]));
 
     if (url.pathname === "/update-solar") {
       if (url.searchParams.get("token") !== getUpdateSecret(env)) return new Response("Non autorizzato 🔒",{status:401});
@@ -4727,9 +5212,77 @@ export default {
         if (eventiCF.length > 0 && env.DB_CF) await salvaEventi(env.DB_CF, eventiCF);
         const solare = await fetchSolare();
         if (solare.kpData.length>0) await salvaSolare(db, solare.kpData);
+        const radiazione = await fetchRadiazione(solare.kpData, solare.windData);
+        if (radiazione.length>0) await salvaRadiazione(db, radiazione);
         return Response.redirect(url.origin+"/?updated="+nuovi+(ingvOffline?"&ingv_offline=1":""), 302);
       } catch(e) {
         return new Response(JSON.stringify({error:e.message}),{status:500,headers:{"Content-Type":"application/json"}});
+      }
+    }
+
+    if (url.pathname === "/radiazione") {
+      return new Response(renderRadiazione(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
+    }
+
+    if (url.pathname === "/api/radiation") {
+      try {
+        await initDB();
+        const [recent, daily] = await Promise.all([
+          db.prepare(
+            `SELECT time_tag, proton_10mev, proton_100mev, electron_2mev, s_scale, kp_now, wind_speed, wind_density, xray_flux, flare_class
+             FROM radiazione_spaziale ORDER BY time_tag DESC LIMIT 300`
+          ).all(),
+          db.prepare(
+            `SELECT date(time_tag) as giorno, MAX(s_scale) as s_max
+             FROM radiazione_spaziale GROUP BY giorno ORDER BY giorno DESC LIMIT 30`
+          ).all(),
+        ]);
+        const rows = recent.results.slice().reverse(); // ASC per il grafico
+
+        // Contesto: ultimo valore non-nullo per ciascun campo (il "campione corrente" di ognuno può cadere su righe diverse)
+        const lastNonNull = field => { for (let i=rows.length-1;i>=0;i--){ if (rows[i][field]!=null) return rows[i][field]; } return null; };
+        const context = {
+          kp_now:       lastNonNull('kp_now'),
+          wind_speed:   lastNonNull('wind_speed'),
+          wind_density: lastNonNull('wind_density'),
+          xray_flux:    lastNonNull('xray_flux'),
+          flare_class:  lastNonNull('flare_class'),
+          s_scale:      lastNonNull('s_scale'),
+        };
+
+        // Derivati: min/max 24h, tendenza ultima ora (~12 campioni da 5min)
+        const cutoff24h = new Date(Date.now()-24*3600*1000).toISOString();
+        const last24h = rows.filter(r => r.time_tag >= cutoff24h);
+        const range = field => {
+          const vals = (last24h.length?last24h:rows).map(r=>r[field]).filter(v=>v!=null);
+          return vals.length ? { min: Math.min(...vals), max: Math.max(...vals) } : { min:null, max:null };
+        };
+        const trendOf = field => {
+          const vals = rows.map(r=>r[field]).filter(v=>v!=null);
+          if (vals.length<2) return null;
+          const now = vals[vals.length-1], before = vals[Math.max(0,vals.length-13)];
+          const delta = now-before;
+          const rel = before!==0 ? delta/Math.abs(before) : 0;
+          return rel>0.08 ? 'up' : rel<-0.08 ? 'down' : 'stable';
+        };
+
+        // Streak giorni consecutivi S0 (dal giorno più recente a ritroso, si ferma al primo S>=1)
+        let s0Streak = 0;
+        for (const d of daily.results) {
+          const s = d.s_max;
+          if (s==null || parseInt(s)===0) s0Streak++; else break;
+        }
+
+        const derived = {
+          proton10_24h:  range('proton_10mev'),
+          electron2_24h: range('electron_2mev'),
+          proton10_trend: trendOf('proton_10mev'),
+          s0_streak_days: s0Streak,
+        };
+
+        return new Response(JSON.stringify({rows, context, derived}),{headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Cache-Control":"max-age=120"}});
+      } catch(e) {
+        return new Response(JSON.stringify({rows:[], context:{}, derived:{}, error:e.message}),{headers:{"Content-Type":"application/json"}});
       }
     }
 
@@ -4949,6 +5502,21 @@ export default {
         time_tag TEXT UNIQUE NOT NULL,
         kp_index REAL
       )`).run();
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS radiazione_spaziale (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        time_tag TEXT UNIQUE NOT NULL,
+        proton_10mev REAL,
+        proton_100mev REAL,
+        electron_2mev REAL,
+        s_scale INTEGER
+      )`).run();
+      await Promise.all([
+        addColIfMissing(env.DB, 'radiazione_spaziale', 'kp_now REAL'),
+        addColIfMissing(env.DB, 'radiazione_spaziale', 'wind_speed REAL'),
+        addColIfMissing(env.DB, 'radiazione_spaziale', 'wind_density REAL'),
+        addColIfMissing(env.DB, 'radiazione_spaziale', 'xray_flux REAL'),
+        addColIfMissing(env.DB, 'radiazione_spaziale', 'flare_class TEXT'),
+      ]);
       if (env.DB_CF) await initCFDB(env.DB_CF);
 
       let eventi = [], eventiCF = [];
@@ -4966,6 +5534,8 @@ export default {
       if (eventi.length>0) await salvaEventi(env.DB, eventi);
       if (eventiCF.length>0 && env.DB_CF) await salvaEventi(env.DB_CF, eventiCF);
       if (solare.kpData.length>0) await salvaSolare(env.DB, solare.kpData);
+      const radiazione = await fetchRadiazione(solare.kpData, solare.windData);
+      if (radiazione.length>0) await salvaRadiazione(env.DB, radiazione);
     } catch(e) {
       console.error("Cron error:", e.message);
     }
