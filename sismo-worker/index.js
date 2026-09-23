@@ -3848,6 +3848,12 @@ const CURATED = [
   {name:"msg_fes:rgb_snow",          title:"Snow RGB - MSG - 0 degree", hasTime:true},
   {name:"mtg_fd:rgb_firetemperature",title:"Fire Temperature RGB - MTG-I - 0 degree", hasTime:true},
   {name:"mtg_fd:rgb_cloudphase",     title:"Cloud Phase RGB - MTG-I - 0 degree", hasTime:true},
+  // Dati (non RGB estetici): fulmini e instabilita' da satellite. Il primo
+  // passo verso previsione (non solo descrizione) — il "lightning jump"
+  // (impennata improvvisa del tasso di fulmini) e' un precursore noto di
+  // tempo severo, spesso 10-20 minuti prima della grandine/downburst.
+  {name:"mtg_fd:li_afa",             title:"LI Accumulated Flash Area - MTG-I - 0 degree", hasTime:true},
+  {name:"msg_fes:gii_liftedindex",   title:"GII Lifted-Index - MSG - 0 degree", hasTime:true},
 ];
 // Spiegazione delle ricette RGB false-colore: cosa mostrano i colori, non il
 // nome tecnico del layer (che l'utente non conosce e non deve conoscere).
@@ -3862,6 +3868,8 @@ const RECIPE_HINTS = [
   [/firetemperature/i, "punti caldi e incendi attivi in rosso acceso"],
   [/cloudphase/i,      "fase della nube: goccioline liquide vs cristalli di ghiaccio"],
   [/cloudtype/i,       "classificazione del tipo di nube per colore"],
+  [/flash area|lightning|\bli_afa\b/i, "attivita' dei fulmini: aree dove il Lightning Imager MTG ha registrato scariche (accumulo) — segue le celle attive, un'impennata rapida spesso precede grandine/raffiche"],
+  [/lifted.?index|liftedindex/i,       "instabilita' da satellite: piu' negativo = atmosfera piu' predisposta ai temporali"],
 ];
 function recipeHint(title){
   const hit = RECIPE_HINTS.find(([re])=>re.test(title));
@@ -4017,11 +4025,15 @@ function onProductChange(){
   const freshness = geo ? " · aggiornato ogni "+(rapid?"~5 minuti (Rapid Scan)":"~10-15 minuti")
                    : mumi ? " · mosaico mondiale quasi in tempo reale (piu' satelliti/agenzie)" : "";
   const recipe = recipeHint(title);
+  // Distinzione fra composizioni RGB false-colore (piu' canali mescolati) e
+  // prodotti dati a canale singolo come fulmini/lifted-index: solo le prime
+  // sono davvero "RGB false-colore", l'etichetta era generica e fuorviante.
+  const isRgbRecipe = /\brgb\b/i.test(title);
   if(single)
     $("prodhint").innerHTML="<span style='color:var(--warn)'>striscia di una singola orbita — usa una versione "
       +"<b>Daily / Accumulated</b> per coprire tutta la mappa</span>";
   else if(recipe)
-    $("prodhint").innerHTML="<span style='color:var(--acc)'>RGB false-colore: "+recipe+"</span>"
+    $("prodhint").innerHTML="<span style='color:var(--acc)'>"+(isRgbRecipe?"RGB false-colore: ":"")+recipe+"</span>"
       +(freshness?"<br><span style='color:var(--ok)'>"+freshness.replace(" · ","")+"</span>":"");
   else if(fullDisk)
     $("prodhint").innerHTML="<span style='color:var(--ok)'>satellite geostazionario — disco intero"+freshness+"</span>"
