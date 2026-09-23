@@ -52,6 +52,10 @@
     border:1px solid var(--edge);border-radius:10px;padding:6px 11px;font-size:12px;
     color:var(--acc);display:none}
   #spin.on{display:block}
+  #legend{position:absolute;bottom:12px;left:12px;background:rgba(8,12,18,.82);
+    border:1px solid var(--edge);border-radius:10px;padding:6px 8px;display:none;
+    max-width:60%;max-height:38%;overflow:auto}
+  #legend img{display:block;max-width:100%}
   /* ---- status ---- */
   #status{grid-column:2;background:var(--panel);border-top:1px solid var(--edge);
     display:flex;align-items:center;padding:0 12px;font-size:12px;color:var(--sub);gap:16px}
@@ -104,6 +108,9 @@
     </select>
     <select id="product" style="margin-top:6px"></select>
     <div id="prodhint" class="sub" style="margin-top:6px"></div>
+    <label class="chk" id="lightningBeepRow" style="display:none;margin-top:8px">
+      <input type="checkbox" id="lightningBeep"> 🔔 Bip su nuova attività fulmini (satellite, ogni ~10 min — non per singola scarica)
+    </label>
 
     <div class="sect">Data</div>
     <div class="row">
@@ -114,6 +121,11 @@
     <select id="times"><option value="">— (usa la data intera) —</option></select>
     <label class="chk"><input type="checkbox" id="live" checked> <span id="liveLabel">Aggiornamento automatico</span></label>
     <div id="livehint" class="sub" style="margin:-4px 0 8px"></div>
+
+    <div class="sect">Fulmini live</div>
+    <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra, Blitzortung — vero per-scarica)</label>
+    <div id="liveLightningStatus" class="sub" style="margin:-4px 0 8px"></div>
+    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (FVG e dintorni), con un bip più acuto e corto del bip satellitare qui sopra.</div>
 
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
@@ -145,6 +157,10 @@
     <div id="globehint" class="sub" style="margin:-4px 0 8px"></div>
     <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
     <label class="chk"><input type="checkbox" id="borders" checked> Confini delle nazioni</label>
+    <label class="chk" id="rdtRow" style="display:none">
+      <input type="checkbox" id="rdt"> 🌪️ Celle convettive tracciate (RDT)
+    </label>
+    <div id="rdtHint" class="sub" style="margin:-4px 0 8px;display:none">contorni delle celle temporalesche gia' tracciate dal satellite: poligono + vettore di moto, colore secondo la fase di sviluppo — solo sopra prodotti MSG/MTG (stesso orario)</div>
     <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
     <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
     <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
@@ -164,6 +180,7 @@
     <canvas id="cv"></canvas>
     <div id="chip">Pronto — trascina per spostarti, rotella per zoomare.</div>
     <div id="spin">⏳ scarico…</div>
+    <div id="legend"><img id="legendImg" alt="legenda colore"></div>
   </div>
 
   <div id="status">
@@ -240,6 +257,7 @@ function draw(){
   }
   if(document.getElementById("grid").checked && !globeOn) drawGraticule();
   if(globeOn) drawGlobeOutline();
+  if(!globeOn) drawLiveStrikes();
   document.getElementById("st-view").textContent =
     "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
     view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
@@ -493,6 +511,15 @@ const CURATED = [
   {name:"msg_fes:rgb_snow",          title:"Snow RGB - MSG - 0 degree", hasTime:true},
   {name:"mtg_fd:rgb_firetemperature",title:"Fire Temperature RGB - MTG-I - 0 degree", hasTime:true},
   {name:"mtg_fd:rgb_cloudphase",     title:"Cloud Phase RGB - MTG-I - 0 degree", hasTime:true},
+  // Dati (non RGB estetici): fulmini e instabilita' da satellite. Il primo
+  // passo verso previsione (non solo descrizione) — il "lightning jump"
+  // (impennata improvvisa del tasso di fulmini) e' un precursore noto di
+  // tempo severo, spesso 10-20 minuti prima della grandine/downburst.
+  {name:"mtg_fd:li_afa",             title:"LI Accumulated Flash Area - MTG-I - 0 degree", hasTime:true},
+  {name:"msg_fes:gii_liftedindex",   title:"GII Lifted-Index - MSG - 0 degree", hasTime:true},
+  // Altezza reale della cima delle nubi: collegata all'overshooting-top
+  // (una cima convettiva molto alta/fredda e' un segno di temporale intenso).
+  {name:"msg_fes:cth",               title:"Cloud Top Height - MSG - 0 degree", hasTime:true},
 ];
 // Spiegazione delle ricette RGB false-colore: cosa mostrano i colori, non il
 // nome tecnico del layer (che l'utente non conosce e non deve conoscere).
@@ -507,6 +534,9 @@ const RECIPE_HINTS = [
   [/firetemperature/i, "punti caldi e incendi attivi in rosso acceso"],
   [/cloudphase/i,      "fase della nube: goccioline liquide vs cristalli di ghiaccio"],
   [/cloudtype/i,       "classificazione del tipo di nube per colore"],
+  [/flash area|lightning|\bli_afa\b/i, "attivita' dei fulmini: aree dove il Lightning Imager MTG ha registrato scariche (accumulo) — segue le celle attive, un'impennata rapida spesso precede grandine/raffiche"],
+  [/lifted.?index|liftedindex/i,       "instabilita' da satellite: piu' negativo = atmosfera piu' predisposta ai temporali"],
+  [/cloud top height|\bcth\b/i,        "altezza reale della cima delle nubi: piu' alta (colori piu' freddi/violacei) spesso vuol dire temporale piu' intenso — collegata all'overshooting top"],
 ];
 function recipeHint(title){
   const hit = RECIPE_HINTS.find(([re])=>re.test(title));
@@ -536,6 +566,7 @@ async function fetchImage(){
   if(time) u+="&time="+encodeURIComponent(time);
   if($("bg").checked) u+="&bg=1";
   if($("borders").checked) u+="&borders=1";
+  if($("rdt").checked) u+="&rdt=1";
 
   $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
@@ -549,6 +580,7 @@ async function fetchImage(){
     const blob=await resp.blob(), im=new Image();
     await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
     img=im; imgBox={...view};
+    if(/li_afa/i.test(curVal())) checkLightningActivity(im);
     const now=new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
     $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""))
       + (isFollowingLive()?" · 🔴 LIVE aggiornata alle "+now:"");
@@ -626,7 +658,7 @@ function catOf(title, name){
   if(/rgb_124|_ir\d|_wv\d|_vis\d|_cloud|_fog|_dust|_ash|_airmass/.test(n)) return "cloud";
   if(/sst|_chl|ascat|wind|ozone|aerosol|orbit|footprint|instab/.test(n)) return "data";
   // --- per TITOLO (fallback) ---
-  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability/.test(t)) return "data";
+  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability|top height/.test(t)) return "data";
   if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\bolci\b/.test(t)) return "real";
   if(/cloud|\bir\b|ir\d|\bwv\b|wv\d|vis\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
   return "other";
@@ -662,11 +694,15 @@ function onProductChange(){
   const freshness = geo ? " · aggiornato ogni "+(rapid?"~5 minuti (Rapid Scan)":"~10-15 minuti")
                    : mumi ? " · mosaico mondiale quasi in tempo reale (piu' satelliti/agenzie)" : "";
   const recipe = recipeHint(title);
+  // Distinzione fra composizioni RGB false-colore (piu' canali mescolati) e
+  // prodotti dati a canale singolo come fulmini/lifted-index: solo le prime
+  // sono davvero "RGB false-colore", l'etichetta era generica e fuorviante.
+  const isRgbRecipe = /\brgb\b/i.test(title);
   if(single)
     $("prodhint").innerHTML="<span style='color:var(--warn)'>striscia di una singola orbita — usa una versione "
       +"<b>Daily / Accumulated</b> per coprire tutta la mappa</span>";
   else if(recipe)
-    $("prodhint").innerHTML="<span style='color:var(--acc)'>RGB false-colore: "+recipe+"</span>"
+    $("prodhint").innerHTML="<span style='color:var(--acc)'>"+(isRgbRecipe?"RGB false-colore: ":"")+recipe+"</span>"
       +(freshness?"<br><span style='color:var(--ok)'>"+freshness.replace(" · ","")+"</span>":"");
   else if(fullDisk)
     $("prodhint").innerHTML="<span style='color:var(--ok)'>satellite geostazionario — disco intero"+freshness+"</span>"
@@ -686,8 +722,155 @@ function onProductChange(){
   $("globe").disabled = single;
   $("globehint").textContent = single ? "non disponibile su una striscia a singola orbita"
     : fullDisk ? "consigliata per questo prodotto (disco intero)" : "";
-  loadTimes(); draw(); updateLiveHint();
+  // Il bip ha senso solo sul layer fulmini: cambiando prodotto lo si nasconde
+  // e si azzera la base di confronto, cosi' non scatta un falso "nuova
+  // attivita'" solo perche' si e' passati a un altro layer/area.
+  const isLightning = /li_afa/i.test(v);
+  $("lightningBeepRow").style.display = isLightning ? "flex" : "none";
+  if(!isLightning){ $("lightningBeep").checked=false; lastFlashPixelCount=null; lastFlashKey=null; }
+  // RDT (celle tracciate) e' un OVERLAY vettoriale MSG: ha senso solo sopra
+  // prodotti geostazionari (stesso TIME della composizione WMS), non sopra
+  // METOP/Sentinel-3 dove il tempo non e' comparabile.
+  $("rdtRow").style.display = geo ? "flex" : "none";
+  $("rdtHint").style.display = geo && $("rdt").checked ? "block" : "none";
+  if(!geo) $("rdt").checked=false;
+  loadTimes(); draw(); updateLiveHint(); loadLegend(v, catOf(title, v));
 }
+// --------------------------------------------------------------------------
+// Legenda colore (GetLegendGraphic via il Worker, vedi /metop?legend=1).
+// Ha senso solo sui prodotti "dati" classificati (Lifted-Index, fulmini,
+// vento, ozono…): sui compositi RGB "foto" (Geo Colour, True Colour…) il
+// server restituirebbe solo uno swatch senza significato, quindi si nasconde.
+let legendReqId = 0;
+async function loadLegend(v, cat){
+  const reqId = ++legendReqId;
+  const el = $("legend"), im = $("legendImg");
+  if(!isRealLayer(v) || cat!=="data"){ el.style.display="none"; return; }
+  try{
+    const r = await fetch(API+"/metop?legend=1&layer="+encodeURIComponent(v));
+    if(reqId!==legendReqId) return;
+    const ct = r.headers.get("Content-Type")||"";
+    if(!r.ok || !ct.includes("image")){ el.style.display="none"; return; }
+    const blob = await r.blob();
+    if(reqId!==legendReqId) return;
+    im.src = URL.createObjectURL(blob);
+    el.style.display="block";
+  }catch(_){ if(reqId===legendReqId) el.style.display="none"; }
+}
+
+// --------------------------------------------------------------------------
+// Bip sonoro sui fulmini (Web Audio, nessun file esterno). ATTENZIONE ai
+// limiti reali: li_afa e' un accumulo satellitare aggiornato ogni ~10 minuti
+// (ciclo di scansione MTG), non un flusso per singola scarica — qui si conta
+// quanti pixel non-trasparenti (area con fulmini) ci sono nell'immagine appena
+// scaricata e si confronta col conteggio precedente SULLA STESSA VISTA: se e'
+// cresciuto, e' arrivata nuova attivita' dall'ultimo scan. Un vero bip "per
+// ogni fulmine" richiede un feed punto (es. Blitzortung), non un raster.
+let audioCtx=null, lastFlashPixelCount=null, lastFlashKey=null;
+function beep(freq=880, durMs=140){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type="sine"; o.frequency.value=freq; g.gain.value=0.18;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+durMs/1000);
+    o.stop(audioCtx.currentTime+durMs/1000+0.03);
+  }catch(_){ /* audio non disponibile (autoplay bloccato finche' l'utente non interagisce): niente bip */ }
+}
+function checkLightningActivity(im){
+  if(!$("lightningBeep").checked || !imgBox) return;
+  try{
+    const w=im.naturalWidth||im.width, h=im.naturalHeight||im.height;
+    if(!w||!h) return;
+    const off=document.createElement("canvas"); off.width=w; off.height=h;
+    const octx=off.getContext("2d"); octx.drawImage(im,0,0);
+    const data=octx.getImageData(0,0,w,h).data;
+    let count=0;
+    for(let i=3;i<data.length;i+=4) if(data[i]>20) count++;   // alpha>soglia = pixel con fulmini
+    const key=[imgBox.latMin,imgBox.lonMin,imgBox.latMax,imgBox.lonMax].map(n=>n.toFixed(2)).join(",");
+    if(lastFlashKey===key && lastFlashPixelCount!==null && count>lastFlashPixelCount){
+      beep();
+      $("chip").textContent += "  ⚡ nuova attività fulmini rilevata";
+    }
+    lastFlashPixelCount=count; lastFlashKey=key;
+  }catch(_){ /* immagine non leggibile (CORS o altro): niente bip, il viewer resta comunque usabile */ }
+}
+
+// --------------------------------------------------------------------------
+// Fulmini live (Blitzortung, feed punto vero via il relay MQTT->WebSocket
+// del Worker: /lightning/ws). A differenza del bip satellitare qui sopra
+// (li_afa, ~10 min, area accumulata), questo e' ogni singola scarica reale
+// captata dalla rete di antenne a terra, in un raggio di poche centinaia di
+// km intorno al FVG (le tessere geohash scelte lato server) — indipendente
+// dal layer/prodotto satellitare mostrato in quel momento.
+let liveWs=null, liveStrikes=[], liveAnimTimer=null, liveReconnectDelay=2000, liveWanted=false;
+function wsUrlFromApi(){
+  const u = new URL(API);
+  u.protocol = u.protocol==="https:" ? "wss:" : "ws:";
+  u.pathname = "/lightning/ws";
+  u.search = "";
+  return u.toString();
+}
+function connectLiveLightning(){
+  liveWanted = true;
+  if(liveWs) return;
+  $("liveLightningStatus").textContent="connessione…";
+  let ws;
+  try{ ws = new WebSocket(wsUrlFromApi()); }
+  catch(_){ $("liveLightningStatus").textContent="non disponibile in questo browser"; return; }
+  liveWs = ws;
+  ws.onopen = () => { $("liveLightningStatus").textContent="🟢 live — in ascolto"; liveReconnectDelay=2000; };
+  ws.onmessage = (ev) => {
+    let d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
+    if(typeof d.lat!=="number" || typeof d.lon!=="number") return;
+    liveStrikes.push({ lat:d.lat, lon:d.lon, t:performance.now() });
+    ensureLiveAnim();
+    // Bip solo se la scarica cade nella vista corrente: altrimenti, con
+    // tutta l'area coperta dalle tessere geohash (ben piu' larga della
+    // vista tipica), sarebbe un bip quasi continuo e inutile.
+    if(d.lat>=view.latMin && d.lat<=view.latMax && d.lon>=view.lonMin && d.lon<=view.lonMax)
+      beep(1500, 90);   // piu' acuto/corto del bip satellitare (880Hz/140ms): si riconoscono ad orecchio
+  };
+  ws.onclose = ws.onerror = () => {
+    liveWs=null;
+    if(!liveWanted) return;
+    $("liveLightningStatus").textContent="riconnessione…";
+    setTimeout(()=>{ if(liveWanted) connectLiveLightning(); }, liveReconnectDelay);
+    liveReconnectDelay = Math.min(liveReconnectDelay*2, 30000);
+  };
+}
+function disconnectLiveLightning(){
+  liveWanted = false;
+  if(liveWs){ try{ liveWs.close(); }catch(_){} liveWs=null; }
+  $("liveLightningStatus").textContent="";
+}
+function ensureLiveAnim(){
+  if(liveAnimTimer) return;
+  liveAnimTimer=setInterval(()=>{
+    const now=performance.now();
+    liveStrikes=liveStrikes.filter(s=>now-s.t<3000);
+    draw();
+    if(!liveStrikes.length){ clearInterval(liveAnimTimer); liveAnimTimer=null; }
+  }, 80);
+}
+function drawLiveStrikes(){
+  if(!liveStrikes.length) return;
+  const now=performance.now();
+  for(const s of liveStrikes){
+    if(s.lat<view.latMin||s.lat>view.latMax||s.lon<view.lonMin||s.lon>view.lonMax) continue;
+    const age=(now-s.t)/3000;                       // 0 = appena arrivato, 1 = da rimuovere
+    const x=lonToX(s.lon), y=latToY(s.lat);
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,1-age);
+    ctx.strokeStyle="#fff35c"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y,4+age*18,0,Math.PI*2); ctx.stroke();  // anello che si espande e svanisce
+    ctx.fillStyle="#fff35c";
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();           // punto esatto della scarica
+    ctx.restore();
+  }
+}
+
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
   try{
@@ -827,6 +1010,7 @@ $("cat").onchange=populateProducts;
 $("times").onchange=()=>{ fetchImage(); updateLiveHint(); };
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("borders").onchange=scheduleFetch;
+$("rdt").onchange=()=>{ $("rdtHint").style.display=$("rdt").checked?"block":"none"; scheduleFetch(); };
 $("globe").onchange=()=>{ $("globehint").textContent=""; draw(); };
 $("grid").onchange=draw;
 $("labels").onchange=draw;
@@ -895,6 +1079,7 @@ function scheduleLiveTimer(){
   liveTimer=setInterval(liveTick, 60*1000);
 }
 $("live").onchange=()=>{ updateLiveHint(); if($("live").checked) liveTick(); };
+$("liveLightning").onchange=()=>{ if($("liveLightning").checked) connectLiveLightning(); else disconnectLiveLightning(); };
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) liveTick(); });
 
 fitDPR(); draw(); initCatalog().then(()=>{ configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });

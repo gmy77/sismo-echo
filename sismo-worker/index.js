@@ -36,6 +36,10 @@ function flareClassSrv(f) {
 function getUpdateSecret(env) { return env?.UPDATE_SECRET || ""; }
 
 const FVG = { lat_min:45.5, lat_max:46.8, lon_min:12.4, lon_max:14.1 };
+// Centro del FVG, riusato anche dal relay fulmini live (LightningRelay) per
+// scegliere le tessere geohash su cui abbonarsi — stessa area, un solo posto
+// dove tenerla aggiornata se un giorno cambia.
+const FVG_CENTER = { lat: (FVG.lat_min + FVG.lat_max) / 2, lon: (FVG.lon_min + FVG.lon_max) / 2 };
 const CF  = { lat_min:40.4, lat_max:41.1, lon_min:13.7, lon_max:14.8 }; // Campi Flegrei · Vesuvio · Ischia
 
 // ============================================================
@@ -3876,6 +3880,10 @@ const METOP_HTML = `<!doctype html>
     border:1px solid var(--edge);border-radius:10px;padding:6px 11px;font-size:12px;
     color:var(--acc);display:none}
   #spin.on{display:block}
+  #legend{position:absolute;bottom:12px;left:12px;background:rgba(8,12,18,.82);
+    border:1px solid var(--edge);border-radius:10px;padding:6px 8px;display:none;
+    max-width:60%;max-height:38%;overflow:auto}
+  #legend img{display:block;max-width:100%}
   /* ---- status ---- */
   #status{grid-column:2;background:var(--panel);border-top:1px solid var(--edge);
     display:flex;align-items:center;padding:0 12px;font-size:12px;color:var(--sub);gap:16px}
@@ -3928,6 +3936,9 @@ const METOP_HTML = `<!doctype html>
     </select>
     <select id="product" style="margin-top:6px"></select>
     <div id="prodhint" class="sub" style="margin-top:6px"></div>
+    <label class="chk" id="lightningBeepRow" style="display:none;margin-top:8px">
+      <input type="checkbox" id="lightningBeep"> 🔔 Bip su nuova attività fulmini (satellite, ogni ~10 min — non per singola scarica)
+    </label>
 
     <div class="sect">Data</div>
     <div class="row">
@@ -3938,6 +3949,11 @@ const METOP_HTML = `<!doctype html>
     <select id="times"><option value="">— (usa la data intera) —</option></select>
     <label class="chk"><input type="checkbox" id="live" checked> <span id="liveLabel">Aggiornamento automatico</span></label>
     <div id="livehint" class="sub" style="margin:-4px 0 8px"></div>
+
+    <div class="sect">Fulmini live</div>
+    <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra, Blitzortung — vero per-scarica)</label>
+    <div id="liveLightningStatus" class="sub" style="margin:-4px 0 8px"></div>
+    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (FVG e dintorni), con un bip più acuto e corto del bip satellitare qui sopra.</div>
 
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
@@ -3969,6 +3985,10 @@ const METOP_HTML = `<!doctype html>
     <div id="globehint" class="sub" style="margin:-4px 0 8px"></div>
     <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
     <label class="chk"><input type="checkbox" id="borders" checked> Confini delle nazioni</label>
+    <label class="chk" id="rdtRow" style="display:none">
+      <input type="checkbox" id="rdt"> 🌪️ Celle convettive tracciate (RDT)
+    </label>
+    <div id="rdtHint" class="sub" style="margin:-4px 0 8px;display:none">contorni delle celle temporalesche gia' tracciate dal satellite: poligono + vettore di moto, colore secondo la fase di sviluppo — solo sopra prodotti MSG/MTG (stesso orario)</div>
     <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
     <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
     <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
@@ -3988,6 +4008,7 @@ const METOP_HTML = `<!doctype html>
     <canvas id="cv"></canvas>
     <div id="chip">Pronto — trascina per spostarti, rotella per zoomare.</div>
     <div id="spin">⏳ scarico…</div>
+    <div id="legend"><img id="legendImg" alt="legenda colore"></div>
   </div>
 
   <div id="status">
@@ -4064,6 +4085,7 @@ function draw(){
   }
   if(document.getElementById("grid").checked && !globeOn) drawGraticule();
   if(globeOn) drawGlobeOutline();
+  if(!globeOn) drawLiveStrikes();
   document.getElementById("st-view").textContent =
     "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
     view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
@@ -4317,6 +4339,15 @@ const CURATED = [
   {name:"msg_fes:rgb_snow",          title:"Snow RGB - MSG - 0 degree", hasTime:true},
   {name:"mtg_fd:rgb_firetemperature",title:"Fire Temperature RGB - MTG-I - 0 degree", hasTime:true},
   {name:"mtg_fd:rgb_cloudphase",     title:"Cloud Phase RGB - MTG-I - 0 degree", hasTime:true},
+  // Dati (non RGB estetici): fulmini e instabilita' da satellite. Il primo
+  // passo verso previsione (non solo descrizione) — il "lightning jump"
+  // (impennata improvvisa del tasso di fulmini) e' un precursore noto di
+  // tempo severo, spesso 10-20 minuti prima della grandine/downburst.
+  {name:"mtg_fd:li_afa",             title:"LI Accumulated Flash Area - MTG-I - 0 degree", hasTime:true},
+  {name:"msg_fes:gii_liftedindex",   title:"GII Lifted-Index - MSG - 0 degree", hasTime:true},
+  // Altezza reale della cima delle nubi: collegata all'overshooting-top
+  // (una cima convettiva molto alta/fredda e' un segno di temporale intenso).
+  {name:"msg_fes:cth",               title:"Cloud Top Height - MSG - 0 degree", hasTime:true},
 ];
 // Spiegazione delle ricette RGB false-colore: cosa mostrano i colori, non il
 // nome tecnico del layer (che l'utente non conosce e non deve conoscere).
@@ -4331,6 +4362,9 @@ const RECIPE_HINTS = [
   [/firetemperature/i, "punti caldi e incendi attivi in rosso acceso"],
   [/cloudphase/i,      "fase della nube: goccioline liquide vs cristalli di ghiaccio"],
   [/cloudtype/i,       "classificazione del tipo di nube per colore"],
+  [/flash area|lightning|\bli_afa\b/i, "attivita' dei fulmini: aree dove il Lightning Imager MTG ha registrato scariche (accumulo) — segue le celle attive, un'impennata rapida spesso precede grandine/raffiche"],
+  [/lifted.?index|liftedindex/i,       "instabilita' da satellite: piu' negativo = atmosfera piu' predisposta ai temporali"],
+  [/cloud top height|\bcth\b/i,        "altezza reale della cima delle nubi: piu' alta (colori piu' freddi/violacei) spesso vuol dire temporale piu' intenso — collegata all'overshooting top"],
 ];
 function recipeHint(title){
   const hit = RECIPE_HINTS.find(([re])=>re.test(title));
@@ -4360,6 +4394,7 @@ async function fetchImage(){
   if(time) u+="&time="+encodeURIComponent(time);
   if($("bg").checked) u+="&bg=1";
   if($("borders").checked) u+="&borders=1";
+  if($("rdt").checked) u+="&rdt=1";
 
   $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
@@ -4373,6 +4408,7 @@ async function fetchImage(){
     const blob=await resp.blob(), im=new Image();
     await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
     img=im; imgBox={...view};
+    if(/li_afa/i.test(curVal())) checkLightningActivity(im);
     const now=new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
     $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""))
       + (isFollowingLive()?" · 🔴 LIVE aggiornata alle "+now:"");
@@ -4450,7 +4486,7 @@ function catOf(title, name){
   if(/rgb_124|_ir\d|_wv\d|_vis\d|_cloud|_fog|_dust|_ash|_airmass/.test(n)) return "cloud";
   if(/sst|_chl|ascat|wind|ozone|aerosol|orbit|footprint|instab/.test(n)) return "data";
   // --- per TITOLO (fallback) ---
-  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability/.test(t)) return "data";
+  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability|top height/.test(t)) return "data";
   if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\bolci\b/.test(t)) return "real";
   if(/cloud|\bir\b|ir\d|\bwv\b|wv\d|vis\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
   return "other";
@@ -4486,11 +4522,15 @@ function onProductChange(){
   const freshness = geo ? " · aggiornato ogni "+(rapid?"~5 minuti (Rapid Scan)":"~10-15 minuti")
                    : mumi ? " · mosaico mondiale quasi in tempo reale (piu' satelliti/agenzie)" : "";
   const recipe = recipeHint(title);
+  // Distinzione fra composizioni RGB false-colore (piu' canali mescolati) e
+  // prodotti dati a canale singolo come fulmini/lifted-index: solo le prime
+  // sono davvero "RGB false-colore", l'etichetta era generica e fuorviante.
+  const isRgbRecipe = /\brgb\b/i.test(title);
   if(single)
     $("prodhint").innerHTML="<span style='color:var(--warn)'>striscia di una singola orbita — usa una versione "
       +"<b>Daily / Accumulated</b> per coprire tutta la mappa</span>";
   else if(recipe)
-    $("prodhint").innerHTML="<span style='color:var(--acc)'>RGB false-colore: "+recipe+"</span>"
+    $("prodhint").innerHTML="<span style='color:var(--acc)'>"+(isRgbRecipe?"RGB false-colore: ":"")+recipe+"</span>"
       +(freshness?"<br><span style='color:var(--ok)'>"+freshness.replace(" · ","")+"</span>":"");
   else if(fullDisk)
     $("prodhint").innerHTML="<span style='color:var(--ok)'>satellite geostazionario — disco intero"+freshness+"</span>"
@@ -4510,8 +4550,155 @@ function onProductChange(){
   $("globe").disabled = single;
   $("globehint").textContent = single ? "non disponibile su una striscia a singola orbita"
     : fullDisk ? "consigliata per questo prodotto (disco intero)" : "";
-  loadTimes(); draw(); updateLiveHint();
+  // Il bip ha senso solo sul layer fulmini: cambiando prodotto lo si nasconde
+  // e si azzera la base di confronto, cosi' non scatta un falso "nuova
+  // attivita'" solo perche' si e' passati a un altro layer/area.
+  const isLightning = /li_afa/i.test(v);
+  $("lightningBeepRow").style.display = isLightning ? "flex" : "none";
+  if(!isLightning){ $("lightningBeep").checked=false; lastFlashPixelCount=null; lastFlashKey=null; }
+  // RDT (celle tracciate) e' un OVERLAY vettoriale MSG: ha senso solo sopra
+  // prodotti geostazionari (stesso TIME della composizione WMS), non sopra
+  // METOP/Sentinel-3 dove il tempo non e' comparabile.
+  $("rdtRow").style.display = geo ? "flex" : "none";
+  $("rdtHint").style.display = geo && $("rdt").checked ? "block" : "none";
+  if(!geo) $("rdt").checked=false;
+  loadTimes(); draw(); updateLiveHint(); loadLegend(v, catOf(title, v));
 }
+// --------------------------------------------------------------------------
+// Legenda colore (GetLegendGraphic via il Worker, vedi /metop?legend=1).
+// Ha senso solo sui prodotti "dati" classificati (Lifted-Index, fulmini,
+// vento, ozono…): sui compositi RGB "foto" (Geo Colour, True Colour…) il
+// server restituirebbe solo uno swatch senza significato, quindi si nasconde.
+let legendReqId = 0;
+async function loadLegend(v, cat){
+  const reqId = ++legendReqId;
+  const el = $("legend"), im = $("legendImg");
+  if(!isRealLayer(v) || cat!=="data"){ el.style.display="none"; return; }
+  try{
+    const r = await fetch(API+"/metop?legend=1&layer="+encodeURIComponent(v));
+    if(reqId!==legendReqId) return;
+    const ct = r.headers.get("Content-Type")||"";
+    if(!r.ok || !ct.includes("image")){ el.style.display="none"; return; }
+    const blob = await r.blob();
+    if(reqId!==legendReqId) return;
+    im.src = URL.createObjectURL(blob);
+    el.style.display="block";
+  }catch(_){ if(reqId===legendReqId) el.style.display="none"; }
+}
+
+// --------------------------------------------------------------------------
+// Bip sonoro sui fulmini (Web Audio, nessun file esterno). ATTENZIONE ai
+// limiti reali: li_afa e' un accumulo satellitare aggiornato ogni ~10 minuti
+// (ciclo di scansione MTG), non un flusso per singola scarica — qui si conta
+// quanti pixel non-trasparenti (area con fulmini) ci sono nell'immagine appena
+// scaricata e si confronta col conteggio precedente SULLA STESSA VISTA: se e'
+// cresciuto, e' arrivata nuova attivita' dall'ultimo scan. Un vero bip "per
+// ogni fulmine" richiede un feed punto (es. Blitzortung), non un raster.
+let audioCtx=null, lastFlashPixelCount=null, lastFlashKey=null;
+function beep(freq=880, durMs=140){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type="sine"; o.frequency.value=freq; g.gain.value=0.18;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+durMs/1000);
+    o.stop(audioCtx.currentTime+durMs/1000+0.03);
+  }catch(_){ /* audio non disponibile (autoplay bloccato finche' l'utente non interagisce): niente bip */ }
+}
+function checkLightningActivity(im){
+  if(!$("lightningBeep").checked || !imgBox) return;
+  try{
+    const w=im.naturalWidth||im.width, h=im.naturalHeight||im.height;
+    if(!w||!h) return;
+    const off=document.createElement("canvas"); off.width=w; off.height=h;
+    const octx=off.getContext("2d"); octx.drawImage(im,0,0);
+    const data=octx.getImageData(0,0,w,h).data;
+    let count=0;
+    for(let i=3;i<data.length;i+=4) if(data[i]>20) count++;   // alpha>soglia = pixel con fulmini
+    const key=[imgBox.latMin,imgBox.lonMin,imgBox.latMax,imgBox.lonMax].map(n=>n.toFixed(2)).join(",");
+    if(lastFlashKey===key && lastFlashPixelCount!==null && count>lastFlashPixelCount){
+      beep();
+      $("chip").textContent += "  ⚡ nuova attività fulmini rilevata";
+    }
+    lastFlashPixelCount=count; lastFlashKey=key;
+  }catch(_){ /* immagine non leggibile (CORS o altro): niente bip, il viewer resta comunque usabile */ }
+}
+
+// --------------------------------------------------------------------------
+// Fulmini live (Blitzortung, feed punto vero via il relay MQTT->WebSocket
+// del Worker: /lightning/ws). A differenza del bip satellitare qui sopra
+// (li_afa, ~10 min, area accumulata), questo e' ogni singola scarica reale
+// captata dalla rete di antenne a terra, in un raggio di poche centinaia di
+// km intorno al FVG (le tessere geohash scelte lato server) — indipendente
+// dal layer/prodotto satellitare mostrato in quel momento.
+let liveWs=null, liveStrikes=[], liveAnimTimer=null, liveReconnectDelay=2000, liveWanted=false;
+function wsUrlFromApi(){
+  const u = new URL(API);
+  u.protocol = u.protocol==="https:" ? "wss:" : "ws:";
+  u.pathname = "/lightning/ws";
+  u.search = "";
+  return u.toString();
+}
+function connectLiveLightning(){
+  liveWanted = true;
+  if(liveWs) return;
+  $("liveLightningStatus").textContent="connessione…";
+  let ws;
+  try{ ws = new WebSocket(wsUrlFromApi()); }
+  catch(_){ $("liveLightningStatus").textContent="non disponibile in questo browser"; return; }
+  liveWs = ws;
+  ws.onopen = () => { $("liveLightningStatus").textContent="🟢 live — in ascolto"; liveReconnectDelay=2000; };
+  ws.onmessage = (ev) => {
+    let d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
+    if(typeof d.lat!=="number" || typeof d.lon!=="number") return;
+    liveStrikes.push({ lat:d.lat, lon:d.lon, t:performance.now() });
+    ensureLiveAnim();
+    // Bip solo se la scarica cade nella vista corrente: altrimenti, con
+    // tutta l'area coperta dalle tessere geohash (ben piu' larga della
+    // vista tipica), sarebbe un bip quasi continuo e inutile.
+    if(d.lat>=view.latMin && d.lat<=view.latMax && d.lon>=view.lonMin && d.lon<=view.lonMax)
+      beep(1500, 90);   // piu' acuto/corto del bip satellitare (880Hz/140ms): si riconoscono ad orecchio
+  };
+  ws.onclose = ws.onerror = () => {
+    liveWs=null;
+    if(!liveWanted) return;
+    $("liveLightningStatus").textContent="riconnessione…";
+    setTimeout(()=>{ if(liveWanted) connectLiveLightning(); }, liveReconnectDelay);
+    liveReconnectDelay = Math.min(liveReconnectDelay*2, 30000);
+  };
+}
+function disconnectLiveLightning(){
+  liveWanted = false;
+  if(liveWs){ try{ liveWs.close(); }catch(_){} liveWs=null; }
+  $("liveLightningStatus").textContent="";
+}
+function ensureLiveAnim(){
+  if(liveAnimTimer) return;
+  liveAnimTimer=setInterval(()=>{
+    const now=performance.now();
+    liveStrikes=liveStrikes.filter(s=>now-s.t<3000);
+    draw();
+    if(!liveStrikes.length){ clearInterval(liveAnimTimer); liveAnimTimer=null; }
+  }, 80);
+}
+function drawLiveStrikes(){
+  if(!liveStrikes.length) return;
+  const now=performance.now();
+  for(const s of liveStrikes){
+    if(s.lat<view.latMin||s.lat>view.latMax||s.lon<view.lonMin||s.lon>view.lonMax) continue;
+    const age=(now-s.t)/3000;                       // 0 = appena arrivato, 1 = da rimuovere
+    const x=lonToX(s.lon), y=latToY(s.lat);
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,1-age);
+    ctx.strokeStyle="#fff35c"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y,4+age*18,0,Math.PI*2); ctx.stroke();  // anello che si espande e svanisce
+    ctx.fillStyle="#fff35c";
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();           // punto esatto della scarica
+    ctx.restore();
+  }
+}
+
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
   try{
@@ -4651,6 +4838,7 @@ $("cat").onchange=populateProducts;
 $("times").onchange=()=>{ fetchImage(); updateLiveHint(); };
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("borders").onchange=scheduleFetch;
+$("rdt").onchange=()=>{ $("rdtHint").style.display=$("rdt").checked?"block":"none"; scheduleFetch(); };
 $("globe").onchange=()=>{ $("globehint").textContent=""; draw(); };
 $("grid").onchange=draw;
 $("labels").onchange=draw;
@@ -4719,6 +4907,7 @@ function scheduleLiveTimer(){
   liveTimer=setInterval(liveTick, 60*1000);
 }
 $("live").onchange=()=>{ updateLiveHint(); if($("live").checked) liveTick(); };
+$("liveLightning").onchange=()=>{ if($("liveLightning").checked) connectLiveLightning(); else disconnectLiveLightning(); };
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) liveTick(); });
 
 fitDPR(); draw(); initCatalog().then(()=>{ configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });
@@ -4818,6 +5007,282 @@ function parseWmsLayers(xml) {
   return out;
 }
 
+// ============================================================
+// BLITZORTUNG LIGHTNING RELAY — fulmini live, punto vero (non un'immagine
+// satellitare accumulata come li_afa: qui e' ogni singola scarica, quasi in
+// tempo reale).
+//
+// Blitzortung non ha un'API pubblica ufficiale documentata: il protocollo
+// qui sotto e' stato verificato leggendo il sorgente REALE dell'integrazione
+// Home Assistant di mrk-its (github.com/mrk-its/homeassistant-blitzortung),
+// non indovinato. Loro usano un broker MQTT condiviso, mantenuto per gli
+// utenti di quell'integrazione:
+//   - broker blitzortung.ha.sed.pl:1883, MQTT 3.1.1 su TCP grezzo (NON WebSocket)
+//   - topic "blitzortung/1.1/<geohash carattere-per-carattere>/#"
+//   - QoS 0, auth anonima, solo subscribe (mai publish)
+// La policy dichiarata da Blitzortung stessa (nel README di quel progetto):
+// "third party apps must use their own servers to serve data for their own
+// clients" — cioe' non deve essere ogni singolo utente del nostro viewer a
+// collegarsi al loro feed. Questo Durable Object fa esattamente quello: UNA
+// sola connessione MQTT globale, che fa da hub WebSocket per ogni visitatore
+// del viewer — meno carico sul loro relay di quanti utenti nostri ci fossero
+// se si collegasse ciascuno per conto suo.
+//
+// Impronta "da buon cittadino" (stessi criteri di un caso analogo gia'
+// discusso pubblicamente con il maintainer, issue #340 di quel repo): una
+// sola connessione, client id vuoto, poche tessere geohash (qui: al massimo
+// 9, la tessera centrata sul FVG piu' le 8 vicine), QoS 0, nessun publish,
+// reconnect con backoff esponenziale. La connessione si apre solo quando
+// c'e' almeno un visitatore collegato al viewer e si chiude subito quando
+// l'ultimo se ne va: zero carico sul loro relay se non sta guardando nessuno.
+//
+// ATTENZIONE (onesta' tecnica, non testato end-to-end da questo ambiente):
+// il framing MQTT qui sotto e' scritto a mano seguendo lo spec 3.1.1 standard
+// (nessuna libreria MQTT gira nel runtime Workers), e i nomi dei campi del
+// payload (lat/lon/time) sono dedotti dal codice che CONSUMA il dato gia'
+// decodificato in homeassistant-blitzortung, non visti byte-per-byte sul filo
+// reale — verificare dopo il deploy e correggere se il payload usa altre
+// chiavi. Richiede l'API TCP Sockets (cloudflare:sockets) e un Durable Object
+// SQLite-backed: entrambi disponibili anche sul piano Workers Free, ma
+// servono la migrazione in wrangler.toml (vedi commit) e un wrangler
+// aggiornato.
+// ============================================================
+
+const BLITZORTUNG_HOST = "blitzortung.ha.sed.pl";
+const BLITZORTUNG_PORT = 1883;
+const LIGHTNING_GEOHASH_PRECISION = 3;   // celle ~156km: 3x3 attorno al FVG copre comodamente NE Italia/Slovenia/Austria/Adriatico
+
+// --- Geohash standard (Gustavo Niemeyer): alfabeto e interleaving verificati
+// contro l'implementazione usata da homeassistant-blitzortung (stesso
+// alfabeto, longitudine nei bit pari a partire dal primo).
+const GEOHASH_BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+function geohashEncode(lat, lon, precision) {
+  let latRange = [-90, 90], lonRange = [-180, 180];
+  let hash = "", bit = 0, ch = 0, evenBit = true;
+  while (hash.length < precision) {
+    if (evenBit) {
+      const mid = (lonRange[0] + lonRange[1]) / 2;
+      if (lon >= mid) { ch |= (1 << (4 - bit)); lonRange[0] = mid; } else { lonRange[1] = mid; }
+    } else {
+      const mid = (latRange[0] + latRange[1]) / 2;
+      if (lat >= mid) { ch |= (1 << (4 - bit)); latRange[0] = mid; } else { latRange[1] = mid; }
+    }
+    evenBit = !evenBit;
+    if (bit < 4) bit++;
+    else { hash += GEOHASH_BASE32[ch]; bit = 0; ch = 0; }
+  }
+  return hash;
+}
+function geohashBounds(hash) {
+  let latRange = [-90, 90], lonRange = [-180, 180], evenBit = true;
+  for (const c of hash) {
+    const idx = GEOHASH_BASE32.indexOf(c);
+    if (idx < 0) continue;
+    for (let bit = 4; bit >= 0; bit--) {
+      const bitVal = (idx >> bit) & 1;
+      if (evenBit) {
+        const mid = (lonRange[0] + lonRange[1]) / 2;
+        if (bitVal) lonRange[0] = mid; else lonRange[1] = mid;
+      } else {
+        const mid = (latRange[0] + latRange[1]) / 2;
+        if (bitVal) latRange[0] = mid; else latRange[1] = mid;
+      }
+      evenBit = !evenBit;
+    }
+  }
+  return { latMin: latRange[0], latMax: latRange[1], lonMin: lonRange[0], lonMax: lonRange[1] };
+}
+// Le 9 tessere (centro + 8 vicine) attorno a un punto, alla precisione data.
+function geohashNeighborTiles(lat, lon, precision) {
+  const center = geohashEncode(lat, lon, precision);
+  const b = geohashBounds(center);
+  const dLat = b.latMax - b.latMin, dLon = b.lonMax - b.lonMin;
+  const cLat = (b.latMin + b.latMax) / 2, cLon = (b.lonMin + b.lonMax) / 2;
+  const tiles = new Set();
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const plat = Math.max(-90, Math.min(90, cLat + dy * dLat));
+      const plon = (((cLon + dx * dLon) + 180) % 360 + 360) % 360 - 180;
+      tiles.add(geohashEncode(plat, plon, precision));
+    }
+  }
+  return [...tiles];
+}
+
+// --- Framing MQTT 3.1.1 minimale (solo CONNECT/SUBSCRIBE/PINGREQ in uscita,
+// CONNACK/SUBACK/PUBLISH/PINGRESP in entrata — il sottoinsieme che ci serve).
+function mqttEncodeString(str) {
+  const bytes = new TextEncoder().encode(str);
+  const out = new Uint8Array(2 + bytes.length);
+  out[0] = (bytes.length >> 8) & 0xff; out[1] = bytes.length & 0xff;
+  out.set(bytes, 2);
+  return out;
+}
+function mqttRemainingLength(n) {
+  const bytes = [];
+  do { let b = n % 128; n = Math.floor(n / 128); if (n > 0) b |= 0x80; bytes.push(b); } while (n > 0);
+  return new Uint8Array(bytes);
+}
+function concatBytes(arrays) {
+  const total = arrays.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
+function mqttConnectPacket(clientId, keepAliveSec) {
+  const variable = concatBytes([
+    mqttEncodeString("MQTT"),
+    new Uint8Array([0x04]),                                    // livello: 3.1.1
+    new Uint8Array([0x02]),                                    // flags: Clean Session
+    new Uint8Array([(keepAliveSec >> 8) & 0xff, keepAliveSec & 0xff]),
+  ]);
+  const body = concatBytes([variable, mqttEncodeString(clientId)]);
+  return concatBytes([new Uint8Array([0x10]), mqttRemainingLength(body.length), body]);
+}
+function mqttSubscribePacket(packetId, topics) {
+  const parts = [new Uint8Array([(packetId >> 8) & 0xff, packetId & 0xff])];
+  for (const t of topics) { parts.push(mqttEncodeString(t)); parts.push(new Uint8Array([0x00])); } // QoS 0
+  const body = concatBytes(parts);
+  return concatBytes([new Uint8Array([0x82]), mqttRemainingLength(body.length), body]);
+}
+const mqttPingReqPacket = () => new Uint8Array([0xc0, 0x00]);
+
+function parseMqttPublish(body) {
+  const topicLen = (body[0] << 8) | body[1];
+  const topic = new TextDecoder().decode(body.slice(2, 2 + topicLen));
+  const payload = new TextDecoder().decode(body.slice(2 + topicLen)); // QoS0: niente Packet Identifier
+  return { topic, payload };
+}
+
+// Legge frame MQTT da uno stream TCP, bufferizzando i chunk in arrivo finche'
+// non ce n'e' abbastanza per un byte/lunghezza/pacchetto intero.
+class MqttByteReader {
+  constructor(readable) { this.reader = readable.getReader(); this.buf = new Uint8Array(0); }
+  async _fill(min) {
+    while (this.buf.length < min) {
+      const { value, done } = await this.reader.read();
+      if (done) throw new Error("connessione MQTT chiusa dal broker");
+      const merged = new Uint8Array(this.buf.length + value.length);
+      merged.set(this.buf, 0); merged.set(value, this.buf.length);
+      this.buf = merged;
+    }
+  }
+  async readByte() { await this._fill(1); const b = this.buf[0]; this.buf = this.buf.slice(1); return b; }
+  async readBytes(n) { await this._fill(n); const out = this.buf.slice(0, n); this.buf = this.buf.slice(n); return out; }
+  async readPacket() {
+    const type = await this.readByte();
+    let multiplier = 1, len = 0, b;
+    do { b = await this.readByte(); len += (b & 0x7f) * multiplier; multiplier *= 128; } while (b & 0x80);
+    return { type: type >> 4, flags: type & 0x0f, body: await this.readBytes(len) };
+  }
+}
+
+export class LightningRelay {
+  constructor(state, env) {
+    this.state = state; this.env = env;
+    this.clients = new Set();     // WebSocket dei visitatori del viewer
+    this.socket = null;           // connessione TCP verso il broker MQTT
+    this.connecting = false;
+    this.connected = false;
+    this.lastError = null;
+    this.strikeCount = 0;
+    this.lastStrikeAt = null;
+    this.reconnectDelayMs = 2000;
+  }
+
+  async fetch(request) {
+    if (request.headers.get("Upgrade") === "websocket") {
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+      server.accept();
+      this.clients.add(server);
+      const onGone = () => { this.clients.delete(server); this._maybeDisconnect(); };
+      server.addEventListener("close", onGone);
+      server.addEventListener("error", onGone);
+      this._ensureConnected();
+      return new Response(null, { status: 101, webSocket: client });
+    }
+    // /lightning/status — debug in chiaro, nessun dato sensibile.
+    return new Response(JSON.stringify({
+      connected: this.connected, clients: this.clients.size,
+      strikeCount: this.strikeCount, lastStrikeAt: this.lastStrikeAt,
+      lastError: this.lastError,
+    }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // Buon cittadino: se non guarda piu' nessuno, chiudiamo la connessione
+  // verso il loro relay invece di tenerla aperta a vuoto.
+  _maybeDisconnect() {
+    if (this.clients.size === 0 && this.socket) {
+      try { this.socket.close(); } catch (_) {}
+      this.socket = null; this.connected = false;
+    }
+  }
+
+  _broadcast(strike) {
+    const msg = JSON.stringify(strike);
+    for (const ws of this.clients) { try { ws.send(msg); } catch (_) { this.clients.delete(ws); } }
+  }
+
+  async _ensureConnected() {
+    if (this.connected || this.connecting) return;
+    this.connecting = true;
+    let pingInterval = null;
+    try {
+      const { connect } = await import("cloudflare:sockets");
+      const socket = connect({ hostname: BLITZORTUNG_HOST, port: BLITZORTUNG_PORT });
+      this.socket = socket;
+      const writer = socket.writable.getWriter();
+      const reader = new MqttByteReader(socket.readable);
+
+      await writer.write(mqttConnectPacket("", 60));
+      const connack = await reader.readPacket();
+      if (connack.type !== 2 || connack.body[1] !== 0)
+        throw new Error("CONNACK rifiutato (codice " + (connack.body?.[1] ?? "?") + ")");
+
+      const topics = geohashNeighborTiles(FVG_CENTER.lat, FVG_CENTER.lon, LIGHTNING_GEOHASH_PRECISION)
+        .map(g => "blitzortung/1.1/" + g.split("").join("/") + "/#");
+      topics.push("component/hello");
+      await writer.write(mqttSubscribePacket(1, topics));
+      await reader.readPacket(); // SUBACK: non controlliamo i singoli return code
+
+      this.connected = true; this.connecting = false; this.lastError = null; this.reconnectDelayMs = 2000;
+
+      // Keepalive sotto i 60s dichiarati al CONNECT.
+      pingInterval = setInterval(() => { writer.write(mqttPingReqPacket()).catch(() => {}); }, 50000);
+
+      while (this.clients.size > 0) {
+        const pkt = await reader.readPacket();
+        if (pkt.type === 3) {                      // PUBLISH
+          const { topic, payload } = parseMqttPublish(pkt.body);
+          if (topic.startsWith("blitzortung/")) {
+            try {
+              const d = JSON.parse(payload);
+              if (typeof d.lat === "number" && typeof d.lon === "number") {
+                this.strikeCount++; this.lastStrikeAt = new Date().toISOString();
+                this._broadcast({ lat: d.lat, lon: d.lon, time: d.time ?? null });
+              }
+            } catch (_) { /* payload non-JSON o formato diverso da quello atteso: scartato */ }
+          }
+        }
+        // PINGRESP e altri tipi: bastava leggerli per svuotare lo stream.
+      }
+    } catch (e) {
+      this.lastError = String((e && e.message) || e);
+    } finally {
+      if (pingInterval) clearInterval(pingInterval);
+      this.connecting = false; this.connected = false;
+      if (this.socket) { try { this.socket.close(); } catch (_) {} this.socket = null; }
+      if (this.clients.size > 0) {                  // c'e' ancora chi guarda: riprova
+        const delay = this.reconnectDelayMs;
+        this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 60000);
+        setTimeout(() => this._ensureConnected(), delay);
+      }
+    }
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url    = new URL(request.url);
@@ -4842,6 +5307,20 @@ export default {
     if (url.pathname === "/modis-europa" || url.pathname === "/modis-viewer") {
       return new Response(MODIS_HTML || "<h1>MODIS Europa</h1><p>Esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
         { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
+    }
+
+    // Fulmini live (Blitzortung, feed punto reale — vedi il commento sulla
+    // classe LightningRelay per policy/protocollo). Un solo Durable Object
+    // globale ("main") tiene l'unica connessione MQTT e fa da hub WebSocket
+    // per tutti i visitatori: /lightning/ws si aggiorna a WebSocket per il
+    // viewer, /lightning/status e' un JSON di debug (connesso? quante
+    // scariche viste? ultimo errore?).
+    if (url.pathname === "/lightning/ws" || url.pathname === "/lightning/status") {
+      if (!env.LIGHTNING_RELAY) return new Response(JSON.stringify({
+        error: "Durable Object LIGHTNING_RELAY non configurato: serve un wrangler deploy con la migrazione aggiunta a wrangler.toml"
+      }), { status: 503, headers: { "Content-Type": "application/json" } });
+      const id = env.LIGHTNING_RELAY.idFromName("main");
+      return env.LIGHTNING_RELAY.get(id).fetch(request);
     }
 
     // Catalogo: elenca i layer realmente offerti da EUMETView (name+title+time).
@@ -4979,6 +5458,43 @@ export default {
         hint: "Passa il layer EUMETView vero con &layer=<workspace:nome> per aggirare i nomi predefiniti."
       }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
 
+      // Legenda colore (GetLegendGraphic, estensione WMS standard di GeoServer):
+      // serve sui prodotti "dati" classificati (es. Lifted-Index, fulmini) dove
+      // un colore da solo non dice nulla senza la scala — come fanno i viewer
+      // professionali (RAMMB SLIDER, lo stesso toolbox EUMETSAT). E' statica per
+      // layer (non dipende da bbox/tempo), quindi cache lunga a parte da GetMap.
+      // LEGEND_OPTIONS ritinge il rendering GeoServer sul tema scuro dell'app
+      // invece di lasciare la legenda bianca su bianco.
+      if (url.searchParams.get("legend") === "1") {
+        const ttlLegend = 7 * 86400;
+        const cache = caches.default;
+        const cacheKey = new Request(url.origin + "/metop?k=legend|" + encodeURIComponent(layer));
+        const hit = await cache.match(cacheKey);
+        if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
+
+        const legendOpts = "fontColor:0xE9EEF4;fontAntiAliasing:true;bgColor:0x1F242C;fontSize:11;dpi:120";
+        const wmsLegend = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetLegendGraphic&VERSION=1.1.1&LAYER="
+          + encodeURIComponent(layer) + "&FORMAT=image/png&TRANSPARENT=true"
+          + "&LEGEND_OPTIONS=" + encodeURIComponent(legendOpts);
+
+        let legendResp;
+        try { legendResp = await fetch(wmsLegend, { cf: { cacheTtl: ttlLegend, cacheEverything: true } }); }
+        catch (e) { return new Response(JSON.stringify({ error: "legenda non raggiungibile (rete/timeout)", detail: String(e), layer }),
+          { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
+
+        const lct = legendResp.headers.get("Content-Type") || "";
+        if (!legendResp.ok || !lct.includes("image"))
+          return new Response(JSON.stringify({ error: "legenda non disponibile per questo layer", status: legendResp.status, layer }),
+            { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
+
+        const legendBuf = await legendResp.arrayBuffer();
+        const legendHeaders = { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age=" + ttlLegend,
+                                 "X-Cache": "MISS", "X-METOP-Layer": layer };
+        const legendOut = new Response(legendBuf, { headers: legendHeaders });
+        try { await cache.put(cacheKey, legendOut.clone()); } catch (_) {}
+        return legendOut;
+      }
+
       const bbox = url.searchParams.get("bbox") || "-60,-180,80,180"; // lat,lon (WMS 1.3.0)
       const w = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("w") || "1024") || 1024));
       const h = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("h") || "768")  || 768));
@@ -4995,10 +5511,18 @@ export default {
       // NaturalEarth, cosi' si vedono coste e continenti come un globo.
       const bg = url.searchParams.get("bg") === "1";
       const borders = url.searchParams.get("borders") === "1";
+      // RDT (celle convettive gia' tracciate dal satellite, NWC SAF): overlay
+      // vettoriale, non un prodotto a se' — si somma sopra quello scelto.
+      // Ha senso solo con lo stesso TIME di un prodotto MSG/MTG: il client lo
+      // mostra solo per quei satelliti (vedi metop-viewer.html), ma qui non lo
+      // rifiutiamo per prodotti diversi: se il TIME non coincide, GeoServer
+      // semplicemente non disegna nulla per quella tessera, senza errore.
+      const rdt = url.searchParams.get("rdt") === "1";
       const imageLayers = bg ? ("backgrounds:ne_gray," + layer) : layer;
+      const withRdt = rdt ? (imageLayers + ",msg_fes:rdt_red") : imageLayers;
       // Il layer vettoriale e' l'ultimo della composizione WMS, quindi i
       // confini restano nitidi sopra l'immagine satellitare.
-      const layersArg = borders ? (imageLayers + ",backgrounds:ne_boundary_lines_land") : imageLayers;
+      const layersArg = borders ? (withRdt + ",backgrounds:ne_boundary_lines_land") : withRdt;
 
       const wms = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + encodeURIComponent(layersArg)
         + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox + "&WIDTH=" + w + "&HEIGHT=" + h
