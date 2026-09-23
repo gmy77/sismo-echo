@@ -3407,6 +3407,10 @@ const METOP_HTML = `<!doctype html>
     border:1px solid var(--edge);border-radius:10px;padding:6px 11px;font-size:12px;
     color:var(--acc);display:none}
   #spin.on{display:block}
+  #legend{position:absolute;bottom:12px;left:12px;background:rgba(8,12,18,.82);
+    border:1px solid var(--edge);border-radius:10px;padding:6px 8px;display:none;
+    max-width:60%;max-height:38%;overflow:auto}
+  #legend img{display:block;max-width:100%}
   /* ---- status ---- */
   #status{grid-column:2;background:var(--panel);border-top:1px solid var(--edge);
     display:flex;align-items:center;padding:0 12px;font-size:12px;color:var(--sub);gap:16px}
@@ -3459,6 +3463,9 @@ const METOP_HTML = `<!doctype html>
     </select>
     <select id="product" style="margin-top:6px"></select>
     <div id="prodhint" class="sub" style="margin-top:6px"></div>
+    <label class="chk" id="lightningBeepRow" style="display:none;margin-top:8px">
+      <input type="checkbox" id="lightningBeep"> 🔔 Bip su nuova attività fulmini (satellite, ogni ~10 min — non per singola scarica)
+    </label>
 
     <div class="sect">Data</div>
     <div class="row">
@@ -3519,6 +3526,7 @@ const METOP_HTML = `<!doctype html>
     <canvas id="cv"></canvas>
     <div id="chip">Pronto — trascina per spostarti, rotella per zoomare.</div>
     <div id="spin">⏳ scarico…</div>
+    <div id="legend"><img id="legendImg" alt="legenda colore"></div>
   </div>
 
   <div id="status">
@@ -3912,6 +3920,7 @@ async function fetchImage(){
     const blob=await resp.blob(), im=new Image();
     await new Promise((ok,ko)=>{ im.onload=ok; im.onerror=ko; im.src=URL.createObjectURL(blob); });
     img=im; imgBox={...view};
+    if(/li_afa/i.test(curVal())) checkLightningActivity(im);
     const now=new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
     $("chip").textContent = sel().selectedOptions[0].text + (time?" · "+time.replace("T"," ").replace("Z"," UTC"):(date?" · "+date:""))
       + (isFollowingLive()?" · 🔴 LIVE aggiornata alle "+now:"");
@@ -4053,8 +4062,75 @@ function onProductChange(){
   $("globe").disabled = single;
   $("globehint").textContent = single ? "non disponibile su una striscia a singola orbita"
     : fullDisk ? "consigliata per questo prodotto (disco intero)" : "";
-  loadTimes(); draw(); updateLiveHint();
+  // Il bip ha senso solo sul layer fulmini: cambiando prodotto lo si nasconde
+  // e si azzera la base di confronto, cosi' non scatta un falso "nuova
+  // attivita'" solo perche' si e' passati a un altro layer/area.
+  const isLightning = /li_afa/i.test(v);
+  $("lightningBeepRow").style.display = isLightning ? "flex" : "none";
+  if(!isLightning){ $("lightningBeep").checked=false; lastFlashPixelCount=null; lastFlashKey=null; }
+  loadTimes(); draw(); updateLiveHint(); loadLegend(v, catOf(title, v));
 }
+// --------------------------------------------------------------------------
+// Legenda colore (GetLegendGraphic via il Worker, vedi /metop?legend=1).
+// Ha senso solo sui prodotti "dati" classificati (Lifted-Index, fulmini,
+// vento, ozono…): sui compositi RGB "foto" (Geo Colour, True Colour…) il
+// server restituirebbe solo uno swatch senza significato, quindi si nasconde.
+let legendReqId = 0;
+async function loadLegend(v, cat){
+  const reqId = ++legendReqId;
+  const el = $("legend"), im = $("legendImg");
+  if(!isRealLayer(v) || cat!=="data"){ el.style.display="none"; return; }
+  try{
+    const r = await fetch(API+"/metop?legend=1&layer="+encodeURIComponent(v));
+    if(reqId!==legendReqId) return;
+    const ct = r.headers.get("Content-Type")||"";
+    if(!r.ok || !ct.includes("image")){ el.style.display="none"; return; }
+    const blob = await r.blob();
+    if(reqId!==legendReqId) return;
+    im.src = URL.createObjectURL(blob);
+    el.style.display="block";
+  }catch(_){ if(reqId===legendReqId) el.style.display="none"; }
+}
+
+// --------------------------------------------------------------------------
+// Bip sonoro sui fulmini (Web Audio, nessun file esterno). ATTENZIONE ai
+// limiti reali: li_afa e' un accumulo satellitare aggiornato ogni ~10 minuti
+// (ciclo di scansione MTG), non un flusso per singola scarica — qui si conta
+// quanti pixel non-trasparenti (area con fulmini) ci sono nell'immagine appena
+// scaricata e si confronta col conteggio precedente SULLA STESSA VISTA: se e'
+// cresciuto, e' arrivata nuova attivita' dall'ultimo scan. Un vero bip "per
+// ogni fulmine" richiede un feed punto (es. Blitzortung), non un raster.
+let audioCtx=null, lastFlashPixelCount=null, lastFlashKey=null;
+function beep(freq=880, durMs=140){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type="sine"; o.frequency.value=freq; g.gain.value=0.18;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+durMs/1000);
+    o.stop(audioCtx.currentTime+durMs/1000+0.03);
+  }catch(_){ /* audio non disponibile (autoplay bloccato finche' l'utente non interagisce): niente bip */ }
+}
+function checkLightningActivity(im){
+  if(!$("lightningBeep").checked || !imgBox) return;
+  try{
+    const w=im.naturalWidth||im.width, h=im.naturalHeight||im.height;
+    if(!w||!h) return;
+    const off=document.createElement("canvas"); off.width=w; off.height=h;
+    const octx=off.getContext("2d"); octx.drawImage(im,0,0);
+    const data=octx.getImageData(0,0,w,h).data;
+    let count=0;
+    for(let i=3;i<data.length;i+=4) if(data[i]>20) count++;   // alpha>soglia = pixel con fulmini
+    const key=[imgBox.latMin,imgBox.lonMin,imgBox.latMax,imgBox.lonMax].map(n=>n.toFixed(2)).join(",");
+    if(lastFlashKey===key && lastFlashPixelCount!==null && count>lastFlashPixelCount){
+      beep();
+      $("chip").textContent += "  ⚡ nuova attività fulmini rilevata";
+    }
+    lastFlashPixelCount=count; lastFlashKey=key;
+  }catch(_){ /* immagine non leggibile (CORS o altro): niente bip, il viewer resta comunque usabile */ }
+}
+
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
   try{
@@ -4521,6 +4597,43 @@ export default {
         error: "prodotto sconosciuto", product, disponibili: Object.keys(METOP_LAYERS),
         hint: "Passa il layer EUMETView vero con &layer=<workspace:nome> per aggirare i nomi predefiniti."
       }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
+
+      // Legenda colore (GetLegendGraphic, estensione WMS standard di GeoServer):
+      // serve sui prodotti "dati" classificati (es. Lifted-Index, fulmini) dove
+      // un colore da solo non dice nulla senza la scala — come fanno i viewer
+      // professionali (RAMMB SLIDER, lo stesso toolbox EUMETSAT). E' statica per
+      // layer (non dipende da bbox/tempo), quindi cache lunga a parte da GetMap.
+      // LEGEND_OPTIONS ritinge il rendering GeoServer sul tema scuro dell'app
+      // invece di lasciare la legenda bianca su bianco.
+      if (url.searchParams.get("legend") === "1") {
+        const ttlLegend = 7 * 86400;
+        const cache = caches.default;
+        const cacheKey = new Request(url.origin + "/metop?k=legend|" + encodeURIComponent(layer));
+        const hit = await cache.match(cacheKey);
+        if (hit) { const hh = new Headers(hit.headers); hh.set("X-Cache","HIT"); return new Response(hit.body, { headers: hh }); }
+
+        const legendOpts = "fontColor:0xE9EEF4;fontAntiAliasing:true;bgColor:0x1F242C;fontSize:11;dpi:120";
+        const wmsLegend = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetLegendGraphic&VERSION=1.1.1&LAYER="
+          + encodeURIComponent(layer) + "&FORMAT=image/png&TRANSPARENT=true"
+          + "&LEGEND_OPTIONS=" + encodeURIComponent(legendOpts);
+
+        let legendResp;
+        try { legendResp = await fetch(wmsLegend, { cf: { cacheTtl: ttlLegend, cacheEverything: true } }); }
+        catch (e) { return new Response(JSON.stringify({ error: "legenda non raggiungibile (rete/timeout)", detail: String(e), layer }),
+          { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
+
+        const lct = legendResp.headers.get("Content-Type") || "";
+        if (!legendResp.ok || !lct.includes("image"))
+          return new Response(JSON.stringify({ error: "legenda non disponibile per questo layer", status: legendResp.status, layer }),
+            { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
+
+        const legendBuf = await legendResp.arrayBuffer();
+        const legendHeaders = { ...CORS, "Content-Type": "image/png", "Cache-Control": "public, max-age=" + ttlLegend,
+                                 "X-Cache": "MISS", "X-METOP-Layer": layer };
+        const legendOut = new Response(legendBuf, { headers: legendHeaders });
+        try { await cache.put(cacheKey, legendOut.clone()); } catch (_) {}
+        return legendOut;
+      }
 
       const bbox = url.searchParams.get("bbox") || "-60,-180,80,180"; // lat,lon (WMS 1.3.0)
       const w = Math.max(64, Math.min(2048, parseInt(url.searchParams.get("w") || "1024") || 1024));
