@@ -3516,6 +3516,10 @@ const METOP_HTML = `<!doctype html>
     <div id="globehint" class="sub" style="margin:-4px 0 8px"></div>
     <label class="chk"><input type="checkbox" id="bg"> Sfondo Terra (coste e continenti)</label>
     <label class="chk"><input type="checkbox" id="borders" checked> Confini delle nazioni</label>
+    <label class="chk" id="rdtRow" style="display:none">
+      <input type="checkbox" id="rdt"> 🌪️ Celle convettive tracciate (RDT)
+    </label>
+    <div id="rdtHint" class="sub" style="margin:-4px 0 8px;display:none">contorni delle celle temporalesche gia' tracciate dal satellite: poligono + vettore di moto, colore secondo la fase di sviluppo — solo sopra prodotti MSG/MTG (stesso orario)</div>
     <label class="chk"><input type="checkbox" id="grid" checked> Griglia lat/lon</label>
     <label class="chk"><input type="checkbox" id="labels" checked> Etichette coordinate</label>
     <button id="reset" style="margin-top:8px">Reset vista (mondo)</button>
@@ -3872,6 +3876,9 @@ const CURATED = [
   // tempo severo, spesso 10-20 minuti prima della grandine/downburst.
   {name:"mtg_fd:li_afa",             title:"LI Accumulated Flash Area - MTG-I - 0 degree", hasTime:true},
   {name:"msg_fes:gii_liftedindex",   title:"GII Lifted-Index - MSG - 0 degree", hasTime:true},
+  // Altezza reale della cima delle nubi: collegata all'overshooting-top
+  // (una cima convettiva molto alta/fredda e' un segno di temporale intenso).
+  {name:"msg_fes:cth",               title:"Cloud Top Height - MSG - 0 degree", hasTime:true},
 ];
 // Spiegazione delle ricette RGB false-colore: cosa mostrano i colori, non il
 // nome tecnico del layer (che l'utente non conosce e non deve conoscere).
@@ -3888,6 +3895,7 @@ const RECIPE_HINTS = [
   [/cloudtype/i,       "classificazione del tipo di nube per colore"],
   [/flash area|lightning|\bli_afa\b/i, "attivita' dei fulmini: aree dove il Lightning Imager MTG ha registrato scariche (accumulo) — segue le celle attive, un'impennata rapida spesso precede grandine/raffiche"],
   [/lifted.?index|liftedindex/i,       "instabilita' da satellite: piu' negativo = atmosfera piu' predisposta ai temporali"],
+  [/cloud top height|\bcth\b/i,        "altezza reale della cima delle nubi: piu' alta (colori piu' freddi/violacei) spesso vuol dire temporale piu' intenso — collegata all'overshooting top"],
 ];
 function recipeHint(title){
   const hit = RECIPE_HINTS.find(([re])=>re.test(title));
@@ -3917,6 +3925,7 @@ async function fetchImage(){
   if(time) u+="&time="+encodeURIComponent(time);
   if($("bg").checked) u+="&bg=1";
   if($("borders").checked) u+="&borders=1";
+  if($("rdt").checked) u+="&rdt=1";
 
   $("spin").classList.add("on"); $("st-msg").textContent="";
   try{
@@ -4008,7 +4017,7 @@ function catOf(title, name){
   if(/rgb_124|_ir\d|_wv\d|_vis\d|_cloud|_fog|_dust|_ash|_airmass/.test(n)) return "cloud";
   if(/sst|_chl|ascat|wind|ozone|aerosol|orbit|footprint|instab/.test(n)) return "data";
   // --- per TITOLO (fallback) ---
-  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability/.test(t)) return "data";
+  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability|top height/.test(t)) return "data";
   if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\bolci\b/.test(t)) return "real";
   if(/cloud|\bir\b|ir\d|\bwv\b|wv\d|vis\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
   return "other";
@@ -4078,6 +4087,12 @@ function onProductChange(){
   const isLightning = /li_afa/i.test(v);
   $("lightningBeepRow").style.display = isLightning ? "flex" : "none";
   if(!isLightning){ $("lightningBeep").checked=false; lastFlashPixelCount=null; lastFlashKey=null; }
+  // RDT (celle tracciate) e' un OVERLAY vettoriale MSG: ha senso solo sopra
+  // prodotti geostazionari (stesso TIME della composizione WMS), non sopra
+  // METOP/Sentinel-3 dove il tempo non e' comparabile.
+  $("rdtRow").style.display = geo ? "flex" : "none";
+  $("rdtHint").style.display = geo && $("rdt").checked ? "block" : "none";
+  if(!geo) $("rdt").checked=false;
   loadTimes(); draw(); updateLiveHint(); loadLegend(v, catOf(title, v));
 }
 // --------------------------------------------------------------------------
@@ -4354,6 +4369,7 @@ $("cat").onchange=populateProducts;
 $("times").onchange=()=>{ fetchImage(); updateLiveHint(); };
 $("bg").onchange=scheduleFetch;   // lo sfondo Terra e' composto dal server: ri-scarica
 $("borders").onchange=scheduleFetch;
+$("rdt").onchange=()=>{ $("rdtHint").style.display=$("rdt").checked?"block":"none"; scheduleFetch(); };
 $("globe").onchange=()=>{ $("globehint").textContent=""; draw(); };
 $("grid").onchange=draw;
 $("labels").onchange=draw;
@@ -5026,10 +5042,18 @@ export default {
       // NaturalEarth, cosi' si vedono coste e continenti come un globo.
       const bg = url.searchParams.get("bg") === "1";
       const borders = url.searchParams.get("borders") === "1";
+      // RDT (celle convettive gia' tracciate dal satellite, NWC SAF): overlay
+      // vettoriale, non un prodotto a se' — si somma sopra quello scelto.
+      // Ha senso solo con lo stesso TIME di un prodotto MSG/MTG: il client lo
+      // mostra solo per quei satelliti (vedi metop-viewer.html), ma qui non lo
+      // rifiutiamo per prodotti diversi: se il TIME non coincide, GeoServer
+      // semplicemente non disegna nulla per quella tessera, senza errore.
+      const rdt = url.searchParams.get("rdt") === "1";
       const imageLayers = bg ? ("backgrounds:ne_gray," + layer) : layer;
+      const withRdt = rdt ? (imageLayers + ",msg_fes:rdt_red") : imageLayers;
       // Il layer vettoriale e' l'ultimo della composizione WMS, quindi i
       // confini restano nitidi sopra l'immagine satellitare.
-      const layersArg = borders ? (imageLayers + ",backgrounds:ne_boundary_lines_land") : imageLayers;
+      const layersArg = borders ? (withRdt + ",backgrounds:ne_boundary_lines_land") : withRdt;
 
       const wms = EUMETVIEW + "?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=" + encodeURIComponent(layersArg)
         + "&STYLES=&CRS=EPSG:4326&BBOX=" + bbox + "&WIDTH=" + w + "&HEIGHT=" + h
