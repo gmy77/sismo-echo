@@ -13,6 +13,10 @@ const NOAA_WIND   = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json"
 function getUpdateSecret(env) { return env?.UPDATE_SECRET || ""; }
 
 const FVG = { lat_min:45.5, lat_max:46.8, lon_min:12.4, lon_max:14.1 };
+// Centro del FVG, riusato anche dal relay fulmini live (LightningRelay) per
+// scegliere le tessere geohash su cui abbonarsi — stessa area, un solo posto
+// dove tenerla aggiornata se un giorno cambia.
+const FVG_CENTER = { lat: (FVG.lat_min + FVG.lat_max) / 2, lon: (FVG.lon_min + FVG.lon_max) / 2 };
 const CF  = { lat_min:40.4, lat_max:41.1, lon_min:13.7, lon_max:14.8 }; // Campi Flegrei · Vesuvio · Ischia
 
 // ============================================================
@@ -3477,6 +3481,11 @@ const METOP_HTML = `<!doctype html>
     <label class="chk"><input type="checkbox" id="live" checked> <span id="liveLabel">Aggiornamento automatico</span></label>
     <div id="livehint" class="sub" style="margin:-4px 0 8px"></div>
 
+    <div class="sect">Fulmini live</div>
+    <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra, Blitzortung — vero per-scarica)</label>
+    <div id="liveLightningStatus" class="sub" style="margin:-4px 0 8px"></div>
+    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (FVG e dintorni), con un bip più acuto e corto del bip satellitare qui sopra.</div>
+
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
     <div class="row">
@@ -3603,6 +3612,7 @@ function draw(){
   }
   if(document.getElementById("grid").checked && !globeOn) drawGraticule();
   if(globeOn) drawGlobeOutline();
+  if(!globeOn) drawLiveStrikes();
   document.getElementById("st-view").textContent =
     "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
     view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
@@ -4131,6 +4141,80 @@ function checkLightningActivity(im){
   }catch(_){ /* immagine non leggibile (CORS o altro): niente bip, il viewer resta comunque usabile */ }
 }
 
+// --------------------------------------------------------------------------
+// Fulmini live (Blitzortung, feed punto vero via il relay MQTT->WebSocket
+// del Worker: /lightning/ws). A differenza del bip satellitare qui sopra
+// (li_afa, ~10 min, area accumulata), questo e' ogni singola scarica reale
+// captata dalla rete di antenne a terra, in un raggio di poche centinaia di
+// km intorno al FVG (le tessere geohash scelte lato server) — indipendente
+// dal layer/prodotto satellitare mostrato in quel momento.
+let liveWs=null, liveStrikes=[], liveAnimTimer=null, liveReconnectDelay=2000, liveWanted=false;
+function wsUrlFromApi(){
+  const u = new URL(API);
+  u.protocol = u.protocol==="https:" ? "wss:" : "ws:";
+  u.pathname = "/lightning/ws";
+  u.search = "";
+  return u.toString();
+}
+function connectLiveLightning(){
+  liveWanted = true;
+  if(liveWs) return;
+  $("liveLightningStatus").textContent="connessione…";
+  let ws;
+  try{ ws = new WebSocket(wsUrlFromApi()); }
+  catch(_){ $("liveLightningStatus").textContent="non disponibile in questo browser"; return; }
+  liveWs = ws;
+  ws.onopen = () => { $("liveLightningStatus").textContent="🟢 live — in ascolto"; liveReconnectDelay=2000; };
+  ws.onmessage = (ev) => {
+    let d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
+    if(typeof d.lat!=="number" || typeof d.lon!=="number") return;
+    liveStrikes.push({ lat:d.lat, lon:d.lon, t:performance.now() });
+    ensureLiveAnim();
+    // Bip solo se la scarica cade nella vista corrente: altrimenti, con
+    // tutta l'area coperta dalle tessere geohash (ben piu' larga della
+    // vista tipica), sarebbe un bip quasi continuo e inutile.
+    if(d.lat>=view.latMin && d.lat<=view.latMax && d.lon>=view.lonMin && d.lon<=view.lonMax)
+      beep(1500, 90);   // piu' acuto/corto del bip satellitare (880Hz/140ms): si riconoscono ad orecchio
+  };
+  ws.onclose = ws.onerror = () => {
+    liveWs=null;
+    if(!liveWanted) return;
+    $("liveLightningStatus").textContent="riconnessione…";
+    setTimeout(()=>{ if(liveWanted) connectLiveLightning(); }, liveReconnectDelay);
+    liveReconnectDelay = Math.min(liveReconnectDelay*2, 30000);
+  };
+}
+function disconnectLiveLightning(){
+  liveWanted = false;
+  if(liveWs){ try{ liveWs.close(); }catch(_){} liveWs=null; }
+  $("liveLightningStatus").textContent="";
+}
+function ensureLiveAnim(){
+  if(liveAnimTimer) return;
+  liveAnimTimer=setInterval(()=>{
+    const now=performance.now();
+    liveStrikes=liveStrikes.filter(s=>now-s.t<3000);
+    draw();
+    if(!liveStrikes.length){ clearInterval(liveAnimTimer); liveAnimTimer=null; }
+  }, 80);
+}
+function drawLiveStrikes(){
+  if(!liveStrikes.length) return;
+  const now=performance.now();
+  for(const s of liveStrikes){
+    if(s.lat<view.latMin||s.lat>view.latMax||s.lon<view.lonMin||s.lon>view.lonMax) continue;
+    const age=(now-s.t)/3000;                       // 0 = appena arrivato, 1 = da rimuovere
+    const x=lonToX(s.lon), y=latToY(s.lat);
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,1-age);
+    ctx.strokeStyle="#fff35c"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y,4+age*18,0,Math.PI*2); ctx.stroke();  // anello che si espande e svanisce
+    ctx.fillStyle="#fff35c";
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();           // punto esatto della scarica
+    ctx.restore();
+  }
+}
+
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
   try{
@@ -4338,6 +4422,7 @@ function scheduleLiveTimer(){
   liveTimer=setInterval(liveTick, 60*1000);
 }
 $("live").onchange=()=>{ updateLiveHint(); if($("live").checked) liveTick(); };
+$("liveLightning").onchange=()=>{ if($("liveLightning").checked) connectLiveLightning(); else disconnectLiveLightning(); };
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) liveTick(); });
 
 fitDPR(); draw(); initCatalog().then(()=>{ configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });
@@ -4437,6 +4522,282 @@ function parseWmsLayers(xml) {
   return out;
 }
 
+// ============================================================
+// BLITZORTUNG LIGHTNING RELAY — fulmini live, punto vero (non un'immagine
+// satellitare accumulata come li_afa: qui e' ogni singola scarica, quasi in
+// tempo reale).
+//
+// Blitzortung non ha un'API pubblica ufficiale documentata: il protocollo
+// qui sotto e' stato verificato leggendo il sorgente REALE dell'integrazione
+// Home Assistant di mrk-its (github.com/mrk-its/homeassistant-blitzortung),
+// non indovinato. Loro usano un broker MQTT condiviso, mantenuto per gli
+// utenti di quell'integrazione:
+//   - broker blitzortung.ha.sed.pl:1883, MQTT 3.1.1 su TCP grezzo (NON WebSocket)
+//   - topic "blitzortung/1.1/<geohash carattere-per-carattere>/#"
+//   - QoS 0, auth anonima, solo subscribe (mai publish)
+// La policy dichiarata da Blitzortung stessa (nel README di quel progetto):
+// "third party apps must use their own servers to serve data for their own
+// clients" — cioe' non deve essere ogni singolo utente del nostro viewer a
+// collegarsi al loro feed. Questo Durable Object fa esattamente quello: UNA
+// sola connessione MQTT globale, che fa da hub WebSocket per ogni visitatore
+// del viewer — meno carico sul loro relay di quanti utenti nostri ci fossero
+// se si collegasse ciascuno per conto suo.
+//
+// Impronta "da buon cittadino" (stessi criteri di un caso analogo gia'
+// discusso pubblicamente con il maintainer, issue #340 di quel repo): una
+// sola connessione, client id vuoto, poche tessere geohash (qui: al massimo
+// 9, la tessera centrata sul FVG piu' le 8 vicine), QoS 0, nessun publish,
+// reconnect con backoff esponenziale. La connessione si apre solo quando
+// c'e' almeno un visitatore collegato al viewer e si chiude subito quando
+// l'ultimo se ne va: zero carico sul loro relay se non sta guardando nessuno.
+//
+// ATTENZIONE (onesta' tecnica, non testato end-to-end da questo ambiente):
+// il framing MQTT qui sotto e' scritto a mano seguendo lo spec 3.1.1 standard
+// (nessuna libreria MQTT gira nel runtime Workers), e i nomi dei campi del
+// payload (lat/lon/time) sono dedotti dal codice che CONSUMA il dato gia'
+// decodificato in homeassistant-blitzortung, non visti byte-per-byte sul filo
+// reale — verificare dopo il deploy e correggere se il payload usa altre
+// chiavi. Richiede l'API TCP Sockets (cloudflare:sockets) e un Durable Object
+// SQLite-backed: entrambi disponibili anche sul piano Workers Free, ma
+// servono la migrazione in wrangler.toml (vedi commit) e un wrangler
+// aggiornato.
+// ============================================================
+
+const BLITZORTUNG_HOST = "blitzortung.ha.sed.pl";
+const BLITZORTUNG_PORT = 1883;
+const LIGHTNING_GEOHASH_PRECISION = 3;   // celle ~156km: 3x3 attorno al FVG copre comodamente NE Italia/Slovenia/Austria/Adriatico
+
+// --- Geohash standard (Gustavo Niemeyer): alfabeto e interleaving verificati
+// contro l'implementazione usata da homeassistant-blitzortung (stesso
+// alfabeto, longitudine nei bit pari a partire dal primo).
+const GEOHASH_BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+function geohashEncode(lat, lon, precision) {
+  let latRange = [-90, 90], lonRange = [-180, 180];
+  let hash = "", bit = 0, ch = 0, evenBit = true;
+  while (hash.length < precision) {
+    if (evenBit) {
+      const mid = (lonRange[0] + lonRange[1]) / 2;
+      if (lon >= mid) { ch |= (1 << (4 - bit)); lonRange[0] = mid; } else { lonRange[1] = mid; }
+    } else {
+      const mid = (latRange[0] + latRange[1]) / 2;
+      if (lat >= mid) { ch |= (1 << (4 - bit)); latRange[0] = mid; } else { latRange[1] = mid; }
+    }
+    evenBit = !evenBit;
+    if (bit < 4) bit++;
+    else { hash += GEOHASH_BASE32[ch]; bit = 0; ch = 0; }
+  }
+  return hash;
+}
+function geohashBounds(hash) {
+  let latRange = [-90, 90], lonRange = [-180, 180], evenBit = true;
+  for (const c of hash) {
+    const idx = GEOHASH_BASE32.indexOf(c);
+    if (idx < 0) continue;
+    for (let bit = 4; bit >= 0; bit--) {
+      const bitVal = (idx >> bit) & 1;
+      if (evenBit) {
+        const mid = (lonRange[0] + lonRange[1]) / 2;
+        if (bitVal) lonRange[0] = mid; else lonRange[1] = mid;
+      } else {
+        const mid = (latRange[0] + latRange[1]) / 2;
+        if (bitVal) latRange[0] = mid; else latRange[1] = mid;
+      }
+      evenBit = !evenBit;
+    }
+  }
+  return { latMin: latRange[0], latMax: latRange[1], lonMin: lonRange[0], lonMax: lonRange[1] };
+}
+// Le 9 tessere (centro + 8 vicine) attorno a un punto, alla precisione data.
+function geohashNeighborTiles(lat, lon, precision) {
+  const center = geohashEncode(lat, lon, precision);
+  const b = geohashBounds(center);
+  const dLat = b.latMax - b.latMin, dLon = b.lonMax - b.lonMin;
+  const cLat = (b.latMin + b.latMax) / 2, cLon = (b.lonMin + b.lonMax) / 2;
+  const tiles = new Set();
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const plat = Math.max(-90, Math.min(90, cLat + dy * dLat));
+      const plon = (((cLon + dx * dLon) + 180) % 360 + 360) % 360 - 180;
+      tiles.add(geohashEncode(plat, plon, precision));
+    }
+  }
+  return [...tiles];
+}
+
+// --- Framing MQTT 3.1.1 minimale (solo CONNECT/SUBSCRIBE/PINGREQ in uscita,
+// CONNACK/SUBACK/PUBLISH/PINGRESP in entrata — il sottoinsieme che ci serve).
+function mqttEncodeString(str) {
+  const bytes = new TextEncoder().encode(str);
+  const out = new Uint8Array(2 + bytes.length);
+  out[0] = (bytes.length >> 8) & 0xff; out[1] = bytes.length & 0xff;
+  out.set(bytes, 2);
+  return out;
+}
+function mqttRemainingLength(n) {
+  const bytes = [];
+  do { let b = n % 128; n = Math.floor(n / 128); if (n > 0) b |= 0x80; bytes.push(b); } while (n > 0);
+  return new Uint8Array(bytes);
+}
+function concatBytes(arrays) {
+  const total = arrays.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
+function mqttConnectPacket(clientId, keepAliveSec) {
+  const variable = concatBytes([
+    mqttEncodeString("MQTT"),
+    new Uint8Array([0x04]),                                    // livello: 3.1.1
+    new Uint8Array([0x02]),                                    // flags: Clean Session
+    new Uint8Array([(keepAliveSec >> 8) & 0xff, keepAliveSec & 0xff]),
+  ]);
+  const body = concatBytes([variable, mqttEncodeString(clientId)]);
+  return concatBytes([new Uint8Array([0x10]), mqttRemainingLength(body.length), body]);
+}
+function mqttSubscribePacket(packetId, topics) {
+  const parts = [new Uint8Array([(packetId >> 8) & 0xff, packetId & 0xff])];
+  for (const t of topics) { parts.push(mqttEncodeString(t)); parts.push(new Uint8Array([0x00])); } // QoS 0
+  const body = concatBytes(parts);
+  return concatBytes([new Uint8Array([0x82]), mqttRemainingLength(body.length), body]);
+}
+const mqttPingReqPacket = () => new Uint8Array([0xc0, 0x00]);
+
+function parseMqttPublish(body) {
+  const topicLen = (body[0] << 8) | body[1];
+  const topic = new TextDecoder().decode(body.slice(2, 2 + topicLen));
+  const payload = new TextDecoder().decode(body.slice(2 + topicLen)); // QoS0: niente Packet Identifier
+  return { topic, payload };
+}
+
+// Legge frame MQTT da uno stream TCP, bufferizzando i chunk in arrivo finche'
+// non ce n'e' abbastanza per un byte/lunghezza/pacchetto intero.
+class MqttByteReader {
+  constructor(readable) { this.reader = readable.getReader(); this.buf = new Uint8Array(0); }
+  async _fill(min) {
+    while (this.buf.length < min) {
+      const { value, done } = await this.reader.read();
+      if (done) throw new Error("connessione MQTT chiusa dal broker");
+      const merged = new Uint8Array(this.buf.length + value.length);
+      merged.set(this.buf, 0); merged.set(value, this.buf.length);
+      this.buf = merged;
+    }
+  }
+  async readByte() { await this._fill(1); const b = this.buf[0]; this.buf = this.buf.slice(1); return b; }
+  async readBytes(n) { await this._fill(n); const out = this.buf.slice(0, n); this.buf = this.buf.slice(n); return out; }
+  async readPacket() {
+    const type = await this.readByte();
+    let multiplier = 1, len = 0, b;
+    do { b = await this.readByte(); len += (b & 0x7f) * multiplier; multiplier *= 128; } while (b & 0x80);
+    return { type: type >> 4, flags: type & 0x0f, body: await this.readBytes(len) };
+  }
+}
+
+export class LightningRelay {
+  constructor(state, env) {
+    this.state = state; this.env = env;
+    this.clients = new Set();     // WebSocket dei visitatori del viewer
+    this.socket = null;           // connessione TCP verso il broker MQTT
+    this.connecting = false;
+    this.connected = false;
+    this.lastError = null;
+    this.strikeCount = 0;
+    this.lastStrikeAt = null;
+    this.reconnectDelayMs = 2000;
+  }
+
+  async fetch(request) {
+    if (request.headers.get("Upgrade") === "websocket") {
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+      server.accept();
+      this.clients.add(server);
+      const onGone = () => { this.clients.delete(server); this._maybeDisconnect(); };
+      server.addEventListener("close", onGone);
+      server.addEventListener("error", onGone);
+      this._ensureConnected();
+      return new Response(null, { status: 101, webSocket: client });
+    }
+    // /lightning/status — debug in chiaro, nessun dato sensibile.
+    return new Response(JSON.stringify({
+      connected: this.connected, clients: this.clients.size,
+      strikeCount: this.strikeCount, lastStrikeAt: this.lastStrikeAt,
+      lastError: this.lastError,
+    }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // Buon cittadino: se non guarda piu' nessuno, chiudiamo la connessione
+  // verso il loro relay invece di tenerla aperta a vuoto.
+  _maybeDisconnect() {
+    if (this.clients.size === 0 && this.socket) {
+      try { this.socket.close(); } catch (_) {}
+      this.socket = null; this.connected = false;
+    }
+  }
+
+  _broadcast(strike) {
+    const msg = JSON.stringify(strike);
+    for (const ws of this.clients) { try { ws.send(msg); } catch (_) { this.clients.delete(ws); } }
+  }
+
+  async _ensureConnected() {
+    if (this.connected || this.connecting) return;
+    this.connecting = true;
+    let pingInterval = null;
+    try {
+      const { connect } = await import("cloudflare:sockets");
+      const socket = connect({ hostname: BLITZORTUNG_HOST, port: BLITZORTUNG_PORT });
+      this.socket = socket;
+      const writer = socket.writable.getWriter();
+      const reader = new MqttByteReader(socket.readable);
+
+      await writer.write(mqttConnectPacket("", 60));
+      const connack = await reader.readPacket();
+      if (connack.type !== 2 || connack.body[1] !== 0)
+        throw new Error("CONNACK rifiutato (codice " + (connack.body?.[1] ?? "?") + ")");
+
+      const topics = geohashNeighborTiles(FVG_CENTER.lat, FVG_CENTER.lon, LIGHTNING_GEOHASH_PRECISION)
+        .map(g => "blitzortung/1.1/" + g.split("").join("/") + "/#");
+      topics.push("component/hello");
+      await writer.write(mqttSubscribePacket(1, topics));
+      await reader.readPacket(); // SUBACK: non controlliamo i singoli return code
+
+      this.connected = true; this.connecting = false; this.lastError = null; this.reconnectDelayMs = 2000;
+
+      // Keepalive sotto i 60s dichiarati al CONNECT.
+      pingInterval = setInterval(() => { writer.write(mqttPingReqPacket()).catch(() => {}); }, 50000);
+
+      while (this.clients.size > 0) {
+        const pkt = await reader.readPacket();
+        if (pkt.type === 3) {                      // PUBLISH
+          const { topic, payload } = parseMqttPublish(pkt.body);
+          if (topic.startsWith("blitzortung/")) {
+            try {
+              const d = JSON.parse(payload);
+              if (typeof d.lat === "number" && typeof d.lon === "number") {
+                this.strikeCount++; this.lastStrikeAt = new Date().toISOString();
+                this._broadcast({ lat: d.lat, lon: d.lon, time: d.time ?? null });
+              }
+            } catch (_) { /* payload non-JSON o formato diverso da quello atteso: scartato */ }
+          }
+        }
+        // PINGRESP e altri tipi: bastava leggerli per svuotare lo stream.
+      }
+    } catch (e) {
+      this.lastError = String((e && e.message) || e);
+    } finally {
+      if (pingInterval) clearInterval(pingInterval);
+      this.connecting = false; this.connected = false;
+      if (this.socket) { try { this.socket.close(); } catch (_) {} this.socket = null; }
+      if (this.clients.size > 0) {                  // c'e' ancora chi guarda: riprova
+        const delay = this.reconnectDelayMs;
+        this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 60000);
+        setTimeout(() => this._ensureConnected(), delay);
+      }
+    }
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url    = new URL(request.url);
@@ -4461,6 +4822,20 @@ export default {
     if (url.pathname === "/modis-europa" || url.pathname === "/modis-viewer") {
       return new Response(MODIS_HTML || "<h1>MODIS Europa</h1><p>Esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
         { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
+    }
+
+    // Fulmini live (Blitzortung, feed punto reale — vedi il commento sulla
+    // classe LightningRelay per policy/protocollo). Un solo Durable Object
+    // globale ("main") tiene l'unica connessione MQTT e fa da hub WebSocket
+    // per tutti i visitatori: /lightning/ws si aggiorna a WebSocket per il
+    // viewer, /lightning/status e' un JSON di debug (connesso? quante
+    // scariche viste? ultimo errore?).
+    if (url.pathname === "/lightning/ws" || url.pathname === "/lightning/status") {
+      if (!env.LIGHTNING_RELAY) return new Response(JSON.stringify({
+        error: "Durable Object LIGHTNING_RELAY non configurato: serve un wrangler deploy con la migrazione aggiunta a wrangler.toml"
+      }), { status: 503, headers: { "Content-Type": "application/json" } });
+      const id = env.LIGHTNING_RELAY.idFromName("main");
+      return env.LIGHTNING_RELAY.get(id).fetch(request);
     }
 
     // Catalogo: elenca i layer realmente offerti da EUMETView (name+title+time).

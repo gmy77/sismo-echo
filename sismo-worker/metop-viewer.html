@@ -122,6 +122,11 @@
     <label class="chk"><input type="checkbox" id="live" checked> <span id="liveLabel">Aggiornamento automatico</span></label>
     <div id="livehint" class="sub" style="margin:-4px 0 8px"></div>
 
+    <div class="sect">Fulmini live</div>
+    <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra, Blitzortung — vero per-scarica)</label>
+    <div id="liveLightningStatus" class="sub" style="margin:-4px 0 8px"></div>
+    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (FVG e dintorni), con un bip più acuto e corto del bip satellitare qui sopra.</div>
+
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
     <div class="row">
@@ -248,6 +253,7 @@ function draw(){
   }
   if(document.getElementById("grid").checked && !globeOn) drawGraticule();
   if(globeOn) drawGlobeOutline();
+  if(!globeOn) drawLiveStrikes();
   document.getElementById("st-view").textContent =
     "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
     view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
@@ -776,6 +782,80 @@ function checkLightningActivity(im){
   }catch(_){ /* immagine non leggibile (CORS o altro): niente bip, il viewer resta comunque usabile */ }
 }
 
+// --------------------------------------------------------------------------
+// Fulmini live (Blitzortung, feed punto vero via il relay MQTT->WebSocket
+// del Worker: /lightning/ws). A differenza del bip satellitare qui sopra
+// (li_afa, ~10 min, area accumulata), questo e' ogni singola scarica reale
+// captata dalla rete di antenne a terra, in un raggio di poche centinaia di
+// km intorno al FVG (le tessere geohash scelte lato server) — indipendente
+// dal layer/prodotto satellitare mostrato in quel momento.
+let liveWs=null, liveStrikes=[], liveAnimTimer=null, liveReconnectDelay=2000, liveWanted=false;
+function wsUrlFromApi(){
+  const u = new URL(API);
+  u.protocol = u.protocol==="https:" ? "wss:" : "ws:";
+  u.pathname = "/lightning/ws";
+  u.search = "";
+  return u.toString();
+}
+function connectLiveLightning(){
+  liveWanted = true;
+  if(liveWs) return;
+  $("liveLightningStatus").textContent="connessione…";
+  let ws;
+  try{ ws = new WebSocket(wsUrlFromApi()); }
+  catch(_){ $("liveLightningStatus").textContent="non disponibile in questo browser"; return; }
+  liveWs = ws;
+  ws.onopen = () => { $("liveLightningStatus").textContent="🟢 live — in ascolto"; liveReconnectDelay=2000; };
+  ws.onmessage = (ev) => {
+    let d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
+    if(typeof d.lat!=="number" || typeof d.lon!=="number") return;
+    liveStrikes.push({ lat:d.lat, lon:d.lon, t:performance.now() });
+    ensureLiveAnim();
+    // Bip solo se la scarica cade nella vista corrente: altrimenti, con
+    // tutta l'area coperta dalle tessere geohash (ben piu' larga della
+    // vista tipica), sarebbe un bip quasi continuo e inutile.
+    if(d.lat>=view.latMin && d.lat<=view.latMax && d.lon>=view.lonMin && d.lon<=view.lonMax)
+      beep(1500, 90);   // piu' acuto/corto del bip satellitare (880Hz/140ms): si riconoscono ad orecchio
+  };
+  ws.onclose = ws.onerror = () => {
+    liveWs=null;
+    if(!liveWanted) return;
+    $("liveLightningStatus").textContent="riconnessione…";
+    setTimeout(()=>{ if(liveWanted) connectLiveLightning(); }, liveReconnectDelay);
+    liveReconnectDelay = Math.min(liveReconnectDelay*2, 30000);
+  };
+}
+function disconnectLiveLightning(){
+  liveWanted = false;
+  if(liveWs){ try{ liveWs.close(); }catch(_){} liveWs=null; }
+  $("liveLightningStatus").textContent="";
+}
+function ensureLiveAnim(){
+  if(liveAnimTimer) return;
+  liveAnimTimer=setInterval(()=>{
+    const now=performance.now();
+    liveStrikes=liveStrikes.filter(s=>now-s.t<3000);
+    draw();
+    if(!liveStrikes.length){ clearInterval(liveAnimTimer); liveAnimTimer=null; }
+  }, 80);
+}
+function drawLiveStrikes(){
+  if(!liveStrikes.length) return;
+  const now=performance.now();
+  for(const s of liveStrikes){
+    if(s.lat<view.latMin||s.lat>view.latMax||s.lon<view.lonMin||s.lon>view.lonMax) continue;
+    const age=(now-s.t)/3000;                       // 0 = appena arrivato, 1 = da rimuovere
+    const x=lonToX(s.lon), y=latToY(s.lat);
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,1-age);
+    ctx.strokeStyle="#fff35c"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y,4+age*18,0,Math.PI*2); ctx.stroke();  // anello che si espande e svanisce
+    ctx.fillStyle="#fff35c";
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();           // punto esatto della scarica
+    ctx.restore();
+  }
+}
+
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
   try{
@@ -983,6 +1063,7 @@ function scheduleLiveTimer(){
   liveTimer=setInterval(liveTick, 60*1000);
 }
 $("live").onchange=()=>{ updateLiveHint(); if($("live").checked) liveTick(); };
+$("liveLightning").onchange=()=>{ if($("liveLightning").checked) connectLiveLightning(); else disconnectLiveLightning(); };
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) liveTick(); });
 
 fitDPR(); draw(); initCatalog().then(()=>{ configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });

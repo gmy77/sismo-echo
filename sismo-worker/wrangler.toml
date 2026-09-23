@@ -20,6 +20,19 @@ id = "7ed7834f05f64969ae9b8753df1a3708"
 [ai]
 binding = "AI"
 
+# Fulmini live (Blitzortung via relay MQTT->WebSocket, vedi LightningRelay
+# in index.js): un solo Durable Object globale tiene l'unica connessione
+# verso il loro relay e fa da hub per tutti i visitatori del viewer.
+# new_sqlite_classes (non new_classes): backend SQLite, disponibile anche
+# sul piano Workers Free — new_classes richiederebbe il piano a pagamento.
+[[durable_objects.bindings]]
+name = "LIGHTNING_RELAY"
+class_name = "LightningRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LightningRelay"]
+
 [triggers]
 # Consolidati in un unico cron (stessi orari) per restare nel limite di 5 trigger/account del piano Free
 crons = ["0 8,13,18,23 * * *"]
