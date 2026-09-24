@@ -1,0 +1,50 @@
+name: Worker probe (diagnostica)
+
+# Interroga il Worker in produzione da un runner GitHub e stampa le risposte
+# nei log del job. Serve a Claude nelle sessioni cloud: da li' il Worker
+# (sismo-fvg.gimmy077.workers.dev) non e' raggiungibile per la rete in uscita
+# bloccata, ma un workflow si puo' lanciare e i suoi log si possono leggere.
+# Solo endpoint pubblici, nessun segreto, nessuna scrittura: chiunque vede le
+# stesse cose dal browser. Lo si puo' lanciare anche a mano da Actions.
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "Percorso aggiuntivo da interrogare (es. /metop/layers?q=rdt). Vuoto = solo i controlli standard."
+        required: false
+        default: ""
+
+jobs:
+  probe:
+    name: Interroga il Worker
+    runs-on: ubuntu-latest
+    env:
+      BASE: https://sismo-fvg.gimmy077.workers.dev
+    steps:
+      - name: Controlli standard
+        run: |
+          probe() {
+            echo "=== GET $1"
+            curl -sS -m 25 -o /tmp/body -w 'HTTP %{http_code} in %{time_total}s, %{size_download} byte, %{content_type}\n' "$BASE$1" \
+              || echo "curl fallito (exit $?)"
+            head -c 4000 /tmp/body; echo; echo
+          }
+          probe /lightning/status
+          probe "/metop/layers?q=li"
+          probe /api/stats
+          echo "=== HEAD /polar"
+          curl -sS -m 25 -I "$BASE/polar" | head -6
+
+      - name: Percorso richiesto
+        if: ${{ inputs.path != '' }}
+        env:
+          P: ${{ inputs.path }}
+        run: |
+          echo "=== GET $P"
+          curl -sS -m 25 -o /tmp/body -w 'HTTP %{http_code} in %{time_total}s, %{size_download} byte, %{content_type}\n' "$BASE$P" \
+            || echo "curl fallito (exit $?)"
+          if file -b /tmp/body | grep -qi 'image'; then
+            echo "(risposta binaria: $(file -b /tmp/body))"
+          else
+            head -c 8000 /tmp/body; echo
+          fi

@@ -24,6 +24,33 @@ async function addColIfMissing(db, table, colDef) {
   catch(e) { if (!/duplicate column/i.test(e.message||'')) throw e; }
 }
 
+// Diagnostica: una riga in D1 per gli eventi che servono a capire come sta
+// girando il Worker (connessioni al relay fulmini, errori verso EUMETView,
+// esecuzioni del cron). La tabella si legge anche da fuori con una query D1,
+// senza passare dal browser: e' il canale con cui Claude controlla la
+// produzione da solo dalle sessioni cloud (vedi CLAUDE.md). Volume minimo:
+// solo eventi di ciclo di vita, errori e un heartbeat ogni 5 minuti — MAI una
+// riga per scarica. Non deve mai rompere chi la chiama: ogni errore viene
+// inghiottito, e senza binding DB e' un no-op. Ritenzione: 14 giorni (pulizia
+// nel cron).
+const DIAG_TABLE_SQL = `CREATE TABLE IF NOT EXISTS diagnostica (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL,
+  origine TEXT NOT NULL,
+  evento TEXT NOT NULL,
+  dettaglio TEXT
+)`;
+let diagTableReady = false;
+async function logDiag(db, origine, evento, dettaglio) {
+  if (!db) return;
+  try {
+    if (!diagTableReady) { await db.prepare(DIAG_TABLE_SQL).run(); diagTableReady = true; }
+    await db.prepare("INSERT INTO diagnostica (ts, origine, evento, dettaglio) VALUES (?,?,?,?)")
+      .bind(new Date().toISOString(), origine, evento, dettaglio == null ? null : JSON.stringify(dettaglio))
+      .run();
+  } catch (_) { /* la diagnostica non deve mai far fallire la richiesta che la chiama */ }
+}
+
 // Classificazione flare X-ray GOES (canale lungo 0.1-0.8nm) — standard NOAA A/B/C/M/X
 function flareClassSrv(f) {
   if (f==null || Number.isNaN(f)) return null;
@@ -5202,11 +5229,23 @@ export class LightningRelay {
     this.socket = null;           // connessione TCP verso il broker MQTT
     this.connecting = false;
     this.connected = false;
+    this.connectedSince = null;
+    this.closingByUs = false;     // chiusura voluta (ultimo visitatore uscito), non un errore
+    this.connects = 0;            // connessioni riuscite dall'avvio di questa istanza
     this.lastError = null;
-    this.strikeCount = 0;
+    this.lastErrorAt = null;
+    this.strikeCount = 0;         // dall'avvio di questa istanza del DO
+    this.strikesSinceBeat = 0;    // finestra dell'heartbeat (5 min)
     this.lastStrikeAt = null;
+    this.lastStrikes = [];        // ultime 20 scariche, per /lightning/status
     this.reconnectDelayMs = 2000;
+    this.startedAt = new Date().toISOString();
+    // Calcolate una volta e riusate sia per il SUBSCRIBE sia per lo status:
+    // cosi' quello che dichiariamo e' esattamente quello che chiediamo.
+    this.tiles = geohashTilesForBounds(NORTH_ITALY_BOUNDS, LIGHTNING_GEOHASH_PRECISION);
   }
+
+  _diag(evento, dettaglio) { return logDiag(this.env && this.env.DB, "lightning", evento, dettaglio); }
 
   async fetch(request) {
     if (request.headers.get("Upgrade") === "websocket") {
@@ -5220,18 +5259,31 @@ export class LightningRelay {
       this._ensureConnected();
       return new Response(null, { status: 101, webSocket: client });
     }
-    // /lightning/status — debug in chiaro, nessun dato sensibile.
+    // /lightning/status — debug in chiaro, nessun dato sensibile. Dice cosa e'
+    // sottoscritto DAVVERO (tessere), non solo se e' connesso: cosi' dopo un
+    // deploy si verifica la copertura senza fidarsi del commit.
     return new Response(JSON.stringify({
-      connected: this.connected, clients: this.clients.size,
+      version: ECHO_VERSION,
+      connected: this.connected, connectedSince: this.connectedSince,
+      clients: this.clients.size,
       strikeCount: this.strikeCount, lastStrikeAt: this.lastStrikeAt,
-      lastError: this.lastError,
-    }), { headers: { "Content-Type": "application/json" } });
+      lastStrikes: this.lastStrikes,
+      reconnects: Math.max(0, this.connects - 1),
+      lastError: this.lastError, lastErrorAt: this.lastErrorAt,
+      subscription: {
+        broker: BLITZORTUNG_HOST + ":" + BLITZORTUNG_PORT,
+        bounds: NORTH_ITALY_BOUNDS, precision: LIGHTNING_GEOHASH_PRECISION,
+        tileCount: this.tiles.length, tiles: this.tiles,
+      },
+      doStartedAt: this.startedAt,
+    }, null, 2), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 
   // Buon cittadino: se non guarda piu' nessuno, chiudiamo la connessione
   // verso il loro relay invece di tenerla aperta a vuoto.
   _maybeDisconnect() {
     if (this.clients.size === 0 && this.socket) {
+      this.closingByUs = true;
       try { this.socket.close(); } catch (_) {}
       this.socket = null; this.connected = false;
     }
@@ -5245,10 +5297,11 @@ export class LightningRelay {
   async _ensureConnected() {
     if (this.connected || this.connecting) return;
     this.connecting = true;
-    let pingInterval = null;
+    this.closingByUs = false;
+    let pingInterval = null, beatInterval = null, wasConnected = false, socket = null;
     try {
       const { connect } = await import("cloudflare:sockets");
-      const socket = connect({ hostname: BLITZORTUNG_HOST, port: BLITZORTUNG_PORT });
+      socket = connect({ hostname: BLITZORTUNG_HOST, port: BLITZORTUNG_PORT });
       this.socket = socket;
       const writer = socket.writable.getWriter();
       const reader = new MqttByteReader(socket.readable);
@@ -5258,16 +5311,25 @@ export class LightningRelay {
       if (connack.type !== 2 || connack.body[1] !== 0)
         throw new Error("CONNACK rifiutato (codice " + (connack.body?.[1] ?? "?") + ")");
 
-      const topics = geohashTilesForBounds(NORTH_ITALY_BOUNDS, LIGHTNING_GEOHASH_PRECISION)
-        .map(g => "blitzortung/1.1/" + g.split("").join("/") + "/#");
+      const topics = this.tiles.map(g => "blitzortung/1.1/" + g.split("").join("/") + "/#");
       topics.push("component/hello");
       await writer.write(mqttSubscribePacket(1, topics));
       await reader.readPacket(); // SUBACK: non controlliamo i singoli return code
 
       this.connected = true; this.connecting = false; this.lastError = null; this.reconnectDelayMs = 2000;
+      this.connectedSince = new Date().toISOString(); this.connects++; wasConnected = true;
+      this.strikesSinceBeat = 0;
+      await this._diag("connect", { tiles: this.tiles.length, topics: topics.length, clients: this.clients.size,
+                                    reconnects: Math.max(0, this.connects - 1) });
 
       // Keepalive sotto i 60s dichiarati al CONNECT.
       pingInterval = setInterval(() => { writer.write(mqttPingReqPacket()).catch(() => {}); }, 50000);
+      // Heartbeat ogni 5 minuti finche' siamo connessi: da D1 si vede se il
+      // relay era vivo, per quanti visitatori e quante scariche ha passato.
+      beatInterval = setInterval(() => {
+        this._diag("heartbeat", { clients: this.clients.size, strikes5m: this.strikesSinceBeat, strikeCount: this.strikeCount });
+        this.strikesSinceBeat = 0;
+      }, 5 * 60 * 1000);
 
       while (this.clients.size > 0) {
         const pkt = await reader.readPacket();
@@ -5277,7 +5339,10 @@ export class LightningRelay {
             try {
               const d = JSON.parse(payload);
               if (typeof d.lat === "number" && typeof d.lon === "number") {
-                this.strikeCount++; this.lastStrikeAt = new Date().toISOString();
+                const at = new Date().toISOString();
+                this.strikeCount++; this.strikesSinceBeat++; this.lastStrikeAt = at;
+                this.lastStrikes.unshift({ lat: d.lat, lon: d.lon, time: d.time ?? null, at });
+                if (this.lastStrikes.length > 20) this.lastStrikes.length = 20;
                 this._broadcast({ lat: d.lat, lon: d.lon, time: d.time ?? null });
               }
             } catch (_) { /* payload non-JSON o formato diverso da quello atteso: scartato */ }
@@ -5286,12 +5351,25 @@ export class LightningRelay {
         // PINGRESP e altri tipi: bastava leggerli per svuotare lo stream.
       }
     } catch (e) {
-      this.lastError = String((e && e.message) || e);
+      if (!this.closingByUs) {                      // la chiusura voluta non e' un errore
+        this.lastError = String((e && e.message) || e);
+        this.lastErrorAt = new Date().toISOString();
+        await this._diag("error", { error: this.lastError, clients: this.clients.size, wasConnected });
+      }
     } finally {
       if (pingInterval) clearInterval(pingInterval);
-      this.connecting = false; this.connected = false;
-      if (this.socket) { try { this.socket.close(); } catch (_) {} this.socket = null; }
-      if (this.clients.size > 0) {                  // c'e' ancora chi guarda: riprova
+      if (beatInterval) clearInterval(beatInterval);
+      // Se nel frattempo l'ultimo visitatore e' uscito e ne e' arrivato un
+      // altro, _ensureConnected ha gia' aperto una connessione NUOVA: questo
+      // giro vecchio deve chiudere solo il proprio socket, senza azzerare lo
+      // stato ne' programmare un secondo reconnect sopra quello nuovo.
+      const stillOurs = this.socket === socket || this.socket === null;
+      if (socket) { try { socket.close(); } catch (_) {} }
+      if (stillOurs) { this.socket = null; this.connecting = false; this.connected = false; }
+      if (wasConnected)
+        await this._diag("disconnect", { reason: this.closingByUs ? "nessun visitatore" : "connessione caduta",
+                                         clients: this.clients.size, strikesSinceBeat: this.strikesSinceBeat });
+      if (stillOurs && this.clients.size > 0) {     // c'e' ancora chi guarda: riprova
         const delay = this.reconnectDelayMs;
         this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 60000);
         setTimeout(() => this._ensureConnected(), delay);
@@ -5496,7 +5574,9 @@ export default {
 
         let legendResp;
         try { legendResp = await fetch(wmsLegend, { cf: { cacheTtl: ttlLegend, cacheEverything: true } }); }
-        catch (e) { return new Response(JSON.stringify({ error: "legenda non raggiungibile (rete/timeout)", detail: String(e), layer }),
+        catch (e) {
+          await logDiag(env.DB, "metop", "legend_timeout", { layer, error: String(e) });
+          return new Response(JSON.stringify({ error: "legenda non raggiungibile (rete/timeout)", detail: String(e), layer }),
           { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
 
         const lct = legendResp.headers.get("Content-Type") || "";
@@ -5563,7 +5643,9 @@ export default {
 
       let resp;
       try { resp = await fetch(wms, { cf: { cacheTtl: ttl, cacheEverything: true } }); }
-      catch (e) { return new Response(JSON.stringify({
+      catch (e) {
+        await logDiag(env.DB, "metop", "upstream_timeout", { layer, time, bbox, size: w + "x" + h, big, error: String(e) });
+        return new Response(JSON.stringify({
         error: "EUMETView non ha risposto (rete/timeout)" + (big ? " — l'area e' molto ampia: prova a restringere (Europa/Italia)" : " — riprova"),
         detail: String(e), layer }), { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
 
@@ -5585,6 +5667,10 @@ export default {
           msg = "Nessun passaggio per questa area/orario: scegli un altro passaggio, un'altra data o un'altra zona";
         else
           msg = "Immagine non disponibile per questa area/orario";
+        // Solo gli errori lato server (5xx/area enorme) sono anomalie da capire;
+        // un "nessun passaggio" (4xx) e' normale e non va a sporcare la diagnostica.
+        if (resp.status >= 500 || big)
+          await logDiag(env.DB, "metop", "upstream_error", { layer, time, bbox, size: w + "x" + h, big, status: resp.status, reason });
         return new Response(JSON.stringify({ error: msg, status: resp.status, layer, time, bbox,
           eumetview: reason || undefined }),
           { status: resp.status >= 500 ? 502 : 404, headers: { ...CORS, "Content-Type": "application/json" } });
@@ -6037,7 +6123,18 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
+    const t0 = Date.now();
+    let eventi = [], eventiCF = [], solare = null, radiazione = [], ingvOk = true;
     try {
+      // Diagnostica: tabella pronta e pulizia a 14 giorni (bastano per capire
+      // un problema; oltre e' solo peso sul database). In un try a parte: se
+      // fallisse, il cron deve comunque scaricare i dati.
+      try {
+        await env.DB.prepare(DIAG_TABLE_SQL).run();
+        await env.DB.prepare("DELETE FROM diagnostica WHERE ts < ?")
+          .bind(new Date(Date.now() - 14 * 86400000).toISOString()).run();
+      } catch (e) { console.error("Diagnostica: pulizia fallita:", e.message); }
+
       await env.DB.prepare(`CREATE TABLE IF NOT EXISTS dati_solari (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         time_tag TEXT UNIQUE NOT NULL,
@@ -6060,7 +6157,6 @@ export default {
       ]);
       if (env.DB_CF) await initCFDB(env.DB_CF);
 
-      let eventi = [], eventiCF = [];
       try {
         [eventi, eventiCF] = await Promise.all([
           fetchINGV(2),
@@ -6068,17 +6164,23 @@ export default {
         ]);
         if (env.F4_LEARN) await env.F4_LEARN.put("ingv_status", JSON.stringify({online:true, last_check:new Date().toISOString()}));
       } catch(ingvErr) {
+        ingvOk = false;
         if (env.F4_LEARN) await env.F4_LEARN.put("ingv_status", JSON.stringify({online:false, last_error:ingvErr.message, last_check:new Date().toISOString()}));
         console.error("INGV offline:", ingvErr.message);
       }
-      const solare = await fetchSolare();
+      solare = await fetchSolare();
       if (eventi.length>0) await salvaEventi(env.DB, eventi);
       if (eventiCF.length>0 && env.DB_CF) await salvaEventi(env.DB_CF, eventiCF);
       if (solare.kpData.length>0) await salvaSolare(env.DB, solare.kpData);
-      const radiazione = await fetchRadiazione(solare.kpData, solare.windData);
+      radiazione = await fetchRadiazione(solare.kpData, solare.windData);
       if (radiazione.length>0) await salvaRadiazione(env.DB, radiazione);
+      // kp/radiazione a 0 = NOAA non ha risposto (fetchSolare/fetchRadiazione
+      // inghiottono i propri errori); ingvOk=false = INGV giu', non "nessun sisma".
+      await logDiag(env.DB, "cron", "run", { ingvOk, eventi: eventi.length, eventiCF: eventiCF.length,
+        kp: solare.kpData.length, radiazione: radiazione.length, durataMs: Date.now() - t0 });
     } catch(e) {
       console.error("Cron error:", e.message);
+      await logDiag(env.DB, "cron", "error", { error: e.message, durataMs: Date.now() - t0 });
     }
   },
 };
