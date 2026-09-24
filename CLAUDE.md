@@ -41,10 +41,15 @@ I canali che funzionano:
      mattino).
    Eventi: `lightning/connect|heartbeat(5 min)|disconnect|error`,
    `metop/upstream_timeout|upstream_error|legend_timeout`, `cron/run|error`.
-2. **Sonda HTTP via GitHub Actions**: workflow `worker-probe.yml`
-   (`workflow_dispatch`, input opzionale `path`). Si lancia con
-   `actions_run_trigger run_workflow` e si leggono i log con `get_job_logs`.
-   Interroga `/lightning/status`, `/metop/layers?q=li`, `/api/stats`, `/polar`.
+2. **Sonda HTTP via GitHub Actions**: workflow `worker-probe.yml`. Interroga
+   `/lightning/status`, `/metop/layers?q=li`, `/api/stats`, `/polar`. Gira
+   da sola ogni 6 ore (00:17, 06:17, 12:17, 18:17 UTC): Claude NON può
+   lanciarla, l'integrazione GitHub del cloud risponde 403 "Resource not
+   accessible by integration" a `run_workflow` (verificato il 2026-09-24).
+   Si leggono i log dell'ultima esecuzione: `actions_list list_workflow_runs`
+   con `resource_id=worker-probe.yml`, poi `list_workflow_jobs` e
+   `get_job_logs` col `job_id`. Gimmy può lanciarla a mano da Actions, anche
+   con un percorso extra (input `path`).
 3. **`/lightning/status`** (pubblico) espone: `version`, `connected`,
    `connectedSince`, `clients`, `strikeCount`, `lastStrikes` (ultime 20),
    `reconnects`, `lastError`, `subscription.tiles` (le tessere geohash
@@ -73,9 +78,10 @@ Ricetta, in 4 pezzi:
 3. **Ritenzione** automatica (qui 14 giorni, nel cron) e **uno status endpoint
    pubblico** che dice cosa è configurato DAVVERO (es. le tessere sottoscritte),
    non cosa c'è nel commit.
-4. **Una sonda** che Claude può lanciare e leggere (qui il workflow
-   `worker-probe.yml`), per vedere le risposte HTTP vere quando la rete del
-   cloud non arriva al servizio.
+4. **Una sonda** che gira da sola a orario e i cui log Claude può leggere (qui
+   il workflow `worker-probe.yml`), per vedere le risposte HTTP vere quando la
+   rete del cloud non arriva al servizio. A orario e non a comando, perché dal
+   cloud Claude non ha il permesso di lanciare workflow.
 
 ### Controllo periodico (la "sentinella")
 
@@ -101,8 +107,10 @@ se qualcosa non va, dice cosa, da quando e con quale prova (la query o il log).
 4. **Proxy METOP**: conteggio `upstream_timeout`/`upstream_error` per layer.
    Allarme se un layer fallisce sempre (magari è stato rinominato su
    EUMETView).
-5. **Sonda HTTP**: lanciare `worker-probe.yml` e leggerne i log. Allarmi:
-   risposte diverse da 200, `/lightning/status` senza `subscription`.
+5. **Sonda HTTP**: leggere i log dell'ultima esecuzione di `worker-probe.yml`
+   (gira da sola ogni 6 ore). Allarmi: risposte diverse da 200,
+   `/lightning/status` senza `subscription`, ultima esecuzione più vecchia di
+   8 ore (lo schedule di GitHub si è fermato).
 6. **GitHub Actions**: ultimi run di ogni workflow su `main`. Allarmi: rossi
    nuovi. Quelli sospesi di proposito sono elencati sotto.
 7. **Deploy allineato**: `workers_list` su Cloudflare, confrontare il
