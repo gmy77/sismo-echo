@@ -7,10 +7,16 @@ name: FVG GRIB data (aggiorna il dato)
 # La Release è marcata prerelease: così NON interferisce con il controllo
 # aggiornamenti dell'app (che legge releases/latest e ignora le prerelease).
 
+# SOSPESO (2026-09-24): il progetto FVG-GribMonitor non e' piu' in questo repo
+# (cartella Projects/coded/FVG-GribMonitor rimossa il 2026-09-01, commit
+# 2c1fc4a "rimuove file di progetti estranei"), quindi lo script
+# scripts/fetch_fvg_grib.sh non esiste e ogni esecuzione a orario falliva,
+# 4 volte al giorno, da settimane. Avvio automatico tolto finche' non si
+# decide se spostare questo workflow nel repo dell'app o eliminarlo.
+# Per riattivarlo: ripristinare sotto `on:` il blocco
+#   schedule:
+#     - cron: '30 5,11,17,23 * * *'   # ~4 h dopo i cicli GFS 00/06/12/18 UTC
 on:
-  schedule:
-    # ~4 h dopo i cicli GFS 00/06/12/18 UTC.
-    - cron: '30 5,11,17,23 * * *'
   workflow_dispatch:
 
 permissions:

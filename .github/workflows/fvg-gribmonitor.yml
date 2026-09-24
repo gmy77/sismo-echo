@@ -5,15 +5,22 @@ name: FVG-GribMonitor (Windows build)
 #  - A tag like "fvg-v1.0.1" -> also packages the exe and publishes a GitHub
 #    Release, which is exactly what the app's "Controlla aggiornamenti" button
 #    reads (api.github.com/.../releases/latest).
+# SOSPESO (2026-09-24): il progetto FVG-GribMonitor non e' piu' in questo repo
+# (cartella Projects/coded/FVG-GribMonitor rimossa il 2026-09-01, commit
+# 2c1fc4a "rimuove file di progetti estranei"), quindi la working-directory
+# non esiste e la build falliva a ogni push su main, segnando ogni commit
+# con una X rossa che non c'entra col Worker. Avvio automatico tolto finche'
+# non si decide se spostare questo workflow nel repo dell'app o eliminarlo.
+# Per riattivarlo: ripristinare sotto `on:` il blocco originale
+#   push:
+#     # NB: no `paths:` filter here on purpose — combining paths with a tag
+#     # filter makes tag pushes fail to trigger (path filtering has no "new"
+#     # commits to match against on a tag), so releases would never build.
+#     branches: [ main ]
+#     tags: [ 'fvg-v*' ]
+#   pull_request:
+#     paths: [ 'Projects/coded/FVG-GribMonitor/**' ]
 on:
-  push:
-    # NB: no `paths:` filter here on purpose — combining paths with a tag
-    # filter makes tag pushes fail to trigger (path filtering has no "new"
-    # commits to match against on a tag), so releases would never build.
-    branches: [ main ]
-    tags: [ 'fvg-v*' ]
-  pull_request:
-    paths: [ 'Projects/coded/FVG-GribMonitor/**' ]
   workflow_dispatch:
 
 permissions:
