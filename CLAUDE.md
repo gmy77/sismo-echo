@@ -33,7 +33,12 @@ I canali che funzionano:
    Worker e pulita a 14 giorni dal cron. Query utili:
    - `SELECT * FROM diagnostica ORDER BY id DESC LIMIT 30`
    - `SELECT evento, COUNT(*) FROM diagnostica WHERE origine='lightning' AND ts > datetime('now','-1 day') GROUP BY evento`
-   - `SELECT * FROM fetch_log ORDER BY id DESC LIMIT 5` (il cron gira? 4 volte al giorno)
+   - `SELECT * FROM diagnostica WHERE origine='cron' ORDER BY id DESC LIMIT 8`
+     (il cron gira? 4 volte al giorno). NON usare `fetch_log` per questo: viene
+     scritto solo quando INGV restituisce sismi nella finestra di 2 giorni,
+     quindi resta fermo per giorni anche col cron sano (verificato il
+     2026-09-24: ultima riga del giorno prima, radiazione aggiornata quel
+     mattino).
    Eventi: `lightning/connect|heartbeat(5 min)|disconnect|error`,
    `metop/upstream_timeout|upstream_error|legend_timeout`, `cron/run|error`.
 2. **Sonda HTTP via GitHub Actions**: workflow `worker-probe.yml`
@@ -85,9 +90,11 @@ se qualcosa non va, dice cosa, da quando e con quale prova (la query o il log).
    ripetuto, `kp:0` ripetuto (NOAA giù).
 2. **Dati freschi**: `SELECT MAX(data_ora) FROM terremoti`,
    `SELECT MAX(time_tag) FROM dati_solari`,
-   `SELECT MAX(time_tag) FROM radiazione_spaziale`. Allarme se il dato solare
-   o la radiazione sono più vecchi di 12 ore (i sismi possono mancare per
-   giorni senza che sia un guasto).
+   `SELECT MAX(time_tag) FROM radiazione_spaziale`. Allarme se il Kp è più
+   vecchio di 18 ore o la radiazione di 15: il cron ha buchi fino a 9 ore
+   (23→08 UTC) e il Kp esce a blocchi di 3 ore, quindi soglie più strette
+   danno falsi allarmi. I sismi possono mancare per giorni senza che sia un
+   guasto.
 3. **Relay fulmini**: righe `origine='lightning'` degli ultimi giorni. Allarmi:
    `error` ripetuti, `CONNACK rifiutato`, reconnect molto frequenti. Nessuna
    riga è normale se nessuno ha aperto il viewer con la spunta.
