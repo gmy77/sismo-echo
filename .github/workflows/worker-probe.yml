@@ -3,10 +3,16 @@ name: Worker probe (diagnostica)
 # Interroga il Worker in produzione da un runner GitHub e stampa le risposte
 # nei log del job. Serve a Claude nelle sessioni cloud: da li' il Worker
 # (sismo-fvg.gimmy077.workers.dev) non e' raggiungibile per la rete in uscita
-# bloccata, ma un workflow si puo' lanciare e i suoi log si possono leggere.
-# Solo endpoint pubblici, nessun segreto, nessuna scrittura: chiunque vede le
-# stesse cose dal browser. Lo si puo' lanciare anche a mano da Actions.
+# bloccata, ma i log dei workflow si possono leggere.
+# Gira da sola ogni 6 ore perche' Claude NON puo' lanciarla: l'integrazione
+# GitHub delle sessioni cloud risponde 403 "Resource not accessible by
+# integration" a workflow_dispatch (verificato il 2026-09-24). Claude legge i
+# log dell'ultima esecuzione; Gimmy puo' lanciarla a mano da Actions, anche
+# con un percorso extra. Solo endpoint pubblici, nessun segreto, nessuna
+# scrittura: chiunque vede le stesse cose dal browser.
 on:
+  schedule:
+    - cron: '17 */6 * * *'   # 00:17, 06:17, 12:17, 18:17 UTC
   workflow_dispatch:
     inputs:
       path:
