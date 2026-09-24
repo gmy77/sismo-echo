@@ -13,6 +13,16 @@ Cloudflare su `https://sismo-fvg.gimmy077.workers.dev/modis-europa`.
   display, fino a 4096 px per lato.
 - Aree rapide Europa, Italia e FVG; esportazione della vista in PNG.
 
+## Versione 1.2.0
+
+- Nuova opzione satellite **"EUMETSAT Geo Colour · tempo reale"**: non e' un
+  prodotto MODIS ma un'altra fonte dati (rotta `/metop`, layer
+  `mtg_fd:rgb_geocolour`), senza mosaico a data fissa - mostra sempre l'ultimo
+  passaggio disponibile (quasi tempo reale, ogni 10-15 minuti).
+- Selezionandola il menu Prodotto (True Color/721/367, che non si applica a
+  Geo Colour) si disabilita e i testi informativi si aggiornano di
+  conseguenza.
+
 ## Versione 1.1.0
 
 - Confronto selezionabile fra Terra e Aqua, con fallback automatico.

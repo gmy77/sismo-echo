@@ -32,6 +32,11 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+# ...ma i manifest Win32 delle app C++ vanno versionati: la regola qui
+# sopra viene dal modello PyInstaller e li escludeva per pura omonimia,
+# rendendo la build irriproducibile fuori dalla macchina di chi l'ha scritta
+# (il .rc li incorpora, quindi senza il file windres/rc si fermano).
+!Projects/coded/*/src/app.manifest
 
 # Unit test / coverage reports
 htmlcov/
