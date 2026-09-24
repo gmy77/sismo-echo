@@ -36,10 +36,6 @@ function flareClassSrv(f) {
 function getUpdateSecret(env) { return env?.UPDATE_SECRET || ""; }
 
 const FVG = { lat_min:45.5, lat_max:46.8, lon_min:12.4, lon_max:14.1 };
-// Centro del FVG, riusato anche dal relay fulmini live (LightningRelay) per
-// scegliere le tessere geohash su cui abbonarsi — stessa area, un solo posto
-// dove tenerla aggiornata se un giorno cambia.
-const FVG_CENTER = { lat: (FVG.lat_min + FVG.lat_max) / 2, lon: (FVG.lon_min + FVG.lon_max) / 2 };
 const CF  = { lat_min:40.4, lat_max:41.1, lon_min:13.7, lon_max:14.8 }; // Campi Flegrei · Vesuvio · Ischia
 
 // ============================================================
@@ -3953,7 +3949,7 @@ const METOP_HTML = `<!doctype html>
     <div class="sect">Fulmini live</div>
     <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra, Blitzortung — vero per-scarica)</label>
     <div id="liveLightningStatus" class="sub" style="margin:-4px 0 8px"></div>
-    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (FVG e dintorni), con un bip più acuto e corto del bip satellitare qui sopra.</div>
+    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (tutto il Nord Italia, da Torino a Trieste), con un bip più acuto e corto del bip satellitare qui sopra.</div>
 
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
@@ -4629,8 +4625,8 @@ function checkLightningActivity(im){
 // Fulmini live (Blitzortung, feed punto vero via il relay MQTT->WebSocket
 // del Worker: /lightning/ws). A differenza del bip satellitare qui sopra
 // (li_afa, ~10 min, area accumulata), questo e' ogni singola scarica reale
-// captata dalla rete di antenne a terra, in un raggio di poche centinaia di
-// km intorno al FVG (le tessere geohash scelte lato server) — indipendente
+// captata dalla rete di antenne a terra, su tutto il Nord Italia (le tessere
+// geohash scelte lato server, NORTH_ITALY_BOUNDS in index.js) — indipendente
 // dal layer/prodotto satellitare mostrato in quel momento.
 let liveWs=null, liveStrikes=[], liveAnimTimer=null, liveReconnectDelay=2000, liveWanted=false;
 function wsUrlFromApi(){
@@ -5030,8 +5026,9 @@ function parseWmsLayers(xml) {
 //
 // Impronta "da buon cittadino" (stessi criteri di un caso analogo gia'
 // discusso pubblicamente con il maintainer, issue #340 di quel repo): una
-// sola connessione, client id vuoto, poche tessere geohash (qui: al massimo
-// 9, la tessera centrata sul FVG piu' le 8 vicine), QoS 0, nessun publish,
+// sola connessione, client id vuoto, tessere geohash limitate a un'area
+// precisa (qui: 15, tutto il Nord Italia — vedi NORTH_ITALY_BOUNDS; erano 9
+// attorno al FVG nella prima versione), QoS 0, nessun publish,
 // reconnect con backoff esponenziale. La connessione si apre solo quando
 // c'e' almeno un visitatore collegato al viewer e si chiude subito quando
 // l'ultimo se ne va: zero carico sul loro relay se non sta guardando nessuno.
@@ -5050,7 +5047,18 @@ function parseWmsLayers(xml) {
 
 const BLITZORTUNG_HOST = "blitzortung.ha.sed.pl";
 const BLITZORTUNG_PORT = 1883;
-const LIGHTNING_GEOHASH_PRECISION = 3;   // celle ~156km: 3x3 attorno al FVG copre comodamente NE Italia/Slovenia/Austria/Adriatico
+const LIGHTNING_GEOHASH_PRECISION = 3;   // celle ~156x110km a questa latitudine
+// Tutto il Nord Italia (Torino-Milano-Genova-Bologna-Venezia-Trieste-Udine-
+// Trento-Bolzano dentro, verificato), non solo il FVG: cosi' si vede una
+// cella avvicinarsi da lontano, non solo quando e' gia' sopra casa. A
+// precisione 3 servono 15 tessere reali (3 righe x 5 colonne — vedi
+// geohashTilesForBounds sul perche' non sono meno) — piu' delle "massimo 9"
+// dichiarate nella courtesy notice pubblica a mrk-its/homeassistant-blitzortung
+// (una scelta di cortesia per un raggio puntiforme, non un limite tecnico
+// imposto dal broker). Restiamo comunque UNA sola connessione globale, il
+// numero di topic sottoscritti pesa pochissimo sul loro relay — ma e'
+// onesto segnalarlo pubblicamente, non far finta di niente.
+const NORTH_ITALY_BOUNDS = { latMin: 44.2, latMax: 46.9, lonMin: 7.3, lonMax: 14.0 };
 
 // --- Geohash standard (Gustavo Niemeyer): alfabeto e interleaving verificati
 // contro l'implementazione usata da homeassistant-blitzortung (stesso
@@ -5092,19 +5100,28 @@ function geohashBounds(hash) {
   }
   return { latMin: latRange[0], latMax: latRange[1], lonMin: lonRange[0], lonMax: lonRange[1] };
 }
-// Le 9 tessere (centro + 8 vicine) attorno a un punto, alla precisione data.
-function geohashNeighborTiles(lat, lon, precision) {
-  const center = geohashEncode(lat, lon, precision);
-  const b = geohashBounds(center);
-  const dLat = b.latMax - b.latMin, dLon = b.lonMax - b.lonMin;
-  const cLat = (b.latMin + b.latMax) / 2, cLon = (b.lonMin + b.lonMax) / 2;
+// Tutte le tessere geohash che coprono un rettangolo lat/lon, alla precisione
+// data. NON basta dividere lo span per la dimensione di una cella: la griglia
+// geohash e' fissa e ancorata a -90/-180, quasi mai allineata al rettangolo
+// richiesto, quindi un conto "a spanne" sottostima sempre (verificato: dava
+// 10 invece delle 15 vere per il Nord Italia). Si cammina cella per cella,
+// leggendo i bordi VERI di ciascuna tessera (geohashBounds) per decidere
+// quando fermarsi, invece di indovinare quanti passi servono.
+function geohashTilesForBounds(bounds, precision) {
   const tiles = new Set();
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const plat = Math.max(-90, Math.min(90, cLat + dy * dLat));
-      const plon = (((cLon + dx * dLon) + 180) % 360 + 360) % 360 - 180;
-      tiles.add(geohashEncode(plat, plon, precision));
+  let lat = bounds.latMin;
+  while (true) {
+    let lon = bounds.lonMin, rowLatMax = -Infinity;
+    while (true) {
+      const g = geohashEncode(lat, lon, precision);
+      tiles.add(g);
+      const cell = geohashBounds(g);
+      rowLatMax = Math.max(rowLatMax, cell.latMax);
+      if (cell.lonMax > bounds.lonMax) break;
+      lon = cell.lonMax + 1e-9;              // salta dentro la tessera successiva a est
     }
+    if (rowLatMax > bounds.latMax) break;
+    lat = rowLatMax + 1e-9;                  // salta dentro la riga successiva a nord
   }
   return [...tiles];
 }
@@ -5241,7 +5258,7 @@ export class LightningRelay {
       if (connack.type !== 2 || connack.body[1] !== 0)
         throw new Error("CONNACK rifiutato (codice " + (connack.body?.[1] ?? "?") + ")");
 
-      const topics = geohashNeighborTiles(FVG_CENTER.lat, FVG_CENTER.lon, LIGHTNING_GEOHASH_PRECISION)
+      const topics = geohashTilesForBounds(NORTH_ITALY_BOUNDS, LIGHTNING_GEOHASH_PRECISION)
         .map(g => "blitzortung/1.1/" + g.split("").join("/") + "/#");
       topics.push("component/hello");
       await writer.write(mqttSubscribePacket(1, topics));

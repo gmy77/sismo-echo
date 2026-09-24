@@ -125,7 +125,7 @@
     <div class="sect">Fulmini live</div>
     <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra, Blitzortung — vero per-scarica)</label>
     <div id="liveLightningStatus" class="sub" style="margin:-4px 0 8px"></div>
-    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (FVG e dintorni), con un bip più acuto e corto del bip satellitare qui sopra.</div>
+    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (tutto il Nord Italia, da Torino a Trieste), con un bip più acuto e corto del bip satellitare qui sopra.</div>
 
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
@@ -801,8 +801,8 @@ function checkLightningActivity(im){
 // Fulmini live (Blitzortung, feed punto vero via il relay MQTT->WebSocket
 // del Worker: /lightning/ws). A differenza del bip satellitare qui sopra
 // (li_afa, ~10 min, area accumulata), questo e' ogni singola scarica reale
-// captata dalla rete di antenne a terra, in un raggio di poche centinaia di
-// km intorno al FVG (le tessere geohash scelte lato server) — indipendente
+// captata dalla rete di antenne a terra, su tutto il Nord Italia (le tessere
+// geohash scelte lato server, NORTH_ITALY_BOUNDS in index.js) — indipendente
 // dal layer/prodotto satellitare mostrato in quel momento.
 let liveWs=null, liveStrikes=[], liveAnimTimer=null, liveReconnectDelay=2000, liveWanted=false;
 function wsUrlFromApi(){
