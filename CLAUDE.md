@@ -45,7 +45,9 @@ I canali che funzionano:
    fulmine: chiavi del payload vero, se c'è la lista stazioni `sig` e un
    esempio. È la prova di cosa manda DAVVERO il broker.
 2. **Sonda HTTP via GitHub Actions**: workflow `worker-probe.yml`. Interroga
-   `/lightning/status`, `/metop/layers?q=li`, `/api/stats`, `/polar`. Gira
+   `/lightning/status`, `/metop/layers?q=li`, `/api/stats`, `/polar` e, per
+   StormShift, `/status` e `/api/radar/latest` (con l'età dell'ultimo frame
+   radar). Gira
    da sola ogni 6 ore (00:17, 06:17, 12:17, 18:17 UTC): Claude NON può
    lanciarla, l'integrazione GitHub del cloud risponde 403 "Resource not
    accessible by integration" a `run_workflow` (verificato il 2026-09-24).
@@ -205,12 +207,45 @@ sentinella deve prima controllare con `get_trigger` che sia davvero
 8. **Pulizia**: la tabella `diagnostica` non deve avere righe più vecchie di
    14 giorni (altrimenti la pulizia del cron non gira).
 
+9. **StormShift** (solo quando è segnato `[x]` nella lista Adozione qui
+   sotto):
+   - su D1, righe `origine='stormshift'` dall'ultimo giro. Allarmi:
+     - `container_stop` con `gravita='da_guardare'` (uscita diversa da 0:
+       crash o memoria finita);
+     - `container_error` ripetuti;
+     - `api_5xx`: ogni riga riassume fino a 10 minuti di errori, con il
+       conteggio.
+   - nei log di `worker-probe.yml`, step "StormShift":
+     - `/status` deve avere `secrets` entrambi `true` e `d1: true`;
+     - la riga `radar: ultimo frame …` deve avere un'età sotto i 60 minuti.
+       La soglia è provvisoria: va rivista dopo le prime settimane di sonde.
+
+   Nessuna riga `container_start` per giorni non è un guasto: il container
+   parte solo quando qualcuno apre la dashboard (o la sonda chiama
+   `/api/radar/latest`).
+
+Perimetro, deciso con Gimmy il 2026-09-25: la sentinella copre **solo le app
+meteo online**. Inventario dei Worker Cloudflare, fatto lo stesso giorno
+leggendo il codice in produzione con `workers_get_worker_code`:
+- è meteo solo `stormshift`, oltre a `sismo-fvg`;
+- non sono meteo: `newtab-worker` (pagina "nuova scheda"), `luce-circadiana-01`
+  (lampada), `game-monitor`, `cloudflare-mcp-worker` e `throbbing-queen-1b6f`
+  (demo di Workers AI del 2025).
+
+Esclusi per scelta di Gimmy anche SatView_preview (gira solo sul PC) e
+FVG-GribMonitor.
+
 Adozione:
 - [x] sismo-echo / Worker `sismo-fvg` (relay fulmini, proxy METOP, cron)
-- [ ] SatView_preview (pipeline FCI su PC Windows, Python): da progettare il
-  canale di lettura
-- [ ] StormShift (bridge METEOHUB + Worker `stormshift`)
-- [ ] newtab-worker e gli altri Worker Cloudflare (stesso schema D1)
+- [ ] StormShift: repo privato `gmy77/Storm_Shift`, Worker `stormshift` +
+  Container con il bridge radar METEOHUB.
+  - La diagnostica e `/status` sono nel codice (PR #1 di Storm_Shift, mergiata
+    il 2026-09-25); la sonda interroga già StormShift.
+  - Diventa `[x]` dopo il primo deploy dal repo Storm_Shift, verificato con
+    una riga `stormshift/container_start` su D1 e con `/status` che risponde
+    `version: "cf-1"`.
+  - Il deploy lo fa Gimmy dal PC con Docker acceso: vedi il `CLAUDE.md` di
+    Storm_Shift.
 
 ## Fulmini live: stato attuale
 
