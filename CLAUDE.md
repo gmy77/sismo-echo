@@ -60,6 +60,78 @@ I canali che funzionano:
    l'ok esplicito di Gimmy per quel deploy: di norma il deploy lo fa Gimmy
    dal PC.
 
+## Tassonomia diagnostica (categorie + gravità, valida per ogni progetto)
+
+Decisa con Gimmy il 2026-09-25, per smettere di far scoprire alla sentinella
+da zero cosa conta ogni volta: il codice stesso dichiara la gravità quando
+scrive in `diagnostica` (colonna `gravita`, aggiunta con `addColIfMissing`
+dentro `logDiag` — vedi `sismo-worker/index.js`).
+
+**Categorie** (dimensioni, non colonne separate — si riconoscono dal campo
+`origine`): Disponibilità (il servizio/cron/deploy gira?), Dati (freschi,
+completi, plausibili?), Sicurezza (segreti, accessi anomali, dipendenze
+vulnerabili), Prestazioni/risorse (tempi in crescita, vicino ai limiti del
+piano gratuito), Igiene (branch vecchi, workflow rotti, dipendenze deprecate).
+
+**Gravità** (colonna `gravita`, stessa scala per ogni categoria):
+- `bloccante` — il servizio non fa quello per cui esiste. Nel rapporto della
+  sentinella sempre, notifica push sempre. Esempio in questo repo: `cron/error`
+  (quel giro non ha scaricato/salvato niente).
+- `da_guardare` — non blocca oggi, ma è da tenere d'occhio (si auto-cura da
+  sola, o è vicino a una soglia). Nel rapporto, senza notifica isolata.
+  Esempi: `lightning/error` (si riprova da sola col backoff),
+  `metop/upstream_timeout|upstream_error|legend_timeout` (di solito è
+  EUMETView lento, non un guasto nostro — diventa serio solo se un layer
+  fallisce SEMPRE, pattern che la sentinella vede contando le righe, non una
+  regola scritta nel codice).
+- `NULL` (default, non passare il parametro) — informativo, rumore di fondo
+  normale (`lightning/connect|heartbeat|disconnect`, `cron/run` senza errori).
+  Solo storico, non entra nel rapporto a meno che richiesto esplicitamente.
+
+**Limite onesto sulla frequenza**: il controllo a orario (sentinella 2 volte
+a settimana) ha un ritardo fisico — una cosa `bloccante` può restare
+invisibile fino a 3-4 giorni. Per un progetto hobby è un compromesso
+accettato; se in futuro si vuole vedere prima Disponibilità/Sicurezza, la
+strada è un controllo più frequente solo per quelle categorie, non ancora
+implementato — deciderlo con Gimmy prima di farlo, non a occhio.
+
+**Centralizzazione a due corsie, decisa il 2026-09-25** (risolve il buco che
+prima era aperto): un unico tubo uguale per tutti avrebbe due difetti — un
+produttore che si comporta male inonda la tabella condivisa e nasconde i
+segnali degli altri, e un produttore poco fidato (rete, non lo stesso
+account) potrebbe scrivere qualunque cosa. La fiducia del produttore decide
+quale corsia usa, non il tipo di progetto:
+
+1. **Worker Cloudflare** (stormshift, newtab-worker, futuri): binding D1
+   diretto sullo stesso database nel proprio `wrangler.toml`, stessa
+   `logDiag`-style locale (nessuna rete di mezzo, nessuna autenticazione:
+   stesso account, stessa fiducia di `sismo-fvg`). Ancora da fare per i
+   Worker esistenti — non è automatico, va aggiunto binding + chiamata in
+   ognuno.
+2. **Tutto il resto** (SatView_preview su Python/PC, o qualunque produttore
+   non-Worker): `POST /diag/ingest` su `sismo-fvg`, già implementato e
+   testato (verificare estraendo le funzioni dal file reale, come per
+   `geohashTilesForBounds`):
+   - `?token=<UPDATE_SECRET>` (stesso segreto delle altre rotte protette,
+     stessa rotazione secondo `MAINTENANCE.md`);
+   - corpo `{origine, evento, dettaglio, gravita}` — stessa forma di
+     `logDiag`, `dettaglio` troncato a 4000 caratteri se troppo grande,
+     `gravita` fuori da `bloccante`/`da_guardare` scartata a `NULL`;
+   - **limite di velocità: 20 scritture/minuto per `origine`**, via KV
+     `F4_LEARN` (bucket per minuto, scadenza 120s — non lascia residui). Un
+     produttore che sbanda intasa solo la propria fetta, non quella degli
+     altri (verificato: un'origine satura il suo limite, un'altra scrive
+     comunque nello stesso minuto). Funziona anche senza `F4_LEARN` bindato
+     (il limite è un extra, non una dipendenza: senza KV semplicemente non
+     limita).
+   - **lato PC (da fare, non ancora iniziato)**: SatView_preview deve
+     scrivere PRIMA in un log locale (JSONL o simile, sincrono, mai vuoto
+     anche offline), POI tentare l'invio a `/diag/ingest` con un timeout
+     corto e senza bloccare la pipeline se fallisce — così una rete/Worker
+     giù per un po' non perde l'evento, lo si rispedisce al giro dopo. Il
+     log locale resta la fonte di verità per quel progetto; D1 è comodità
+     centralizzata, non l'unica copia.
+
 ## Pattern globale di diagnostica (da replicare negli altri progetti)
 
 Deciso con Gimmy il 2026-09-24: ogni progetto deve avere un posto dove Claude
