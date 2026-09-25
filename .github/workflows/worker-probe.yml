@@ -41,6 +41,39 @@ jobs:
           echo "=== HEAD /polar"
           curl -sS -m 25 -I "$BASE/polar" | head -6
 
+      # StormShift (radar FVG da MeteoHub, repo privato gmy77/Storm_Shift):
+      # /status non sveglia il container; /api/radar/latest si', e lo tiene
+      # acceso circa 10 minuti (4 volte al giorno). E' il controllo che conta:
+      # l'ultimo frame radar deve essere recente. Timeout lungo perche' un
+      # container spento impiega un po' ad avviarsi e ad aprire l'archivio ARCO.
+      - name: StormShift
+        run: |
+          # File puliti: /tmp/body esiste gia' dallo step precedente (sismo-fvg)
+          # e, se StormShift non risponde, verrebbe stampato al suo posto.
+          rm -f /tmp/body /tmp/radar
+          echo "=== GET https://stormshift.gimmy077.workers.dev/status"
+          curl -sS -m 25 -o /tmp/body -w 'HTTP %{http_code} in %{time_total}s, %{size_download} byte, %{content_type}\n' \
+            https://stormshift.gimmy077.workers.dev/status || echo "curl fallito (exit $?)"
+          head -c 2000 /tmp/body 2>/dev/null || echo "(nessuna risposta)"; echo; echo
+          echo "=== GET https://stormshift.gimmycloud.net/api/radar/latest"
+          curl -sS -m 90 -o /tmp/radar -w 'HTTP %{http_code} in %{time_total}s, %{size_download} byte, %{content_type}\n' \
+            https://stormshift.gimmycloud.net/api/radar/latest || echo "curl fallito (exit $?)"
+          python3 - <<'PY'
+          import datetime, json
+          try:
+              d = json.load(open("/tmp/radar"))
+              ts = d["timestamp"]
+              t = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+              age = (datetime.datetime.now(datetime.timezone.utc) - t).total_seconds() / 60
+              print(f"radar: ultimo frame {ts}, eta' {age:.0f} min, {len(d.get('values', []))} righe di griglia")
+          except Exception as e:
+              print("radar: risposta non leggibile ->", str(e)[:200])
+              try:
+                  print(open("/tmp/radar", errors="replace").read()[:500])
+              except OSError:
+                  print("(nessuna risposta)")
+          PY
+
       - name: Percorso richiesto
         if: ${{ inputs.path != '' }}
         env:
