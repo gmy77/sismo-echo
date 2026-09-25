@@ -165,6 +165,14 @@ settimana e segue questa checklist, in sola lettura. Non modifica codice, non
 fa merge, non fa deploy: riferisce. Se tutto è a posto lo dice in una riga;
 se qualcosa non va, dice cosa, da quando e con quale prova (la query o il log).
 
+La Routine si chiama "Sentinella progetti Gimmy" (`trig_01Nj3uc9vkcPX3Tqh6uuFRRw`)
+e gira lunedì e giovedì alle 07 UTC. Dopo il primo lancio di prova del
+2026-09-24 era rimasta **spenta** (`enabled:false`) senza che nessuno se ne
+accorgesse. L'ho trovata così il 2026-09-25 e l'ho riaccesa con il prompt
+aggiornato alla colonna `gravita`. Una sessione che vuole fidarsi della
+sentinella deve prima controllare con `get_trigger` che sia davvero
+`enabled:true`, e che `last_run` non sia più vecchio di 4 giorni.
+
 1. **Cron del Worker**: `SELECT * FROM diagnostica WHERE origine='cron'
    ORDER BY id DESC LIMIT 8`. Atteso: 4 esecuzioni al giorno (08, 13, 18, 23
    UTC). Allarmi: buchi di oltre 6 ore, `evento='error'`, `ingvOk:false`
@@ -185,7 +193,10 @@ se qualcosa non va, dice cosa, da quando e con quale prova (la query o il log).
 5. **Sonda HTTP**: leggere i log dell'ultima esecuzione di `worker-probe.yml`
    (gira da sola ogni 6 ore). Allarmi: risposte diverse da 200,
    `/lightning/status` senza `subscription`, ultima esecuzione più vecchia di
-   8 ore (lo schedule di GitHub si è fermato).
+   12 ore (lo schedule di GitHub si è fermato). La soglia era 8 ore, ma il
+   2026-09-25 GitHub faceva partire i giri con 3–5,5 ore di ritardo (quello
+   delle 06:17 è partito alle 11:54), con intervalli reali già di 7–7,5 ore:
+   con 8 ore sarebbero arrivati falsi allarmi.
 6. **GitHub Actions**: ultimi run di ogni workflow su `main`. Allarmi: rossi
    nuovi. Quelli sospesi di proposito sono elencati sotto.
 7. **Deploy allineato**: `workers_list` su Cloudflare, confrontare il
@@ -210,8 +221,17 @@ Adozione:
   alle 11:59 UTC dopo il deploy: `connected:true`, `clients:1`, nessun errore.
 - Non si è ancora visto arrivare un fulmine reale: durante i test non c'erano
   temporali in zona (controllato su lightningmaps.org).
+- Versione 3.12 verificata in produzione il 2026-09-25:
+  - il deploy delle 13:16 UTC era identico a `main`: codice scaricato con
+    `workers_get_worker_code` e `METOP_HTML` valutato e confrontato byte per
+    byte;
+  - alle 13:19 UTC D1 ha registrato `lightning/connect` con 15 tessere;
+  - `/lightning/status` riporta `coverage` aperta e nessun errore.
 
-### Mappa fulmini "tipo lightningmaps" (viewer 1.5.0, `ECHO_VERSION` 3.12)
+  Con zero fulmini `fieldsSeen` resta `{}`: la domanda su `sig` è ancora
+  aperta.
+
+### Mappa fulmini "tipo lightningmaps" (viewer 1.5.x, `ECHO_VERSION` 3.12+)
 
 - **Storico di 1 ora nella memoria del Durable Object** (`LIGHTNING_BUFFER_MS`,
   massimo 6000 scariche). Esiste solo finché il DO è vivo e qualcuno guarda:
