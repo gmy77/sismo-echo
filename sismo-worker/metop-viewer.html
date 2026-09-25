@@ -6,11 +6,11 @@
      C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
      proxy e cache verso il WMS di EUMETSAT EUMETView. -->
 <!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-     METOP Polar Viewer 1.5.0 — costruito con Claude Code (Anthropic). -->
+     METOP Polar Viewer 1.5.1 — costruito con Claude Code (Anthropic). -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d1b2a'/><text x='50' y='70' font-size='58' text-anchor='middle'>🛰️</text></svg>">
-<title>METOP · Polar Viewer 1.5.0</title>
+<title>METOP · Polar Viewer 1.5.1</title>
 <style>
   :root{
     --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
@@ -67,7 +67,7 @@
   #lxStats .h{color:var(--warn);font-weight:700;letter-spacing:.4px;margin-bottom:4px;
     display:flex;justify-content:space-between;gap:6px}
   #lxStats table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-  #lxStats td{padding:1px 0}
+  #lxStats td{padding:1px 0;white-space:nowrap}
   #lxStats .n{text-align:right}
   #lxStats .k{color:var(--sub)}
   #lxStats canvas{position:static;display:block;width:100%;height:54px;margin:6px 0 1px;cursor:default}
@@ -100,7 +100,7 @@
 <div id="app">
   <div id="panel">
     <h1>METOP · POLARI</h1>
-    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.5.0</div>
+    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.5.1</div>
 
     <div class="sect">Immagini migliori</div>
     <select id="bestProduct">
@@ -234,7 +234,7 @@
     <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
 
     <div class="cred">
-      METOP-Polar v1.5.0<br>
+      METOP-Polar v1.5.1<br>
       Costruito con Claude Code (Anthropic)<br>
       © 2026 Gimmy Pignolo · Tutti i diritti riservati
     </div>
@@ -785,6 +785,10 @@ function onProductChange(){
   const freshness = geo ? " · aggiornato ogni "+(rapid?"~5 minuti (Rapid Scan)":"~10-15 minuti")
                    : mumi ? " · mosaico mondiale quasi in tempo reale (piu' satelliti/agenzie)" : "";
   const recipe = recipeHint(title);
+  // Canali infrarosso / vapore acqueo: si vedono allo stesso modo di giorno e di
+  // notte, quindi la nota sul confine giorno/notte qui sarebbe falsa (usciva
+  // anche sull'IR 10.5). Resta per colori reali, visibile e HRV.
+  const irChannel = /(^|[^a-z])(ir|wv)[\s_]?\d|infrared|infrarosso|water.?vapou?r/i.test(title+" "+v);
   // Distinzione fra composizioni RGB false-colore (piu' canali mescolati) e
   // prodotti dati a canale singolo come fulmini/lifted-index: solo le prime
   // sono davvero "RGB false-colore", l'etichetta era generica e fuorviante.
@@ -800,8 +804,8 @@ function onProductChange(){
       // non e' un difetto dell'immagine: sul lato in ombra il prodotto passa da colore
       // vero a infrarosso notturno (molto piu' scuro, spesso solo luci di citta'), quindi
       // il confine giorno/notte puo' sembrare un "taglio" netto sull'immagine.
-      +"<br><span class='sub' style='margin:2px 0 0'>il lato in ombra e' piu' scuro (infrarosso notturno): "
-      +"non e' un'immagine tagliata, e' il confine giorno/notte reale</span>";
+      +(irChannel ? "" : "<br><span class='sub' style='margin:2px 0 0'>il lato in ombra e' piu' scuro (infrarosso notturno): "
+      +"non e' un'immagine tagliata, e' il confine giorno/notte reale</span>");
   else
     $("prodhint").textContent = isRealLayer(v) ? v
         : (PRODUCTS.find(p=>p.id===v)||{}).hint || "";
@@ -1598,7 +1602,9 @@ function lxUpdateStats(){
   $("lxStats").classList.toggle("on", on);
   if(!on){ lxFitInfo(); return; }
   const now=lxNow(), L=LX.list, ref=LX.ref;
-  const spans=[60000,300000,900000,3600000], names=["ultimo min","ultimi 5 min","ultimi 15 min","ultima ora"];
+  // Etichette corte: nel pannello largo 240px "ultimi 15 min" e "tutto il feed"
+  // andavano a capo. "feed" richiama la scritta "area feed" sul riquadro.
+  const spans=[60000,300000,900000,3600000], names=["1 min","5 min","15 min","60 min"];
   const all=[0,0,0,0], inV=[0,0,0,0], hist=new Array(60).fill(0);
   let prev5=0, near=null, nearD=Infinity, thunder=null;
   const globeOn=$("globe").checked, P=globeOn ? lxProjector() : null;
@@ -1618,7 +1624,7 @@ function lxUpdateStats(){
       }
     }
   }
-  let tab="<tr><td class='k'></td><td class='k n'>tutto il feed</td><td class='k n'>in vista</td></tr>";
+  let tab="<tr><td class='k'>ultimi</td><td class='k n'>feed</td><td class='k n'>in vista</td></tr>";
   for(let j=0;j<4;j++) tab+="<tr><td class='k'>"+names[j]+"</td><td class='n'>"+all[j]+"</td><td class='n'>"+inV[j]+"</td></tr>";
   $("lxStTab").innerHTML=tab;
   const cov5=lxCovered(now-300000,now), cov10=lxCovered(now-600000,now);
