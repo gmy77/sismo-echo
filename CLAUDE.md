@@ -307,9 +307,14 @@ file sorgente e il letterale hanno escape diversi.
   stesso livello di `sismo-echo`: probabile avanzo del trasloco
   (`sismo-worker` è una sottocartella del repo, non un progetto a sé).
 - [ ] Ricontrollare `C:\Users\gimmy` per avanzi della vecchia posizione.
-- [ ] Sul PC di Gimmy esistono modifiche locali non committate a
-  `sismo-worker/package.json` e `package-lock.json` (probabile aggiornamento
-  di wrangler): vedere il diff e, se è quello, portarlo su `main` con una PR.
+- [x] Modifiche locali a `sismo-worker/package.json` e `package-lock.json` sul
+  PC di Gimmy. Il diff (visto il 2026-09-25) era solo wrangler da `^4.70.0` a
+  `^4.135.0`, quindi è stato portato su `main`: wrangler `^4.140.0`, con il
+  lock rigenerato da `npm install` e non copiato a mano. Sul PC, prima del
+  pull, vanno scartate le due modifiche locali, che su `main` sono già
+  presenti:
+  `git restore sismo-worker/package.json sismo-worker/package-lock.json`.
+  Dopo il pull va lanciato `npm ci` in `sismo-worker`.
 - [ ] Branch remoto `claude/happy-galileo-nicmru`: da cancellare. Il suo
   contenuto (pannello radiazione NOAA GOES) è già tutto su `main` via PR #16
   (squash, commit `b60b6af`), verificato riga per riga il 2026-09-24.

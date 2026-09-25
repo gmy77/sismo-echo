@@ -8,6 +8,6 @@
   },
   "devDependencies": {
     "javascript-obfuscator": "^5.3.0",
-    "wrangler": "^4.70.0"
+    "wrangler": "^4.140.0"
   }
 }
