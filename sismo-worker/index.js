@@ -33,20 +33,41 @@ async function addColIfMissing(db, table, colDef) {
 // riga per scarica. Non deve mai rompere chi la chiama: ogni errore viene
 // inghiottito, e senza binding DB e' un no-op. Ritenzione: 14 giorni (pulizia
 // nel cron).
+// Tassonomia di gravita' condivisa (stessa scala per ogni categoria: fulmini,
+// metop, cron, e domani altri progetti che copiano questo schema — vedi
+// CLAUDE.md "Pattern globale di diagnostica"):
+//   'bloccante'   -> il servizio non fa quello per cui esiste. Nel rapporto
+//                     della sentinella sempre, notifica push sempre.
+//   'da_guardare' -> non blocca oggi ma e' da tenere d'occhio (peggiora, si
+//                     avvicina a una soglia, un errore che potrebbe auto-
+//                     risolversi col reconnect/retry gia' previsto). Nel
+//                     rapporto, senza notifica isolata.
+//   null          -> informativo: rumore di fondo normale (connect/disconnect
+//                     per mancanza di visitatori, un run senza errori). Solo
+//                     storico, non entra nel rapporto a meno che richiesto.
 const DIAG_TABLE_SQL = `CREATE TABLE IF NOT EXISTS diagnostica (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,
   origine TEXT NOT NULL,
   evento TEXT NOT NULL,
-  dettaglio TEXT
+  dettaglio TEXT,
+  gravita TEXT
 )`;
 let diagTableReady = false;
-async function logDiag(db, origine, evento, dettaglio) {
+async function logDiag(db, origine, evento, dettaglio, gravita = null) {
   if (!db) return;
   try {
-    if (!diagTableReady) { await db.prepare(DIAG_TABLE_SQL).run(); diagTableReady = true; }
-    await db.prepare("INSERT INTO diagnostica (ts, origine, evento, dettaglio) VALUES (?,?,?,?)")
-      .bind(new Date().toISOString(), origine, evento, dettaglio == null ? null : JSON.stringify(dettaglio))
+    if (!diagTableReady) {
+      await db.prepare(DIAG_TABLE_SQL).run();
+      // Serve per le tabelle diagnostica gia' esistenti in produzione da
+      // prima di questa colonna — CREATE TABLE IF NOT EXISTS non altera
+      // una tabella che c'e' gia' (stesso motivo per cui esiste questo
+      // helper: vedi radiazione_spaziale piu' sotto nel cron).
+      await addColIfMissing(db, "diagnostica", "gravita TEXT");
+      diagTableReady = true;
+    }
+    await db.prepare("INSERT INTO diagnostica (ts, origine, evento, dettaglio, gravita) VALUES (?,?,?,?,?)")
+      .bind(new Date().toISOString(), origine, evento, dettaglio == null ? null : JSON.stringify(dettaglio), gravita)
       .run();
   } catch (_) { /* la diagnostica non deve mai far fallire la richiesta che la chiama */ }
 }
@@ -5245,7 +5266,7 @@ export class LightningRelay {
     this.tiles = geohashTilesForBounds(NORTH_ITALY_BOUNDS, LIGHTNING_GEOHASH_PRECISION);
   }
 
-  _diag(evento, dettaglio) { return logDiag(this.env && this.env.DB, "lightning", evento, dettaglio); }
+  _diag(evento, dettaglio, gravita = null) { return logDiag(this.env && this.env.DB, "lightning", evento, dettaglio, gravita); }
 
   async fetch(request) {
     if (request.headers.get("Upgrade") === "websocket") {
@@ -5354,7 +5375,10 @@ export class LightningRelay {
       if (!this.closingByUs) {                      // la chiusura voluta non e' un errore
         this.lastError = String((e && e.message) || e);
         this.lastErrorAt = new Date().toISOString();
-        await this._diag("error", { error: this.lastError, clients: this.clients.size, wasConnected });
+        // 'da_guardare', non 'bloccante': si auto-cura da sola col reconnect
+        // a backoff qui sotto — diventa un problema vero solo se non guarisce
+        // mai (la sentinella lo vede da reconnect troppo frequenti/ripetuti).
+        await this._diag("error", { error: this.lastError, clients: this.clients.size, wasConnected }, "da_guardare");
       }
     } finally {
       if (pingInterval) clearInterval(pingInterval);
@@ -5416,6 +5440,54 @@ export default {
       }), { status: 503, headers: { "Content-Type": "application/json" } });
       const id = env.LIGHTNING_RELAY.idFromName("main");
       return env.LIGHTNING_RELAY.get(id).fetch(request);
+    }
+
+    // Ingresso diagnostica per chi NON e' un Worker Cloudflare (es. pipeline
+    // Python su PC): niente da qui non c'e' un binding D1 diretto possibile.
+    // Un Worker Cloudflare tuo (stormshift, newtab-worker, futuri) NON deve
+    // passare da qui — si collega direttamente allo stesso database D1 nel
+    // proprio wrangler.toml (stessa fiducia, niente rete di mezzo, niente
+    // rischio di intasare questo endpoint). Qui invece la fiducia e' minore,
+    // quindi tre guardie che un Worker-a-Worker non avrebbe bisogno di avere:
+    //   1. token (stesso UPDATE_SECRET delle altre rotte protette)
+    //   2. payload piccolo e di forma fissa (niente blob liberi)
+    //   3. un limite di velocita' per origine, cosi' un loop rotto in un
+    //      progetto esterno non intasa la tabella condivisa e non nasconde
+    //      i segnali degli altri progetti (vedi CLAUDE.md).
+    if (url.pathname === "/diag/ingest" && request.method === "POST") {
+      const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+      if (url.searchParams.get("token") !== getUpdateSecret(env)) return new Response("Non autorizzato 🔒", { status: 401, headers: CORS });
+
+      let body;
+      try { body = await request.json(); }
+      catch (_) { return new Response(JSON.stringify({ error: "corpo non e' JSON valido" }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } }); }
+
+      const origine = String(body?.origine || "").slice(0, 40);
+      const evento = String(body?.evento || "").slice(0, 40);
+      if (!origine || !evento) return new Response(JSON.stringify({ error: "servono 'origine' ed 'evento' (stringhe non vuote)" }),
+        { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
+      const gravita = ["bloccante", "da_guardare"].includes(body?.gravita) ? body.gravita : null;
+      // dettaglio: qualunque forma, ma con un tetto — non deve poter diventare
+      // un canale per scaricare blob arbitrari nel database condiviso.
+      let dettaglio = null;
+      if (body?.dettaglio != null) {
+        const s = JSON.stringify(body.dettaglio);
+        dettaglio = s.length > 4000 ? { troncato: true, assaggio: s.slice(0, 4000) } : body.dettaglio;
+      }
+
+      // Limite di velocita': max 20 scritture/minuto per origine esterna.
+      // Il minuto stesso e' la chiave (bucket), con scadenza breve: non
+      // lascia residui in KV, e resetta da solo ad ogni minuto nuovo.
+      if (env.F4_LEARN) {
+        const bucket = "diagrate:" + origine + ":" + Math.floor(Date.now() / 60000);
+        const n = parseInt(await env.F4_LEARN.get(bucket) || "0", 10);
+        if (n >= 20) return new Response(JSON.stringify({ error: "limite di scritture per questa origine superato (20/min): riprova al minuto prossimo" }),
+          { status: 429, headers: { ...CORS, "Content-Type": "application/json" } });
+        await env.F4_LEARN.put(bucket, String(n + 1), { expirationTtl: 120 });
+      }
+
+      await logDiag(env.DB, origine, evento, dettaglio, gravita);
+      return new Response(JSON.stringify({ ok: true }), { headers: { ...CORS, "Content-Type": "application/json" } });
     }
 
     // Catalogo: elenca i layer realmente offerti da EUMETView (name+title+time).
@@ -5575,7 +5647,7 @@ export default {
         let legendResp;
         try { legendResp = await fetch(wmsLegend, { cf: { cacheTtl: ttlLegend, cacheEverything: true } }); }
         catch (e) {
-          await logDiag(env.DB, "metop", "legend_timeout", { layer, error: String(e) });
+          await logDiag(env.DB, "metop", "legend_timeout", { layer, error: String(e) }, "da_guardare");
           return new Response(JSON.stringify({ error: "legenda non raggiungibile (rete/timeout)", detail: String(e), layer }),
           { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
 
@@ -5644,7 +5716,11 @@ export default {
       let resp;
       try { resp = await fetch(wms, { cf: { cacheTtl: ttl, cacheEverything: true } }); }
       catch (e) {
-        await logDiag(env.DB, "metop", "upstream_timeout", { layer, time, bbox, size: w + "x" + h, big, error: String(e) });
+        // 'da_guardare': un timeout isolato e' quasi sempre EUMETView lento
+        // per quel layer/orario, non un guasto nostro — la sentinella lo fa
+        // 'bloccante' di fatto solo se un layer fallisce SEMPRE (pattern che
+        // vede lei stessa contando le righe, non una regola qui).
+        await logDiag(env.DB, "metop", "upstream_timeout", { layer, time, bbox, size: w + "x" + h, big, error: String(e) }, "da_guardare");
         return new Response(JSON.stringify({
         error: "EUMETView non ha risposto (rete/timeout)" + (big ? " — l'area e' molto ampia: prova a restringere (Europa/Italia)" : " — riprova"),
         detail: String(e), layer }), { status: 504, headers: { ...CORS, "Content-Type": "application/json" } }); }
@@ -5670,7 +5746,7 @@ export default {
         // Solo gli errori lato server (5xx/area enorme) sono anomalie da capire;
         // un "nessun passaggio" (4xx) e' normale e non va a sporcare la diagnostica.
         if (resp.status >= 500 || big)
-          await logDiag(env.DB, "metop", "upstream_error", { layer, time, bbox, size: w + "x" + h, big, status: resp.status, reason });
+          await logDiag(env.DB, "metop", "upstream_error", { layer, time, bbox, size: w + "x" + h, big, status: resp.status, reason }, "da_guardare");
         return new Response(JSON.stringify({ error: msg, status: resp.status, layer, time, bbox,
           eumetview: reason || undefined }),
           { status: resp.status >= 500 ? 502 : 404, headers: { ...CORS, "Content-Type": "application/json" } });
@@ -6180,7 +6256,10 @@ export default {
         kp: solare.kpData.length, radiazione: radiazione.length, durataMs: Date.now() - t0 });
     } catch(e) {
       console.error("Cron error:", e.message);
-      await logDiag(env.DB, "cron", "error", { error: e.message, durataMs: Date.now() - t0 });
+      // 'bloccante': se il cron esce da qui, quel giro non ha scaricato ne'
+      // salvato NIENTE (sismi, Kp, radiazione) — e' il guasto piu' centrale
+      // che questo Worker possa avere.
+      await logDiag(env.DB, "cron", "error", { error: e.message, durataMs: Date.now() - t0 }, "bloccante");
     }
   },
 };
