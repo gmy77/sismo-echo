@@ -39,8 +39,11 @@ I canali che funzionano:
      quindi resta fermo per giorni anche col cron sano (verificato il
      2026-09-24: ultima riga del giorno prima, radiazione aggiornata quel
      mattino).
-   Eventi: `lightning/connect|heartbeat(5 min)|disconnect|error`,
+   Eventi: `lightning/connect|heartbeat(5 min)|disconnect|error|payload_keys`,
    `metop/upstream_timeout|upstream_error|legend_timeout`, `cron/run|error`.
+   `lightning/payload_keys` si scrive una volta per connessione MQTT, al primo
+   fulmine: chiavi del payload vero, se c'è la lista stazioni `sig` e un
+   esempio. È la prova di cosa manda DAVVERO il broker.
 2. **Sonda HTTP via GitHub Actions**: workflow `worker-probe.yml`. Interroga
    `/lightning/status`, `/metop/layers?q=li`, `/api/stats`, `/polar`. Gira
    da sola ogni 6 ore (00:17, 06:17, 12:17, 18:17 UTC): Claude NON può
@@ -207,6 +210,63 @@ Adozione:
   alle 11:59 UTC dopo il deploy: `connected:true`, `clients:1`, nessun errore.
 - Non si è ancora visto arrivare un fulmine reale: durante i test non c'erano
   temporali in zona (controllato su lightningmaps.org).
+
+### Mappa fulmini "tipo lightningmaps" (viewer 1.5.0, `ECHO_VERSION` 3.12)
+
+- **Storico di 1 ora nella memoria del Durable Object** (`LIGHTNING_BUFFER_MS`,
+  massimo 6000 scariche). Esiste solo finché il DO è vivo e qualcuno guarda:
+  il relay si apre solo con un viewer connesso, e un riavvio del DO azzera
+  tutto. Non è su D1 e non deve andarci: sarebbe una riga per dato, proprio
+  ciò che la regola di `logDiag` vieta.
+- **Protocollo WebSocket**. Dal server arrivano:
+  - `hello`: versione, stato, `coverage` (gli intervalli in cui il relay era
+    davvero collegato), `fieldsSeen`, `sigSeen`, `latency`;
+  - `backfill`: lo storico a blocchi da 1000 righe in forma colonnare
+    (`cols` + `strikes`), SENZA lista stazioni per stare leggero;
+  - `strike`: la scarica live, con `sig`;
+  - `detail`: la lista stazioni di una scarica vecchia, se è ancora fra le
+    ultime 400 che la conservano (altrimenti `missing:true`);
+  - `state`: cambi di connessione.
+
+  Il client può mandare solo `{type:"detail", id}`.
+- **Viewer**:
+  - bottone "Modalità fulmini", oppure `?fulmini` nell'URL;
+  - colori per età, finestra regolabile, celle temporalesche con direzione di
+    moto, allerta di vicinanza;
+  - pannello di dettaglio con la tabella delle stazioni, suono opzionale;
+  - PNG che include i fulmini.
+
+  Il punto di riferimento predefinito è **Udine città, NON la casa di
+  Gimmy** (il viewer è pubblico). Un punto personale si imposta con un clic o
+  col GPS e resta solo nel `localStorage` del browser.
+- **Cosa NON c'è nel feed pubblico**:
+  - la corrente di picco (kA): Blitzortung non la pubblica;
+  - la lista stazioni `sig`: se passi per il proxy MQTT NON è verificato. Il
+    container cloud non raggiunge la porta 1883, quindi lo si vede solo in
+    produzione con `lightning/payload_keys` su D1, o con
+    `sigSeen`/`fieldsSeen` su `/lightning/status`. Se `sigSeen` resta a 0
+    con fulmini arrivati, il proxy la toglie e il pannello stazioni resterà
+    vuoto: non è un bug del viewer.
+- **I fulmini possono cadere fuori dal rettangolo tratteggiato**: le tessere
+  geohash (precisione 3, circa 156×156 km) sono più grandi del rettangolo, e
+  il broker manda tutto quello che cade nella tessera.
+- **`/lightning/status`**, oltre ai campi di prima, ora dà: `fieldsSeen`,
+  `sigSeen`, `latency` (p50/p90 in ms fra scarica e arrivo), `bufferSize`,
+  `coverage`, `doStartedAt`, `lastStrikeAt`.
+- Il layout del viewer non è pensato per il telefono: era così anche prima,
+  va affrontato a parte.
+
+### Lezione del 2026-09-25: il build rompeva le regex del viewer
+
+`build-metop.mjs` incollava l'HTML dentro un template literal senza raddoppiare
+i backslash. Così ogni regex del viewer arrivava rotta in produzione: `\b`
+diventava un backspace e `\s` una semplice `s`. Filtri satellite, descrizioni
+dei prodotti e riconoscimento delle categorie non funzionavano, senza dare
+errori. Ora il build raddoppia i backslash e usa un replacer a funzione
+(`$&`/`$1` nell'HTML non vengono più interpretati). Come verificarlo:
+**valutare la costante `METOP_HTML` di `index.js` e confrontarla byte per byte
+con `metop-viewer.html`**. Non basta cercare la stringa col grep, perché il
+file sorgente e il letterale hanno escape diversi.
 
 ## Da fare
 

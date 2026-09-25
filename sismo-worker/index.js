@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.11";
+const ECHO_VERSION = "3.12";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -3878,11 +3878,11 @@ const METOP_HTML = `<!doctype html>
      C++ MODIS-FVG-Viewer. I dati arrivano dal Worker (rotta /metop), che fa da
      proxy e cache verso il WMS di EUMETSAT EUMETView. -->
 <!-- Copyright (c) 2026 Gimmy Pignolo. Tutti i diritti riservati.
-     METOP Polar Viewer 1.4.2 — costruito con Claude Code (Anthropic). -->
+     METOP Polar Viewer 1.5.0 — costruito con Claude Code (Anthropic). -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d1b2a'/><text x='50' y='70' font-size='58' text-anchor='middle'>🛰️</text></svg>">
-<title>METOP · Polar Viewer 1.4.2</title>
+<title>METOP · Polar Viewer 1.5.0</title>
 <style>
   :root{
     --bg:#0d0f13; --panel:#161a20; --card:#1f242c; --edge:#2c333d;
@@ -3928,6 +3928,41 @@ const METOP_HTML = `<!doctype html>
     border:1px solid var(--edge);border-radius:10px;padding:6px 8px;display:none;
     max-width:60%;max-height:38%;overflow:auto}
   #legend img{display:block;max-width:100%}
+  /* ---- fulmini live: livello, statistiche, dettaglio, allerta ---- */
+  #lx{pointer-events:none}
+  canvas.placing{cursor:crosshair}
+  #stage.lxOn #chip{max-width:calc(100% - 290px)}
+  #lxStats{position:absolute;top:48px;right:12px;width:240px;background:rgba(8,12,18,.86);
+    border:1px solid var(--edge);border-radius:10px;padding:8px 10px;font-size:11.5px;
+    color:var(--txt);display:none;pointer-events:none}
+  #lxStats.on{display:block}
+  #lxStats .h{color:var(--warn);font-weight:700;letter-spacing:.4px;margin-bottom:4px;
+    display:flex;justify-content:space-between;gap:6px}
+  #lxStats table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  #lxStats td{padding:1px 0}
+  #lxStats .n{text-align:right}
+  #lxStats .k{color:var(--sub)}
+  #lxStats canvas{position:static;display:block;width:100%;height:54px;margin:6px 0 1px;cursor:default}
+  #lxStats .lab{display:flex;justify-content:space-between;color:var(--sub);font-size:10px}
+  #lxStats .more div{margin-top:3px}
+  #lxInfo{position:absolute;right:12px;bottom:12px;width:340px;max-height:62%;overflow:auto;
+    background:rgba(8,12,18,.93);border:1px solid var(--edge);border-radius:10px;padding:9px 11px;
+    font-size:12px;display:none}
+  #lxInfo.on{display:block}
+  #lxInfo .x{float:right;width:auto;padding:0 8px;border-radius:6px;font-weight:700}
+  #lxInfo h3{margin:0 0 6px;font-size:13px;color:var(--warn)}
+  #lxInfo table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  #lxInfo td{padding:2px 0;vertical-align:top}
+  #lxInfo td.k{width:40%;padding-right:6px}
+  #lxInfo .k{color:var(--sub)}
+  #lxInfo .n{text-align:right}
+  #lxInfo .note{color:var(--sub);font-size:10.5px;margin-top:6px}
+  #lxInfo .sta{max-height:170px;overflow:auto;margin-top:4px;border-top:1px solid var(--edge)}
+  #lxAlert{position:absolute;top:12px;left:50%;transform:translateX(-50%);max-width:60%;
+    background:rgba(120,20,20,.93);border:1px solid var(--err);border-radius:10px;padding:7px 14px;
+    font-size:13px;font-weight:700;display:none;pointer-events:none;z-index:3;text-align:center}
+  #lxAlert.on{display:block}
+  @media (max-width:700px){ #lxStats{width:185px;font-size:10.5px} #lxInfo{width:calc(100% - 24px)} }
   /* ---- status ---- */
   #status{grid-column:2;background:var(--panel);border-top:1px solid var(--edge);
     display:flex;align-items:center;padding:0 12px;font-size:12px;color:var(--sub);gap:16px}
@@ -3937,7 +3972,7 @@ const METOP_HTML = `<!doctype html>
 <div id="app">
   <div id="panel">
     <h1>METOP · POLARI</h1>
-    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.4.2</div>
+    <div class="sub">Immagini satellitari EUMETSAT · Europa · v1.5.0</div>
 
     <div class="sect">Immagini migliori</div>
     <select id="bestProduct">
@@ -3995,9 +4030,38 @@ const METOP_HTML = `<!doctype html>
     <div id="livehint" class="sub" style="margin:-4px 0 8px"></div>
 
     <div class="sect">Fulmini live</div>
-    <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra, Blitzortung — vero per-scarica)</label>
+    <label class="chk"><input type="checkbox" id="liveLightning"> ⚡ Fulmini live (rete a terra Blitzortung, per singola scarica)</label>
     <div id="liveLightningStatus" class="sub" style="margin:-4px 0 8px"></div>
-    <div class="sub" style="margin:-4px 0 8px">Indipendente dal prodotto scelto sopra: un pallino esatto sulla mappa ad ogni fulmine reale nell'area coperta (tutto il Nord Italia, da Torino a Trieste), con un bip più acuto e corto del bip satellitare qui sopra.</div>
+    <button id="lxMode" class="primary">⚡ Modalità fulmini (Nord Italia su infrarosso)</button>
+    <div class="sub" style="margin:6px 0 4px">Ogni scarica captata dalle antenne a terra nell'area coperta (tutto il Nord Italia, riquadro tratteggiato: le tessere del feed sono un po' più larghe, quindi qualche scarica compare anche appena fuori), con l'ultima ora di storico. Colore = età: bianco appena caduta, poi giallo, arancio, rosso scuro a un'ora. Clic su una scarica per il dettaglio (ora al millisecondo, distanza, stazioni). Il feed pubblico NON contiene l'intensità in kA.</div>
+    <label>Storico mostrato</label>
+    <select id="lxWindow">
+      <option value="60" selected>ultima ora</option>
+      <option value="30">ultimi 30 minuti</option>
+      <option value="15">ultimi 15 minuti</option>
+      <option value="5">ultimi 5 minuti</option>
+    </select>
+    <label>Punto di riferimento (distanze, allerta, tuono)</label>
+    <div class="row">
+      <button id="lxPick">📍 Scegli sulla mappa</button>
+      <button id="lxGps" style="flex:0 0 74px">📡 GPS</button>
+    </div>
+    <div id="lxRefTxt" class="sub" style="margin:4px 0 4px"></div>
+    <label class="chk"><input type="checkbox" id="lxRings" checked> Cerchi di distanza 10 / 25 / 50 km</label>
+    <div class="row" style="align-items:center">
+      <label class="chk" style="flex:1.5"><input type="checkbox" id="lxAlertOn" checked> Allerta vicinanza entro</label>
+      <select id="lxAlertKm">
+        <option value="5">5 km</option>
+        <option value="10">10 km</option>
+        <option value="15" selected>15 km</option>
+        <option value="25">25 km</option>
+        <option value="50">50 km</option>
+      </select>
+    </div>
+    <label class="chk"><input type="checkbox" id="lxBeep" checked> 🔔 Bip per scarica nella vista (più acuto = più vicina)</label>
+    <label class="chk"><input type="checkbox" id="lxSta" checked> Linee verso le stazioni che l'hanno captata</label>
+    <label class="chk"><input type="checkbox" id="lxCells" checked> Celle temporalesche: movimento e arrivo (stima)</label>
+    <label class="chk"><input type="checkbox" id="lxStatsOn" checked> Pannello statistiche sulla mappa</label>
 
     <div class="sect">Area</div>
     <button id="quickEurope" class="primary">Immagine Europa · Geo Colour</button>
@@ -4042,7 +4106,7 @@ const METOP_HTML = `<!doctype html>
     <button id="save" style="margin-top:8px">Salva vista (PNG)</button>
 
     <div class="cred">
-      METOP-Polar v1.4.2<br>
+      METOP-Polar v1.5.0<br>
       Costruito con Claude Code (Anthropic)<br>
       © 2026 Gimmy Pignolo · Tutti i diritti riservati
     </div>
@@ -4050,8 +4114,19 @@ const METOP_HTML = `<!doctype html>
 
   <div id="stage">
     <canvas id="cv"></canvas>
+    <canvas id="lx"></canvas>
     <div id="chip">Pronto — trascina per spostarti, rotella per zoomare.</div>
     <div id="spin">⏳ scarico…</div>
+    <div id="lxAlert"></div>
+    <div id="lxStats">
+      <div class="h"><span>⚡ FULMINI LIVE</span><span id="lxStState"></span></div>
+      <table id="lxStTab"></table>
+      <div id="lxStRate" class="k" style="margin-top:3px"></div>
+      <canvas id="lxHist"></canvas>
+      <div class="lab"><span>-60 min</span><span id="lxCovTxt"></span><span>ora</span></div>
+      <div id="lxStMore" class="more"></div>
+    </div>
+    <div id="lxInfo"></div>
     <div id="legend"><img id="legendImg" alt="legenda colore"></div>
   </div>
 
@@ -4090,10 +4165,14 @@ let img = null;                 // Image scaricata per il bbox corrente
 let imgBox = null;              // bbox a cui l'immagine si riferisce
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
+// Livello fulmini: canvas separato sopra #cv, cosi' il ridisegno a ogni
+// secondo non costringe a ricalcolare l'immagine (costoso sul globo).
+const lxCv = document.getElementById("lx"), lxCtx = lxCv.getContext("2d");
 
 function fitDPR(){
   const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
   cv.width = Math.round(r.width*d); cv.height = Math.round(r.height*d);
+  lxCv.width = cv.width; lxCv.height = cv.height;
 }
 // canvas <-> geo (equirettangolare sul bbox della vista)
 function xToLon(x){ return view.lonMin + (x/cv.width)*(view.lonMax-view.lonMin); }
@@ -4129,7 +4208,7 @@ function draw(){
   }
   if(document.getElementById("grid").checked && !globeOn) drawGraticule();
   if(globeOn) drawGlobeOutline();
-  if(!globeOn) drawLiveStrikes();
+  lxRender();
   document.getElementById("st-view").textContent =
     "bbox "+view.latMin.toFixed(1)+","+view.lonMin.toFixed(1)+" → "+
     view.latMax.toFixed(1)+","+view.lonMax.toFixed(1);
@@ -4325,9 +4404,21 @@ cv.addEventListener("pointermove",e=>{
   const dLat=(e.clientY-drag.y)/r.height*(view.latMax-view.latMin);
   view={ lonMin:drag.view.lonMin-dLon, lonMax:drag.view.lonMax-dLon,
          latMin:drag.view.latMin+dLat, latMax:drag.view.latMax+dLat };
+  drag.moved=true;
   clampView(); draw();
 });
-cv.addEventListener("pointerup",()=>{ if(drag){ drag=null; cv.classList.remove("drag"); scheduleFetch(); }});
+// Un "clic" (spostamento sotto i 5 px) non e' un trascinamento: niente nuovo
+// download dell'immagine, e il clic va al livello fulmini (dettaglio della
+// scarica o scelta del punto di riferimento).
+cv.addEventListener("pointerup",e=>{
+  if(!drag) return;
+  const was=drag; drag=null; cv.classList.remove("drag");
+  if(Math.hypot(e.clientX-was.x,e.clientY-was.y)<5){
+    if(was.moved){ view=was.view; clampView(); draw(); }
+    lxClick(e); return;
+  }
+  scheduleFetch();
+});
 cv.addEventListener("wheel",e=>{
   e.preventDefault();
   const r=cv.getBoundingClientRect();
@@ -4398,17 +4489,17 @@ const CURATED = [
 const RECIPE_HINTS = [
   [/airmass/i,        "masse d'aria, getti e vortici in quota: il rosso/arancio segna aria calda e secca (stratosferica)"],
   [/tropicalairmass/i,"variante Airmass tarata sui tropici, per seguire i cicloni"],
-  [/\bdust\b/i,        "polvere/sabbia sollevata in rosa-magenta sul mare, marrone sulla terra"],
-  [/\bash\b/i,         "cenere vulcanica in verde/giallo — utile per seguire un'eruzione"],
+  [/\\bdust\\b/i,        "polvere/sabbia sollevata in rosa-magenta sul mare, marrone sulla terra"],
+  [/\\bash\\b/i,         "cenere vulcanica in verde/giallo — utile per seguire un'eruzione"],
   [/convection/i,      "temporali e celle convettive severe: il giallo-rosso segna le cime piu' fredde/alte"],
   [/microphys/i,       "nebbia e nubi basse in rosa/violetto, nubi alte ghiacciate in rosso-arancio"],
-  [/\bsnow\b/i,        "distingue neve/ghiaccio (rosso) dalle nubi (bianco-giallo)"],
+  [/\\bsnow\\b/i,        "distingue neve/ghiaccio (rosso) dalle nubi (bianco-giallo)"],
   [/firetemperature/i, "punti caldi e incendi attivi in rosso acceso"],
   [/cloudphase/i,      "fase della nube: goccioline liquide vs cristalli di ghiaccio"],
   [/cloudtype/i,       "classificazione del tipo di nube per colore"],
-  [/flash area|lightning|\bli_afa\b/i, "attivita' dei fulmini: aree dove il Lightning Imager MTG ha registrato scariche (accumulo) — segue le celle attive, un'impennata rapida spesso precede grandine/raffiche"],
+  [/flash area|lightning|\\bli_afa\\b/i, "attivita' dei fulmini: aree dove il Lightning Imager MTG ha registrato scariche (accumulo) — segue le celle attive, un'impennata rapida spesso precede grandine/raffiche"],
   [/lifted.?index|liftedindex/i,       "instabilita' da satellite: piu' negativo = atmosfera piu' predisposta ai temporali"],
-  [/cloud top height|\bcth\b/i,        "altezza reale della cima delle nubi: piu' alta (colori piu' freddi/violacei) spesso vuol dire temporale piu' intenso — collegata all'overshooting top"],
+  [/cloud top height|\\bcth\\b/i,        "altezza reale della cima delle nubi: piu' alta (colori piu' freddi/violacei) spesso vuol dire temporale piu' intenso — collegata all'overshooting top"],
 ];
 function recipeHint(title){
   const hit = RECIPE_HINTS.find(([re])=>re.test(title));
@@ -4506,14 +4597,14 @@ function satMatch(title, name, sat){
   if(sat==="metop-a"||sat==="metop-b"||sat==="metop-c"){
     if(!/^eps:/i.test(name)) return false;
     const L=sat.slice(-1).toUpperCase();
-    if(!/metop[\s-]?[abc]\b/i.test(title)) return true;   // prodotto combinato: sempre
-    return new RegExp("metop[\\s-]?"+L+"\\b","i").test(title);
+    if(!/metop[\\s-]?[abc]\\b/i.test(title)) return true;   // prodotto combinato: sempre
+    return new RegExp("metop[\\\\s-]?"+L+"\\\\b","i").test(title);
   }
   if(sat==="sentinel3a"||sat==="sentinel3b"){
     if(!/^copernicus:/i.test(name)) return false;
     const L=sat.slice(-1).toUpperCase();
-    if(!/sentinel-?3[ab]\b/i.test(title)) return true;    // prodotto combinato: sempre
-    return new RegExp("sentinel-?3"+L+"\\b","i").test(title);
+    if(!/sentinel-?3[ab]\\b/i.test(title)) return true;    // prodotto combinato: sempre
+    return new RegExp("sentinel-?3"+L+"\\\\b","i").test(title);
   }
   if(sat==="msg-fes")  return /^msg_(fes|rss):/i.test(name);
   if(sat==="msg-iodc") return /^msg_iodc:/i.test(name);
@@ -4527,12 +4618,12 @@ function catOf(title, name){
   const t=(title||"").toLowerCase(), n=(name||"").toLowerCase();
   // --- per NOME (robusto): OLCI/SLSTR true colour, natural, geo colour ---
   if(/olci.*rgb|rgb.*olci|geocolou?r|rgb_natural|rgb_geocolour|truecolor|true_colour|slstr.*rgb/.test(n)) return "real";
-  if(/rgb_124|_ir\d|_wv\d|_vis\d|_cloud|_fog|_dust|_ash|_airmass/.test(n)) return "cloud";
+  if(/rgb_124|_ir\\d|_wv\\d|_vis\\d|_cloud|_fog|_dust|_ash|_airmass/.test(n)) return "cloud";
   if(/sst|_chl|ascat|wind|ozone|aerosol|orbit|footprint|instab/.test(n)) return "data";
   // --- per TITOLO (fallback) ---
-  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\bfire\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability|top height/.test(t)) return "data";
-  if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\bolci\b/.test(t)) return "real";
-  if(/cloud|\bir\b|ir\d|\bwv\b|wv\d|vis\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
+  if(/sst|chl|chloro|clorof|wind|ascat|ozone|ozono|aerosol|\\bfire\\b|frp|sea ice|ghiaccio|temperature|k-index|lifted|flash|instability|top height/.test(t)) return "data";
+  if(/natural colou?r|true.?colou?r|geo.?colou?r|geocolor|\\bolci\\b/.test(t)) return "real";
+  if(/cloud|\\bir\\b|ir\\d|\\bwv\\b|wv\\d|vis\\d|fog|microphys|airmass|dust|convection|ash|volcanic|severe|snow|night|notte|seviri|µm image|um image/.test(t)) return "cloud";
   return "other";
 }
 function catMatch(l, cat){
@@ -4555,21 +4646,21 @@ function onProductChange(){
   const title=(sel().selectedOptions[0]||{}).text||"";
   // Prodotto polare a striscia singola (un satellite, non 'accumulated/daily'):
   // copre solo la fascia di un'orbita, il resto e' nero. Avvisa e suggerisci.
-  const single = /sentinel-?3[ab]\b|metop[\s-]?[abc]\b/i.test(title)
+  const single = /sentinel-?3[ab]\\b|metop[\\s-]?[abc]\\b/i.test(title)
               && !/accumulat|daily|giornalier|orbits/i.test(title);
   // Meteosat (MSG/MTG): geostazionario, non un passaggio — ricorda la cadenza
   // vera cosi' non sembra "meno buono", solo piu' frequente e meno definito.
   const geo = /^(msg|mtg)/i.test(v);
   const mumi = /^mumi:/i.test(v);
   const fullDisk = geo || mumi;                 // disco intero: si presta al globo
-  const rapid = /rapid.?scan|_nrt\b/i.test(title) || /_rss:/i.test(v);
+  const rapid = /rapid.?scan|_nrt\\b/i.test(title) || /_rss:/i.test(v);
   const freshness = geo ? " · aggiornato ogni "+(rapid?"~5 minuti (Rapid Scan)":"~10-15 minuti")
                    : mumi ? " · mosaico mondiale quasi in tempo reale (piu' satelliti/agenzie)" : "";
   const recipe = recipeHint(title);
   // Distinzione fra composizioni RGB false-colore (piu' canali mescolati) e
   // prodotti dati a canale singolo come fulmini/lifted-index: solo le prime
   // sono davvero "RGB false-colore", l'etichetta era generica e fuorviante.
-  const isRgbRecipe = /\brgb\b/i.test(title);
+  const isRgbRecipe = /\\brgb\\b/i.test(title);
   if(single)
     $("prodhint").innerHTML="<span style='color:var(--warn)'>striscia di una singola orbita — usa una versione "
       +"<b>Daily / Accumulated</b> per coprire tutta la mappa</span>";
@@ -4670,13 +4761,20 @@ function checkLightningActivity(im){
 }
 
 // --------------------------------------------------------------------------
-// Fulmini live (Blitzortung, feed punto vero via il relay MQTT->WebSocket
-// del Worker: /lightning/ws). A differenza del bip satellitare qui sopra
-// (li_afa, ~10 min, area accumulata), questo e' ogni singola scarica reale
-// captata dalla rete di antenne a terra, su tutto il Nord Italia (le tessere
-// geohash scelte lato server, NORTH_ITALY_BOUNDS in index.js) — indipendente
-// dal layer/prodotto satellitare mostrato in quel momento.
-let liveWs=null, liveStrikes=[], liveAnimTimer=null, liveReconnectDelay=2000, liveWanted=false;
+// Fulmini live (Blitzortung, feed per singola scarica via il relay MQTT ->
+// WebSocket del Worker: /lightning/ws). E' la rete di antenne a terra, su tutto
+// il Nord Italia (tessere geohash scelte lato server, NORTH_ITALY_BOUNDS in
+// index.js), indipendente dal prodotto satellitare mostrato.
+// Protocollo: all'apertura il relay manda "hello" (versione, copertura, campi
+// visti davvero) e "backfill" con l'ultima ora che tiene in memoria, poi uno
+// "strike" per ogni nuova scarica; "detail" restituisce su richiesta la lista
+// stazioni di una scarica (il relay la tiene solo per le ultime 400).
+// Si disegna su #lx, un canvas separato sopra l'immagine: il ridisegno a ogni
+// secondo non tocca l'immagine satellitare.
+// Onesta' sui dati: la corrente di picco (kA) il feed pubblico NON la da';
+// le stazioni arrivano solo se il broker le inoltra; lo storico esiste solo per
+// i tratti in cui il relay era collegato ("vuoto" non vuol dire "sereno": per
+// questo la copertura e' mostrata a parte).
 function wsUrlFromApi(){
   const u = new URL(API);
   u.protocol = u.protocol==="https:" ? "wss:" : "ws:";
@@ -4684,64 +4782,969 @@ function wsUrlFromApi(){
   u.search = "";
   return u.toString();
 }
-function connectLiveLightning(){
-  liveWanted = true;
-  if(liveWs) return;
-  $("liveLightningStatus").textContent="connessione…";
+
+const LX_R = 6371.0088;                          // raggio medio terrestre, km
+// Riferimento predefinito: Udine citta', NON la casa di nessuno. Il punto
+// personale si sceglie a mano (clic o GPS) e resta solo nel browser.
+const LX_DEFAULT_REF = { lat:46.0626, lon:13.2355, name:"Udine", def:true };
+// Colore per eta' in minuti: bianco appena caduta, giallo, arancio, rosso,
+// bordeaux a un'ora (stessa idea delle mappe professionali).
+const LX_RAMP = [[0,255,255,255],[1,255,244,92],[5,255,196,0],[10,255,128,0],[20,255,56,32],[35,200,16,46],[60,110,8,40]];
+function lxAgeRGB(min){
+  if(!(min>0)) return LX_RAMP[0].slice(1);
+  for(let i=1;i<LX_RAMP.length;i++){
+    const a=LX_RAMP[i-1], b=LX_RAMP[i];
+    if(min<=b[0]){
+      const f=(min-a[0])/(b[0]-a[0]);
+      return [0,1,2].map(j=>Math.round(a[j+1]+(b[j+1]-a[j+1])*f));
+    }
+  }
+  return LX_RAMP[LX_RAMP.length-1].slice(1);
+}
+function lxAgeCss(min, alpha){
+  const c=lxAgeRGB(min);
+  return "rgba("+c[0]+","+c[1]+","+c[2]+","+(alpha==null ? 1 : alpha)+")";
+}
+const LX_BUCKET_MS = 30000;                      // un colore ogni 30 s di eta'
+const LX_COLORS = Array.from({length:121},(_,i)=>lxAgeCss(i*0.5));
+const LX_COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
+const LX_TITLE = document.title;
+const LX_OPT_IDS = ["lxWindow","lxRings","lxAlertOn","lxAlertKm","lxBeep","lxSta","lxCells","lxStatsOn"];
+const LX_MAX = 15000;                            // tetto lato browser (piu' istanze del relay)
+
+const LX = {
+  ws:null, wsOpen:false, wanted:false, reconnectDelay:2000, reconnectTimer:null, retryAt:0,
+  lostAt:0,                  // da quando non riceviamo piu' (0 = collegati)
+  byKey:new Map(), list:[],  // list ordinata per t crescente
+  inst:null,                 // istanza del relay (cambia se il Durable Object riparte)
+  skew:0,                    // orologio del server - orologio locale, ms
+  coverage:[], connected:false, fieldsSeen:null, sigSeen:0, strikeBase:0, sigLive:0, freshLive:0,
+  latency:null, bufferMs:3600000, bounds:null, version:null, backfilling:false,
+  selected:null, flashes:[], rafOn:false, placingRef:false, ref:LX_DEFAULT_REF,
+  lastBeep:0, lastAlertBeep:0, alert:null, cells:[], cellsAt:0, lats:[], dirty:true,
+};
+function lxNow(){ return Date.now()+LX.skew; }
+let lxBase=null;                                 // canvas fuori schermo: tutto tranne i lampi animati
+
+// ---- geometria e formati ----
+function lxRad(d){ return d*Math.PI/180; }
+function lxHav(lat1,lon1,lat2,lon2){
+  const dLat=lxRad(lat2-lat1), dLon=lxRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(lxRad(lat1))*Math.cos(lxRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*LX_R*Math.asin(Math.min(1,Math.sqrt(a)));
+}
+function lxBrg(lat1,lon1,lat2,lon2){
+  const p1=lxRad(lat1), p2=lxRad(lat2), dl=lxRad(lon2-lon1);
+  const y=Math.sin(dl)*Math.cos(p2), x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+// Punto a "km" dal punto dato lungo la rotta iniziale "brg": con brg fisso
+// segue il cerchio massimo, quindi serve anche per le linee verso le stazioni.
+function lxDest(lat,lon,brg,km){
+  const d=km/LX_R, b=lxRad(brg), p1=lxRad(lat), l1=lxRad(lon);
+  const p2=Math.asin(Math.sin(p1)*Math.cos(d)+Math.cos(p1)*Math.sin(d)*Math.cos(b));
+  const l2=l1+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(p1), Math.cos(d)-Math.sin(p1)*Math.sin(p2));
+  return { lat:p2*180/Math.PI, lon:((l2*180/Math.PI+540)%360)-180 };
+}
+function lxCompass(b){ return LX_COMPASS[Math.round(b/22.5)%16]; }
+function lxNum(v,dec){ return v.toFixed(dec).replace(".",","); }
+function lxFmtAge(ms){
+  const s=Math.max(0,Math.floor(ms/1000));
+  if(s<60) return s+" s fa";
+  if(s<3600) return Math.floor(s/60)+" min "+(s%60)+" s fa";
+  return Math.floor(s/3600)+" h "+Math.floor((s%3600)/60)+" min fa";
+}
+function lxClock(t){ return new Date(t).toLocaleTimeString("it-IT"); }
+function lxClockMs(t){ return lxClock(t)+","+String(((t%1000)+1000)%1000).padStart(3,"0"); }
+const LX_ESC = {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"};
+function lxEsc(s){ return String(s).replace(/[&<>"']/g, c=>LX_ESC[c]); }
+function lxLat(v){ return lxNum(Math.abs(v),4)+"° "+(v>=0 ? "N" : "S"); }
+function lxLon(v){ return lxNum(Math.abs(v),4)+"° "+(v>=0 ? "E" : "O"); }
+function lxPct(x){ return Math.round(x*100)+"%"; }
+function lxFinite(v){ return (typeof v==="number" && isFinite(v)) ? v : undefined; }
+function lxRefLabel(cap){
+  const t=LX.ref.def ? "da "+LX.ref.name : "dal tuo punto";
+  return cap ? t.charAt(0).toUpperCase()+t.slice(1) : t;
+}
+// Stessa regola di lightningTimeMs in index.js (serve solo per i messaggi
+// vecchio formato, che portano "time" grezzo invece di "t" gia' in ms).
+function lxTimeMs(v,fallbackMs){
+  const n=Number(v);
+  if(!isFinite(n) || n<=0) return fallbackMs;
+  let ms;
+  if(n>1e17) ms=n/1e6; else if(n>1e14) ms=n/1e3; else if(n>1e11) ms=n; else if(n>1e8) ms=n*1e3;
+  else return fallbackMs;
+  ms=Math.round(ms);
+  if(ms<fallbackMs-6*3600*1000 || ms>fallbackMs+10*60*1000) return fallbackMs;
+  return ms;
+}
+// Identita' di una scarica indipendente dall'istanza del relay: serve a non
+// duplicarla quando lo storico viene rimandato dopo una riconnessione.
+function lxKey(s){ return s.t+":"+s.lat.toFixed(4)+":"+s.lon.toFixed(4); }
+// Righe stazione [sta, lat, lon, alt, status, ritardo ns]: solo numeri, al
+// massimo 60, scartate quelle senza posizione valida.
+function lxCleanSig(a){
+  if(!Array.isArray(a)) return undefined;
+  const out=[];
+  for(const r of a){
+    if(out.length>=60) break;
+    if(!Array.isArray(r)) continue;
+    const row=r.slice(0,6);
+    while(row.length<6) row.push(null);
+    for(let i=0;i<6;i++) if(!(typeof row[i]==="number" && isFinite(row[i]))) row[i]=null;
+    if(row[1]==null || row[2]==null || Math.abs(row[1])>90 || Math.abs(row[2])>180) continue;
+    out.push(row);
+  }
+  return out;
+}
+function lxNorm(o,inst){
+  if(!o || typeof o.lat!=="number" || typeof o.lon!=="number" || !isFinite(o.lat) || !isFinite(o.lon)
+     || Math.abs(o.lat)>90 || Math.abs(o.lon)>180) return null;
+  const t=(typeof o.t==="number" && isFinite(o.t)) ? Math.round(o.t) : lxTimeMs(o.time, lxNow());
+  const s={ lat:o.lat, lon:o.lon, t, rx:(typeof o.rx==="number" && isFinite(o.rx)) ? o.rx : t,
+            id:Number.isInteger(o.id) ? o.id : null, inst };
+  for(const k of ["alt","pol","mds","mcg","st","reg","dly","n"]){ const v=lxFinite(o[k]); if(v!==undefined) s[k]=v; }
+  const sig=lxCleanSig(o.sig);
+  if(sig!==undefined) s.sig=sig;
+  return s;
+}
+function lxValidBounds(b){
+  if(!b || typeof b!=="object") return null;
+  for(const k of ["latMin","latMax","lonMin","lonMax"]) if(!(typeof b[k]==="number" && isFinite(b[k]))) return null;
+  return (b.latMin<b.latMax && b.lonMin<b.lonMax) ? {latMin:b.latMin, latMax:b.latMax, lonMin:b.lonMin, lonMax:b.lonMax} : null;
+}
+
+// ---- collegamento al relay ----
+function lxSetStatus(t){ $("liveLightningStatus").textContent=t; }
+function lxConnect(){
+  LX.wanted=true;
+  clearTimeout(LX.reconnectTimer); LX.reconnectTimer=null;
+  lxUpdateStats(); lxAlertFromHistory(); LX.dirty=true; lxRender();
+  if(LX.ws) return;
+  lxSetStatus("connessione…");
   let ws;
-  try{ ws = new WebSocket(wsUrlFromApi()); }
-  catch(_){ $("liveLightningStatus").textContent="non disponibile in questo browser"; return; }
-  liveWs = ws;
-  ws.onopen = () => { $("liveLightningStatus").textContent="🟢 live — in ascolto"; liveReconnectDelay=2000; };
-  ws.onmessage = (ev) => {
+  try{ ws=new WebSocket(wsUrlFromApi()); }
+  catch(_){ lxSetStatus("non disponibile in questo browser"); return; }
+  LX.ws=ws;
+  ws.onopen=()=>{
+    if(LX.ws!==ws) return;
+    LX.wsOpen=true; LX.reconnectDelay=2000;
+    lxSetStatus("🟢 collegato — ricevo lo storico…");
+  };
+  ws.onmessage=ev=>{
+    if(LX.ws!==ws) return;
     let d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
-    if(typeof d.lat!=="number" || typeof d.lon!=="number") return;
-    liveStrikes.push({ lat:d.lat, lon:d.lon, t:performance.now() });
-    ensureLiveAnim();
-    // Bip solo se la scarica cade nella vista corrente: altrimenti, con
-    // tutta l'area coperta dalle tessere geohash (ben piu' larga della
-    // vista tipica), sarebbe un bip quasi continuo e inutile.
-    if(d.lat>=view.latMin && d.lat<=view.latMax && d.lon>=view.lonMin && d.lon<=view.lonMax)
-      beep(1500, 90);   // piu' acuto/corto del bip satellitare (880Hz/140ms): si riconoscono ad orecchio
+    if(d && typeof d==="object") lxOnMessage(d);
   };
-  ws.onclose = ws.onerror = () => {
-    liveWs=null;
-    if(!liveWanted) return;
-    $("liveLightningStatus").textContent="riconnessione…";
-    setTimeout(()=>{ if(liveWanted) connectLiveLightning(); }, liveReconnectDelay);
-    liveReconnectDelay = Math.min(liveReconnectDelay*2, 30000);
+  const lost=()=>{
+    if(LX.ws!==ws) return;                       // socket gia' sostituito o chiuso da noi
+    if(LX.wsOpen || !LX.lostAt) LX.lostAt=lxNow();
+    LX.ws=null; LX.wsOpen=false; LX.backfilling=false;
+    for(const s of LX.list) if(s.sigPending) s.sigPending=false;
+    if(LX.selected) lxRenderInfo();
+    if(!LX.wanted) return;
+    const delay=LX.reconnectDelay;
+    LX.reconnectDelay=Math.min(LX.reconnectDelay*2,30000);
+    LX.retryAt=Date.now()+delay;
+    LX.reconnectTimer=setTimeout(()=>{ LX.reconnectTimer=null; if(LX.wanted) lxConnect(); }, delay);
+    lxRetryText(); lxUpdateStats();
   };
+  ws.onclose=lost; ws.onerror=lost;
 }
-function disconnectLiveLightning(){
-  liveWanted = false;
-  if(liveWs){ try{ liveWs.close(); }catch(_){} liveWs=null; }
-  $("liveLightningStatus").textContent="";
+function lxRetryText(){
+  const s=Math.max(0,Math.ceil((LX.retryAt-Date.now())/1000));
+  lxSetStatus("🟠 collegamento perso — riprovo tra "+s+" s");
 }
-function ensureLiveAnim(){
-  if(liveAnimTimer) return;
-  liveAnimTimer=setInterval(()=>{
-    const now=performance.now();
-    liveStrikes=liveStrikes.filter(s=>now-s.t<3000);
-    draw();
-    if(!liveStrikes.length){ clearInterval(liveAnimTimer); liveAnimTimer=null; }
-  }, 80);
+// Lo storico resta in memoria: riaccendendo, il relay rimanda l'ultima ora e
+// i doppioni si riconoscono da lxKey.
+function lxDisconnect(){
+  LX.wanted=false;
+  clearTimeout(LX.reconnectTimer); LX.reconnectTimer=null;
+  const ws=LX.ws;
+  if(ws){
+    if(LX.wsOpen) LX.lostAt=lxNow();
+    LX.ws=null;
+    try{ ws.close(); }catch(_){}
+  }
+  LX.wsOpen=false; LX.backfilling=false;
+  for(const s of LX.list) if(s.sigPending) s.sigPending=false;
+  LX.alert=null; lxShowAlert(); lxCloseInfo();
+  LX.flashes.length=0;
+  lxSetStatus("");
+  lxRender(); lxUpdateStats();
 }
-function drawLiveStrikes(){
-  if(!liveStrikes.length) return;
-  const now=performance.now();
-  for(const s of liveStrikes){
-    if(s.lat<view.latMin||s.lat>view.latMax||s.lon<view.lonMin||s.lon>view.lonMax) continue;
-    const age=(now-s.t)/3000;                       // 0 = appena arrivato, 1 = da rimuovere
-    const x=lonToX(s.lon), y=latToY(s.lat);
-    ctx.save();
-    ctx.globalAlpha=Math.max(0,1-age);
-    ctx.strokeStyle="#fff35c"; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(x,y,4+age*18,0,Math.PI*2); ctx.stroke();  // anello che si espande e svanisce
-    ctx.fillStyle="#fff35c";
-    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();           // punto esatto della scarica
-    ctx.restore();
+function lxStatusLive(){
+  if(!LX.wsOpen) return;
+  if(LX.backfilling) lxSetStatus("🟢 collegato — ricevo lo storico…");
+  else if(!LX.connected) lxSetStatus("🟡 relay non ancora sul broker — attendo…");
+  else lxSetStatus("🟢 live · "+LX.list.length+" scariche nello storico");
+}
+// Tratti di copertura (relay collegato al broker). Quelli di un'istanza
+// precedente ancora "aperti" si chiudono quando abbiamo smesso di ricevere.
+function lxMergeCoverage(inst,cov){
+  const now=lxNow(), keep=[];
+  for(const c of LX.coverage){
+    if(c.inst===inst) continue;
+    keep.push(c.to==null ? {inst:c.inst, from:c.from, to:LX.lostAt||now} : c);
+  }
+  if(Array.isArray(cov)) for(const c of cov){
+    if(!c || typeof c.from!=="number" || !isFinite(c.from)) continue;
+    keep.push({inst, from:c.from, to:(typeof c.to==="number" && isFinite(c.to)) ? c.to : null});
+  }
+  keep.sort((a,b)=>a.from-b.from);
+  LX.coverage=keep;
+}
+function lxOnMessage(d){
+  if(d.type==="hello"){
+    if(typeof d.now==="number" && isFinite(d.now)) LX.skew=d.now-Date.now();
+    LX.inst=typeof d.inst==="string" ? d.inst : null;
+    LX.version=typeof d.version==="string" ? d.version : null;
+    LX.connected=!!d.connected;
+    LX.bounds=lxValidBounds(d.bounds);
+    if(typeof d.bufferMs==="number" && d.bufferMs>0) LX.bufferMs=Math.min(d.bufferMs, 6*3600000);
+    LX.fieldsSeen=(d.fieldsSeen && typeof d.fieldsSeen==="object") ? d.fieldsSeen : null;
+    LX.sigSeen=lxFinite(d.sigSeen)||0;
+    LX.strikeBase=lxFinite(d.strikeCount)||0;
+    LX.sigLive=0; LX.freshLive=0;
+    LX.latency=(d.latency && typeof d.latency.p50==="number" && typeof d.latency.p90==="number") ? d.latency : null;
+    lxMergeCoverage(LX.inst, d.coverage);
+    LX.lostAt=0;
+    LX.backfilling=true;
+    LX.dirty=true;
+    lxStatusLive();
+  } else if(d.type==="backfill"){
+    const cols=Array.isArray(d.cols) ? d.cols : [];
+    if(Array.isArray(d.strikes)) for(const row of d.strikes){
+      if(!Array.isArray(row)) continue;
+      const o=Object.create(null);
+      for(let i=0;i<cols.length && i<row.length;i++) if(typeof cols[i]==="string" && row[i]!=null) o[cols[i]]=row[i];
+      const s=lxNorm(o, LX.inst);
+      if(s) lxAddStrike(s,false);
+    }
+    if(d.done){
+      LX.backfilling=false;
+      lxPrune(); lxAlertFromHistory(); lxComputeCells(); lxStatusLive(); lxUpdateStats();
+    }
+    lxRender();
+  } else if(d.type==="strike"){
+    const s=lxNorm(d, LX.inst);
+    if(!s) return;
+    LX.freshLive++;
+    if(s.sig && s.sig.length) LX.sigLive++;
+    lxAddStrike(s,true);
+  } else if(d.type==="state"){
+    LX.connected=!!d.connected;
+    lxMergeCoverage(LX.inst, d.coverage);
+    lxStatusLive(); lxUpdateStats();
+  } else if(d.type==="detail"){
+    const s=LX.list.find(x=>x.inst===LX.inst && x.id===d.id);
+    if(!s) return;
+    s.sigPending=false;
+    if(d.missing) s.sigMissing=true;
+    else if(d.strike && typeof d.strike==="object"){
+      const sig=lxCleanSig(d.strike.sig);
+      if(sig===undefined) s.sigMissing=true; else s.sig=sig;
+      const n=lxFinite(d.strike.n); if(n!==undefined) s.n=n;
+    }
+    if(LX.selected===s){ lxRenderInfo(); LX.dirty=true; lxRender(); }
+  } else if(d.type===undefined && typeof d.lat==="number"){
+    // relay di vecchia versione (solo lat/lon/time): si mostra comunque
+    const s=lxNorm({lat:d.lat, lon:d.lon, t:lxTimeMs(d.time, lxNow())}, null);
+    if(s){ LX.freshLive++; lxAddStrike(s,true); }
   }
 }
+function lxAddStrike(s,fresh){
+  const key=lxKey(s), old=LX.byKey.get(key);
+  if(old){
+    if(s.inst && s.inst===LX.inst && old.inst!==s.inst){ old.inst=s.inst; old.id=s.id; old.sigMissing=false; }
+    if(s.sig && !old.sig) old.sig=s.sig;
+    if(s.n!=null && old.n==null) old.n=s.n;
+    return;
+  }
+  s.key=key;
+  const L=LX.list;
+  let lo=0, hi=L.length;
+  while(lo<hi){ const m=(lo+hi)>>1; if(L[m].t<=s.t) lo=m+1; else hi=m; }
+  L.splice(lo,0,s);
+  LX.byKey.set(key,s);
+  if(L.length>LX_MAX){
+    const drop=L.splice(0,L.length-LX_MAX);
+    for(const x of drop){ LX.byKey.delete(x.key); if(x===LX.selected) lxCloseInfo(); }
+  }
+  LX.dirty=true;
+  if(fresh) lxOnFresh(s);
+}
+function lxOnFresh(s){
+  if(s.t!==s.rx){ LX.lats.push(s.rx-s.t); if(LX.lats.length>200) LX.lats.shift(); }
+  if(!document.hidden && lxInView(s)){
+    LX.flashes.push({lat:s.lat, lon:s.lon, at:performance.now()});
+    if(LX.flashes.length>150) LX.flashes.shift();
+    lxEnsureRaf();
+  }
+  lxBeepFor(s);
+  lxCheckAlert(s,true);
+}
+function lxInView(s){
+  if($("globe").checked) return !!lxProjector()(s.lat,s.lon);
+  return s.lat>=view.latMin && s.lat<=view.latMax && s.lon>=view.lonMin && s.lon<=view.lonMax;
+}
+
+// ---- bip e allerta di vicinanza ----
+// Bip solo per le scariche nella vista: con tutto il Nord Italia coperto
+// sarebbe un bip quasi continuo. Piu' acuto = piu' vicina al riferimento.
+function lxBeepFor(s){
+  if(!$("lxBeep").checked || !lxInView(s)) return;
+  const now=performance.now();
+  if(now-LX.lastBeep<120) return;
+  LX.lastBeep=now;
+  const d=lxHav(LX.ref.lat,LX.ref.lon,s.lat,s.lon);
+  beep(Math.round(2000-Math.min(1,d/150)*1300), 80);
+}
+// L'allerta ha il suo doppio bip grave, indipendente dal bip per scarica, al
+// massimo ogni 20 s; resta visibile 10 minuti dall'ultima scarica vicina.
+function lxCheckAlert(s,fresh){
+  if(!$("lxAlertOn").checked) return false;
+  if(lxNow()-s.t>600000) return false;
+  const d=lxHav(LX.ref.lat,LX.ref.lon,s.lat,s.lon);
+  if(d>+$("lxAlertKm").value) return false;
+  if(!LX.alert || s.t>=LX.alert.s.t){
+    LX.alert={ s, d, brg:lxBrg(LX.ref.lat,LX.ref.lon,s.lat,s.lon), until:s.t+600000 };
+    lxShowAlert();
+  }
+  if(fresh){
+    const now=Date.now();
+    if(now-LX.lastAlertBeep>=20000){
+      LX.lastAlertBeep=now;
+      beep(620,160); setTimeout(()=>beep(620,160),220);
+    }
+  }
+  return true;
+}
+function lxShowAlert(){
+  const el=$("lxAlert");
+  if(LX.alert && (!$("liveLightning").checked || !$("lxAlertOn").checked || lxNow()>LX.alert.until)) LX.alert=null;
+  const a=LX.alert;
+  if(!a){
+    el.classList.remove("on"); el.textContent="";
+    if(document.title!==LX_TITLE) document.title=LX_TITLE;
+    return;
+  }
+  el.textContent="⚠ Fulmine a "+lxNum(a.d,1)+" km "+lxCompass(a.brg)+" "+lxRefLabel(false)+" · "+lxClock(a.s.t)+" ("+lxFmtAge(lxNow()-a.s.t)+")";
+  el.classList.add("on");
+  document.title="⚡ "+Math.round(a.d)+" km · "+LX_TITLE;
+}
+function lxAlertFromHistory(){
+  LX.alert=null;
+  if($("lxAlertOn").checked && $("liveLightning").checked){
+    const cut=lxNow()-600000;
+    for(let i=LX.list.length-1;i>=0;i--){
+      const s=LX.list[i];
+      if(s.t<cut) break;
+      if(lxCheckAlert(s,false)) break;           // la piu' recente vince
+    }
+  }
+  lxShowAlert();
+}
+
+// ---- storico e copertura ----
+function lxPrune(){
+  const cut=lxNow()-LX.bufferMs, L=LX.list;
+  let n=0;
+  while(n<L.length && L[n].t<cut) n++;
+  if(n>0){
+    for(let i=0;i<n;i++){ LX.byKey.delete(L[i].key); if(L[i]===LX.selected) lxCloseInfo(); }
+    L.splice(0,n);
+    LX.dirty=true;
+  }
+  const now=lxNow();
+  LX.coverage=LX.coverage.filter(c=>(c.to==null ? now : c.to)>=cut);
+}
+// Frazione dell'intervallo [a,b] in cui avevamo davvero dati (relay sul
+// broker E noi collegati al relay). Sotto il 90% i conteggi non sono affidabili.
+function lxCovered(a,b){
+  if(b<=a) return 1;
+  const openEnd=LX.wsOpen ? lxNow() : (LX.lostAt||lxNow());
+  const segs=[];
+  for(const c of LX.coverage){
+    const x=Math.max(a,c.from), y=Math.min(b, c.to==null ? openEnd : c.to);
+    if(y>x) segs.push([x,y]);
+  }
+  segs.sort((p,q)=>p[0]-q[0]);
+  let tot=0, ca=null, cb=null;
+  for(const g of segs){
+    if(cb===null || g[0]>cb){ if(cb!==null) tot+=cb-ca; ca=g[0]; cb=g[1]; }
+    else if(g[1]>cb) cb=g[1];
+  }
+  if(cb!==null) tot+=cb-ca;
+  return tot/(b-a);
+}
+
+// ---- disegno ----
+function lxProjector(){
+  if($("globe").checked){
+    const p=globeParams(), R2=p.R*p.R*1.0001;
+    return (lat,lon)=>{
+      const q=geoToGlobe(lat,lon,p);
+      if(!q) return null;
+      const dx=q.x-p.cx, dy=q.y-p.cy;
+      return dx*dx+dy*dy<=R2 ? q : null;       // fuori dal disco = non visibile
+    };
+  }
+  return (lat,lon)=>({ x:lonToX(lon), y:latToY(lat) });
+}
+function lxTrace(c,P,pts,close){
+  c.beginPath();
+  let started=false, all=true;
+  for(const g of pts){
+    const q=P(g.lat,g.lon);
+    if(!q){ started=false; all=false; continue; }
+    if(!started){ c.moveTo(q.x,q.y); started=true; } else c.lineTo(q.x,q.y);
+  }
+  if(close && all) c.closePath();
+}
+function lxBoxPts(b){
+  const pts=[], N=24;
+  for(let i=0;i<=N;i++) pts.push({lat:b.latMax, lon:b.lonMin+(b.lonMax-b.lonMin)*i/N});
+  for(let i=1;i<=N;i++) pts.push({lat:b.latMax-(b.latMax-b.latMin)*i/N, lon:b.lonMax});
+  for(let i=1;i<=N;i++) pts.push({lat:b.latMin, lon:b.lonMax-(b.lonMax-b.lonMin)*i/N});
+  for(let i=1;i<=N;i++) pts.push({lat:b.latMin+(b.latMax-b.latMin)*i/N, lon:b.lonMin});
+  return pts;
+}
+function lxCirclePts(lat,lon,km){
+  const pts=[];
+  for(let a=0;a<=360;a+=6) pts.push(lxDest(lat,lon,a,km));
+  return pts;
+}
+// full=false (animazione dei lampi): si ridisegna la base solo se e' cambiato
+// qualcosa; il resto del tempo e' una copia del canvas fuori schermo.
+function lxRender(full=true){
+  const W=lxCv.width, H=lxCv.height;
+  lxCtx.clearRect(0,0,W,H);
+  if(!$("liveLightning").checked){ LX.flashes.length=0; return; }
+  if(!W || !H) return;
+  if(!lxBase){ lxBase=document.createElement("canvas"); full=true; }
+  if(lxBase.width!==W || lxBase.height!==H){ lxBase.width=W; lxBase.height=H; full=true; }
+  if(full || LX.dirty){
+    const b=lxBase.getContext("2d");
+    b.clearRect(0,0,W,H);
+    lxDrawBase(b,W,H);
+    LX.dirty=false;
+  }
+  lxCtx.drawImage(lxBase,0,0);
+  lxDrawFlashes(lxCtx);
+}
+function lxDrawBase(c,W,H){
+  const dpr=window.devicePixelRatio||1, P=lxProjector(), ref=LX.ref, now=lxNow();
+  c.save();
+  if($("globe").checked){ const p=globeParams(); c.beginPath(); c.arc(p.cx,p.cy,p.R,0,Math.PI*2); c.clip(); }
+  c.font=(10.5*dpr)+"px 'Segoe UI',sans-serif";
+  c.lineJoin="round";
+  // area del feed (quella dichiarata dal relay)
+  if(LX.bounds){
+    c.setLineDash([6*dpr,5*dpr]); c.strokeStyle="rgba(226,179,56,.55)"; c.lineWidth=1.2*dpr;
+    lxTrace(c,P,lxBoxPts(LX.bounds),true); c.stroke(); c.setLineDash([]);
+    const q=P(LX.bounds.latMax, LX.bounds.lonMin);
+    if(q){ c.fillStyle="rgba(226,179,56,.85)"; c.fillText("area feed (le tessere sono più larghe)", q.x+4*dpr, q.y-4*dpr); }
+  }
+  // cerchi di distanza dal riferimento
+  if($("lxRings").checked){
+    c.strokeStyle="rgba(56,206,226,.45)"; c.lineWidth=1*dpr; c.fillStyle="rgba(56,206,226,.85)";
+    for(const km of [10,25,50]){
+      lxTrace(c,P,lxCirclePts(ref.lat,ref.lon,km),true); c.stroke();
+      const n=lxDest(ref.lat,ref.lon,0,km), q=P(n.lat,n.lon);
+      if(q) c.fillText(km+" km", q.x+3*dpr, q.y-3*dpr);
+    }
+  }
+  // celle temporalesche: area, conteggio, freccia = dove sara' fra 30 min
+  if($("lxCells").checked){
+    for(const cell of LX.cells){
+      c.setLineDash([4*dpr,4*dpr]); c.strokeStyle="rgba(255,120,60,.8)"; c.lineWidth=1.3*dpr;
+      lxTrace(c,P,lxCirclePts(cell.lat,cell.lon,cell.r),true); c.stroke(); c.setLineDash([]);
+      const q=P(cell.lat,cell.lon);
+      if(!q) continue;
+      c.fillStyle="rgba(255,170,120,.95)";
+      c.fillText(cell.n+" in 10'", q.x+5*dpr, q.y-5*dpr);
+      if(cell.v==null) continue;
+      const e=lxDest(cell.lat,cell.lon,cell.brg,cell.v*0.5), qe=P(e.lat,e.lon);
+      if(!qe) continue;
+      c.strokeStyle="rgba(255,120,60,.95)"; c.lineWidth=2*dpr;
+      c.beginPath(); c.moveTo(q.x,q.y); c.lineTo(qe.x,qe.y); c.stroke();
+      const ang=Math.atan2(qe.y-q.y, qe.x-q.x), h=7*dpr;
+      c.beginPath(); c.moveTo(qe.x,qe.y);
+      c.lineTo(qe.x-h*Math.cos(ang-0.45), qe.y-h*Math.sin(ang-0.45));
+      c.lineTo(qe.x-h*Math.cos(ang+0.45), qe.y-h*Math.sin(ang+0.45));
+      c.closePath(); c.fillStyle="rgba(255,120,60,.95)"; c.fill();
+    }
+  }
+  // linee verso le stazioni della scarica selezionata (cerchio massimo)
+  const sel=LX.selected;
+  if(sel && $("lxSta").checked && sel.sig && sel.sig.length){
+    c.strokeStyle="rgba(120,220,255,.35)"; c.lineWidth=1*dpr;
+    for(const r of sel.sig){
+      const tot=lxHav(sel.lat,sel.lon,r[1],r[2]), b=lxBrg(sel.lat,sel.lon,r[1],r[2]), pts=[];
+      for(let i=0;i<=16;i++) pts.push(lxDest(sel.lat,sel.lon,b,tot*i/16));
+      lxTrace(c,P,pts,false); c.stroke();
+    }
+    c.fillStyle="rgba(120,220,255,.9)";
+    for(const r of sel.sig){ const q=P(r[1],r[2]); if(q) c.fillRect(q.x-2*dpr,q.y-2*dpr,4*dpr,4*dpr); }
+  }
+  // scariche nella finestra scelta: raggruppate per colore (un path per
+  // gruppo di 30 s), dalle piu' vecchie alle piu' nuove, cosi' le recenti
+  // restano sopra
+  const cut=now-(+$("lxWindow").value||60)*60000, L=LX.list, m=10*dpr, buckets=[];
+  for(let i=L.length-1;i>=0;i--){
+    const s=L[i];
+    if(s.t<cut) break;
+    const q=P(s.lat,s.lon);
+    if(!q || q.x<-m || q.y<-m || q.x>W+m || q.y>H+m) continue;
+    const k=Math.max(0,Math.min(120,Math.floor((now-s.t)/LX_BUCKET_MS)));
+    (buckets[k]||(buckets[k]=[])).push(q);
+  }
+  const r=2.3*dpr;
+  c.lineWidth=0.8*dpr; c.strokeStyle="rgba(0,0,0,.55)";
+  for(let k=120;k>=0;k--){
+    const b=buckets[k];
+    if(!b) continue;
+    c.fillStyle=LX_COLORS[k];
+    c.beginPath();
+    for(const q of b){ c.moveTo(q.x+r,q.y); c.arc(q.x,q.y,r,0,Math.PI*2); }
+    c.fill(); c.stroke();
+  }
+  // croce bianca sulle scariche dell'ultimo minuto
+  const h=6*dpr;
+  c.strokeStyle="rgba(255,255,255,.95)"; c.lineWidth=1.3*dpr;
+  c.beginPath();
+  for(const k of [0,1]) if(buckets[k]) for(const q of buckets[k]){
+    c.moveTo(q.x-h,q.y); c.lineTo(q.x+h,q.y); c.moveTo(q.x,q.y-h); c.lineTo(q.x,q.y+h);
+  }
+  c.stroke();
+  if(sel){
+    const q=P(sel.lat,sel.lon);
+    if(q){ c.strokeStyle="#38cee2"; c.lineWidth=2*dpr; c.beginPath(); c.arc(q.x,q.y,8*dpr,0,Math.PI*2); c.stroke(); }
+  }
+  // punto di riferimento: rombo azzurro
+  const qr=P(ref.lat,ref.lon);
+  if(qr){
+    const d=6*dpr;
+    c.beginPath(); c.moveTo(qr.x,qr.y-d); c.lineTo(qr.x+d,qr.y); c.lineTo(qr.x,qr.y+d); c.lineTo(qr.x-d,qr.y); c.closePath();
+    c.fillStyle="rgba(56,206,226,.9)"; c.fill(); c.strokeStyle="#04121a"; c.lineWidth=1.2*dpr; c.stroke();
+  }
+  c.restore();
+}
+// Lampo: anello che si allarga e svanisce in 1,5 s sulla scarica appena arrivata.
+function lxDrawFlashes(c){
+  if(!LX.flashes.length) return;
+  const now=performance.now(), dpr=window.devicePixelRatio||1, P=lxProjector();
+  LX.flashes=LX.flashes.filter(f=>now-f.at<1500);
+  c.save();
+  if($("globe").checked){ const p=globeParams(); c.beginPath(); c.arc(p.cx,p.cy,p.R,0,Math.PI*2); c.clip(); }
+  c.strokeStyle="#fffbe0"; c.lineWidth=2*dpr;
+  for(const f of LX.flashes){
+    const q=P(f.lat,f.lon);
+    if(!q) continue;
+    const e=(now-f.at)/1500;
+    c.globalAlpha=Math.max(0,1-e);
+    c.beginPath(); c.arc(q.x,q.y,(5+28*e)*dpr,0,Math.PI*2); c.stroke();
+  }
+  c.restore();
+}
+function lxEnsureRaf(){
+  if(LX.rafOn) return;
+  LX.rafOn=true;
+  const step=()=>{
+    if(!LX.flashes.length || document.hidden || !$("liveLightning").checked){
+      LX.rafOn=false; LX.flashes.length=0; lxRender(false); return;
+    }
+    lxRender(false);
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// ---- clic: dettaglio della scarica o scelta del riferimento ----
+function lxClick(e){
+  const r=cv.getBoundingClientRect();
+  const dx=(e.clientX-r.left)*cv.width/r.width, dy=(e.clientY-r.top)*cv.height/r.height;
+  if(LX.placingRef){
+    const g=screenToLatLon(dx,dy);
+    if(!g) return;
+    const lon=((g.lon+540)%360)-180;
+    lxSetPlacing(false);
+    lxSetRef(Math.round(g.lat*1e4)/1e4, Math.round(lon*1e4)/1e4, "punto scelto sulla mappa");
+    return;
+  }
+  if(!$("liveLightning").checked) return;
+  const dpr=window.devicePixelRatio||1, P=lxProjector(), cut=lxNow()-(+$("lxWindow").value||60)*60000;
+  let best=null, bd=(10*dpr)*(10*dpr);
+  for(let i=LX.list.length-1;i>=0;i--){
+    const s=LX.list[i];
+    if(s.t<cut) break;
+    const q=P(s.lat,s.lon);
+    if(!q) continue;
+    const d2=(q.x-dx)*(q.x-dx)+(q.y-dy)*(q.y-dy);
+    if(d2<bd){ bd=d2; best=s; }
+  }
+  if(best) lxSelect(best);
+  else if(LX.selected){ lxCloseInfo(); lxRender(); }
+}
+// Le stazioni si chiedono al relay solo se servono: arrivano gia' con le
+// scariche live, mancano in quelle dello storico (troppo pesanti da mandare tutte).
+function lxSelect(s){
+  LX.selected=s;
+  if(!s.sig && s.n>0 && !s.sigMissing && !s.sigPending && s.inst && s.inst===LX.inst && s.id!=null && LX.ws && LX.wsOpen){
+    try{ LX.ws.send(JSON.stringify({type:"detail", id:s.id})); s.sigPending=true; }catch(_){}
+  }
+  LX.dirty=true;
+  lxRenderInfo(); lxRender();
+}
+function lxCloseInfo(){
+  LX.selected=null;
+  const el=$("lxInfo");
+  el.classList.remove("on"); el.innerHTML="";
+  LX.dirty=true;
+}
+function lxRenderInfo(){
+  const s=LX.selected, el=$("lxInfo");
+  if(!s){ el.classList.remove("on"); el.innerHTML=""; return; }
+  const ref=LX.ref, d=lxHav(ref.lat,ref.lon,s.lat,s.lon), b=lxBrg(ref.lat,ref.lon,s.lat,s.lon);
+  const rows=[], row=(k,v)=>rows.push("<tr><td class='k'>"+k+"</td><td>"+v+"</td></tr>");
+  const dt=new Date(s.t);
+  row("Ora locale", lxClockMs(s.t)+" · "+dt.toLocaleDateString("it-IT"));
+  row("Ora UTC", dt.toISOString().slice(11,23));
+  row("Età", "<span id='lxInfoAge'>"+lxFmtAge(lxNow()-s.t)+"</span>");
+  row("Posizione", lxLat(s.lat)+", "+lxLon(s.lon));
+  row(lxEsc(lxRefLabel(true)), lxNum(d,1)+" km "+lxCompass(b)+" ("+Math.round(b)+"°)");
+  row("Tuono", "~"+lxNum(d/0.343,0)+" s dopo il lampo"+(d>20 ? " (oltre ~20 km di solito non si sente)" : ""));
+  row("Stazioni", s.n!=null ? String(s.n) : "non fornito");
+  if(s.mds!=null) row("Scarto temporale max (mds)", lxNum(s.mds,0)+" ns");
+  if(s.mcg!=null) row("Buco angolare max (mcg)", lxNum(s.mcg,0)+"°");
+  if(s.pol!=null) row("Polarità", "codice "+s.pol+" (grezzo, non interpretato)");
+  if(s.st!=null || s.reg!=null) row("Stato / regione", (s.st!=null ? s.st : "–")+" / "+(s.reg!=null ? s.reg : "–")+" (codici grezzi)");
+  if(s.alt!=null) row("Quota", lxNum(s.alt,0)+" m");
+  if(s.dly!=null) row("Ritardo (dly)", lxNum(s.dly,1)+" (grezzo)");
+  if(s.rx!==s.t) row("Latenza (ricezione − lampo)", lxNum((s.rx-s.t)/1000,1)+" s");
+  row("Corrente di picco", "non fornita dal feed pubblico: la danno solo le reti commerciali (LINET, EUCLID…)");
+  let sta;
+  if(s.sig && s.sig.length){
+    const list=s.sig.map(x=>({ sta:x[0], km:lxHav(s.lat,s.lon,x[1],x[2]), dt:x[5] })).sort((p,q)=>p.km-q.km);
+    sta="<div class='k' style='margin-top:6px'>Stazioni che l'hanno captata: "+s.sig.length
+      +(s.n!=null && s.n>s.sig.length ? " (su "+s.n+", il relay ne tiene al massimo 60)" : "")+"</div>"
+      +"<div class='sta'><table><tr><td class='k'>#sta</td><td class='k n'>km</td><td class='k n'>Δt µs</td><td class='k n'>d/c µs</td></tr>";
+    for(const x of list){
+      sta+="<tr><td>"+(x.sta!=null ? lxEsc(x.sta) : "–")+"</td><td class='n'>"+lxNum(x.km,0)+"</td><td class='n'>"
+         +(x.dt!=null && Math.abs(x.dt)<1e9 ? lxNum(x.dt/1000,1) : "–")+"</td><td class='n'>"+lxNum(x.km/0.299792458,0)+"</td></tr>";
+    }
+    sta+="</table></div><div class='note'>Δt = ritardo d'arrivo alla stazione come lo manda il feed; d/c = tempo che la luce impiega a coprire quella distanza (se i due combaciano, Δt è davvero il tempo di volo). Interpretazione dal formato pubblico, non ancora verificata sul dato vero.</div>";
+  } else if(s.sigPending) sta="<div class='note'>Stazioni: chiedo al relay…</div>";
+  else if(s.sig) sta="<div class='note'>Stazioni: il feed ha mandato la lista ma senza posizioni valide.</div>";
+  else if(s.sigMissing) sta="<div class='note'>Stazioni: non più disponibili (il relay tiene la lista solo per le ultime 400 scariche).</div>";
+  else if(s.n>0) sta="<div class='note'>Stazioni: non disponibili (relay scollegato o riavviato).</div>";
+  else sta="<div class='note'>Stazioni: la lista non è arrivata col feed (il broker potrebbe non inoltrarla).</div>";
+  el.innerHTML="<button class='x' id='lxInfoX' title='Chiudi (Esc)'>✕</button><h3>⚡ Scarica"+(s.id!=null ? " #"+s.id : "")+"</h3>"
+    +"<table>"+rows.join("")+"</table>"+sta;
+  el.classList.add("on");
+  $("lxInfoX").onclick=()=>{ lxCloseInfo(); lxRender(); };
+  lxFitInfo();
+}
+// Il dettaglio sta in basso a destra, sotto le statistiche: l'altezza massima
+// si ricalcola perche' non ci finisca sopra (le statistiche cambiano altezza
+// col contenuto). Sotto i 180 px si accetta la sovrapposizione: meglio
+// leggibile e coperto che schiacciato a tre righe.
+function lxFitInfo(){
+  const el=$("lxInfo");
+  if(!el.classList.contains("on")) return;
+  const st=$("lxStats");
+  if(!st.classList.contains("on")){ el.style.maxHeight=""; return; }
+  const top=st.offsetTop+st.offsetHeight+8;
+  el.style.maxHeight=Math.max(180, $("stage").clientHeight-top-12)+"px";
+}
+
+// ---- pannello statistiche ----
+function lxQuant(a){
+  const b=a.slice().sort((x,y)=>x-y), q=p=>b[Math.min(b.length-1,Math.floor(p*b.length))];
+  return { samples:b.length, p50:q(0.5), p90:q(0.9) };
+}
+function lxUpdateStats(){
+  const on=$("liveLightning").checked && $("lxStatsOn").checked;
+  $("stage").classList.toggle("lxOn", on);
+  $("lxStats").classList.toggle("on", on);
+  if(!on){ lxFitInfo(); return; }
+  const now=lxNow(), L=LX.list, ref=LX.ref;
+  const spans=[60000,300000,900000,3600000], names=["ultimo min","ultimi 5 min","ultimi 15 min","ultima ora"];
+  const all=[0,0,0,0], inV=[0,0,0,0], hist=new Array(60).fill(0);
+  let prev5=0, near=null, nearD=Infinity, thunder=null;
+  const globeOn=$("globe").checked, P=globeOn ? lxProjector() : null;
+  for(let i=L.length-1;i>=0;i--){
+    const s=L[i], a=Math.max(0,now-s.t);
+    if(a>3600000) break;
+    const vis=globeOn ? !!P(s.lat,s.lon) : (s.lat>=view.latMin && s.lat<=view.latMax && s.lon>=view.lonMin && s.lon<=view.lonMax);
+    for(let j=0;j<4;j++) if(a<=spans[j]){ all[j]++; if(vis) inV[j]++; }
+    hist[Math.min(59,Math.floor(a/60000))]++;
+    if(a>300000 && a<=600000) prev5++;
+    if(a<=600000){
+      const d=lxHav(ref.lat,ref.lon,s.lat,s.lon);
+      if(d<nearD){ nearD=d; near=s; }
+      if(a<=120000 && d<=25){
+        const arr=s.t+d/0.343*1000;              // quando arriva il tuono
+        if(arr>now && (!thunder || arr<thunder.arr)) thunder={arr,d};
+      }
+    }
+  }
+  let tab="<tr><td class='k'></td><td class='k n'>tutto il feed</td><td class='k n'>in vista</td></tr>";
+  for(let j=0;j<4;j++) tab+="<tr><td class='k'>"+names[j]+"</td><td class='n'>"+all[j]+"</td><td class='n'>"+inV[j]+"</td></tr>";
+  $("lxStTab").innerHTML=tab;
+  const cov5=lxCovered(now-300000,now), cov10=lxCovered(now-600000,now);
+  let rate;
+  if(cov5<0.9) rate="Frequenza: storico insufficiente (relay collegato da poco)";
+  else {
+    let trend="";
+    if(cov10>=0.9){
+      const q=all[1]/Math.max(1,prev5);
+      trend=(all[1]===0 && prev5===0) ? " ● stabile" : q>1.3 ? " ▲ in aumento" : q<0.7 ? " ▼ in calo" : " ● stabile";
+    }
+    rate="Frequenza: "+lxNum(all[1]/5,1)+"/min (5 min)"+trend;
+  }
+  $("lxStRate").textContent=rate;
+  lxDrawHist(hist,now);
+  $("lxCovTxt").textContent="copertura "+lxPct(lxCovered(now-3600000,now));
+  $("lxStState").textContent=LX.wsOpen ? (LX.connected ? "● live" : "○ in attesa") : "○ scollegato";
+  const more=[];
+  if(near) more.push("Più vicina "+lxRefLabel(false)+": "+lxNum(nearD,1)+" km "+lxCompass(lxBrg(ref.lat,ref.lon,near.lat,near.lon))+", "+lxFmtAge(now-near.t));
+  else more.push("Nessuna scarica registrata negli ultimi 10 min"+(cov10<0.9 ? " (ma lo storico ne copre solo il "+lxPct(cov10)+")" : ""));
+  if(thunder) more.push("🔊 Tuono in arrivo tra ~"+Math.max(1,Math.round((thunder.arr-now)/1000))+" s ("+lxNum(thunder.d,1)+" km)");
+  const lat=LX.lats.length>=5 ? lxQuant(LX.lats) : LX.latency;
+  if(lat) more.push("Ritardo del feed: mediana "+lxNum(lat.p50/1000,1)+" s, 90% entro "+lxNum(lat.p90/1000,1)+" s");
+  const sg=LX.sigSeen+LX.sigLive, tot=LX.strikeBase+LX.freshLive;
+  if(tot>0) more.push("Lista stazioni nel feed: "+sg+" su "+tot+(sg===0 && tot>=20 ? " (il broker non la inoltra)" : ""));
+  let bc=null, bcd=Infinity;
+  for(const c of LX.cells){ const d=lxHav(ref.lat,ref.lon,c.lat,c.lon); if(d<bcd){ bcd=d; bc=c; } }
+  if(bc){
+    let t="Cella più vicina: "+lxNum(bcd,0)+" km "+lxCompass(lxBrg(ref.lat,ref.lon,bc.lat,bc.lon))+", "+bc.n+" scariche in 10 min";
+    if(bc.v==null) t+=" (movimento: serve più storico)";
+    else if(bc.v<5) t+=", quasi ferma (stima grezza)";
+    else {
+      t+=", va verso "+lxCompass(bc.brg)+" a ~"+Math.round(bc.v)+" km/h";
+      // componente del moto verso il riferimento: se ci punta contro e ci
+      // passa abbastanza vicino, tempo al passaggio piu' vicino
+      const ang=lxRad(lxBrg(bc.lat,bc.lon,ref.lat,ref.lon)-bc.brg);
+      const along=bcd*Math.cos(ang), cross=Math.abs(bcd*Math.sin(ang));
+      if(along>0 && cross<=Math.max(10,bc.r)) t+=": se non cambia rotta, arriva tra ~"+Math.max(1,Math.round(along/bc.v*60))+" min";
+      t+=" (stima grezza)";
+    }
+    more.push(t);
+  }
+  $("lxStMore").innerHTML=more.map(x=>"<div>"+lxEsc(x)+"</div>").join("");
+  lxFitInfo();
+}
+function lxDrawHist(hist,now){
+  const hc=$("lxHist"), dpr=window.devicePixelRatio||1;
+  const w=Math.round(hc.clientWidth*dpr), h=Math.round(hc.clientHeight*dpr);
+  if(!w || !h) return;
+  if(hc.width!==w || hc.height!==h){ hc.width=w; hc.height=h; }
+  const g=hc.getContext("2d");
+  g.clearRect(0,0,w,h);
+  const strip=3*dpr, top=12*dpr, base=h-strip-2*dpr, bw=w/60;
+  let max=0;
+  for(const v of hist) if(v>max) max=v;
+  for(let b=0;b<60;b++){
+    const v=hist[b];
+    if(!v) continue;
+    const bh=Math.max(1,(base-top)*v/max);
+    g.fillStyle=LX_COLORS[Math.min(120,b*2)];
+    g.fillRect((59-b)*bw+0.5, base-bh, Math.max(1,bw-1), bh);
+  }
+  // striscia di copertura: verde = dati completi, giallo = in parte, grigio = nessun dato
+  for(let b=0;b<60;b++){
+    const cv1=lxCovered(now-(b+1)*60000, now-b*60000);
+    g.fillStyle=cv1>0.95 ? "rgba(79,208,138,.9)" : cv1>0.05 ? "rgba(226,179,56,.9)" : "rgba(148,160,170,.35)";
+    g.fillRect((59-b)*bw, h-strip, Math.ceil(bw), strip);
+  }
+  g.fillStyle="rgba(148,160,170,.9)";
+  g.font=(9.5*dpr)+"px 'Segoe UI',sans-serif";
+  g.fillText("max "+max+"/min", 2*dpr, 9*dpr);
+}
+
+// ---- celle temporalesche (stima grezza) ----
+// Raggruppa le scariche su una griglia di 0,2° (celle vicine unite), tiene i
+// gruppi di almeno 5. Il moto viene dal confronto fra i gruppi degli ultimi
+// 10 minuti e quelli dei 10 precedenti: accoppiati se entro 40 km.
+function lxClusters(arr){
+  const G=0.2, grid=new Map();
+  arr.forEach((s,i)=>{
+    const k=Math.floor(s.lat/G)+","+Math.floor(s.lon/G);
+    let c=grid.get(k);
+    if(!c){ c=[]; grid.set(k,c); }
+    c.push(i);
+  });
+  const seen=new Set(), out=[];
+  for(const k of grid.keys()){
+    if(seen.has(k)) continue;
+    seen.add(k);
+    const stack=[k], idx=[];
+    while(stack.length){
+      const cur=stack.pop();
+      for(const i of grid.get(cur)) idx.push(i);
+      const p=cur.split(","), a=+p[0], b=+p[1];
+      for(let da=-1;da<=1;da++) for(let db=-1;db<=1;db++){
+        const nk=(a+da)+","+(b+db);
+        if(!seen.has(nk) && grid.has(nk)){ seen.add(nk); stack.push(nk); }
+      }
+    }
+    if(idx.length<5) continue;
+    const t0=arr[idx[0]].t;                      // media dei tempi relativa: niente perdita di precisione
+    let sl=0, so=0, st=0;
+    for(const i of idx){ sl+=arr[i].lat; so+=arr[i].lon; st+=arr[i].t-t0; }
+    const n=idx.length, lat=sl/n, lon=so/n;
+    let ss=0;
+    for(const i of idx){ const d=lxHav(lat,lon,arr[i].lat,arr[i].lon); ss+=d*d; }
+    out.push({ lat, lon, n, tm:t0+st/n, r:Math.max(3,Math.sqrt(ss/n)*1.5) });
+  }
+  return out;
+}
+function lxComputeCells(){
+  LX.cellsAt=Date.now();
+  if(!$("lxCells").checked || !$("liveLightning").checked){
+    if(LX.cells.length){ LX.cells=[]; LX.dirty=true; }
+    return;
+  }
+  const now=lxNow(), a=[], b=[];
+  for(let i=LX.list.length-1;i>=0;i--){
+    const s=LX.list[i], age=now-s.t;
+    if(age>1200000) break;
+    if(age<=600000) a.push(s); else b.push(s);
+  }
+  const ca=lxClusters(a), cb=lxClusters(b), motion=lxCovered(now-1200000,now)>=0.9;
+  for(const c of ca){
+    c.v=null; c.brg=null;
+    if(!motion) continue;                        // con buchi nello storico il moto sarebbe inventato
+    let best=null, bd=40;
+    for(const o of cb){ const d=lxHav(o.lat,o.lon,c.lat,c.lon); if(d<bd){ bd=d; best=o; } }
+    if(!best) continue;
+    const dtH=(c.tm-best.tm)/3600000;
+    if(dtH<=0.02) continue;
+    const v=bd/dtH;
+    if(v>150) continue;                          // oltre 150 km/h non e' la stessa cella
+    c.v=v; c.brg=lxBrg(best.lat,best.lon,c.lat,c.lon);
+  }
+  LX.cells=ca;
+  LX.dirty=true;
+}
+
+// ---- ciclo di aggiornamento ----
+function lxTick(){
+  if(!$("liveLightning").checked) return;
+  lxPrune(); lxShowAlert();                      // anche a scheda nascosta: il titolo avvisa
+  if(document.hidden) return;
+  if(Date.now()-LX.cellsAt>=5000) lxComputeCells();
+  lxUpdateStats();
+  const ageEl=document.getElementById("lxInfoAge");
+  if(ageEl && LX.selected) ageEl.textContent=lxFmtAge(lxNow()-LX.selected.t);
+  if(LX.reconnectTimer) lxRetryText(); else lxStatusLive();
+  if(!LX.rafOn) lxRender();
+}
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape") return;
+  if(LX.placingRef) lxSetPlacing(false);
+  else if(LX.selected){ lxCloseInfo(); lxRender(); }
+});
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){ LX.flashes.length=0; return; }
+  if($("liveLightning").checked){ lxPrune(); lxUpdateStats(); lxRender(); }
+});
+
+// ---- opzioni e punto di riferimento (solo in questo browser) ----
+function lxLoadOpts(){
+  let o=null;
+  try{ o=JSON.parse(localStorage.getItem("lxOpts")||"null"); }catch(_){ o=null; }
+  if(!o || typeof o!=="object") return false;
+  for(const id of LX_OPT_IDS){
+    const el=$(id), v=o[id];
+    if(v===undefined) continue;
+    if(el.type==="checkbox") el.checked=!!v;
+    else if([...el.options].some(op=>op.value===String(v))) el.value=String(v);
+  }
+  const r=o.ref;
+  if(r && typeof r.lat==="number" && typeof r.lon==="number" && isFinite(r.lat) && isFinite(r.lon)
+     && Math.abs(r.lat)<=90 && Math.abs(r.lon)<=180){
+    const name=(typeof r.name==="string" && r.name.trim()) ? r.name.trim().slice(0,40) : "punto salvato";
+    LX.ref={ lat:r.lat, lon:r.lon, name, def:false };
+  }
+  return !!o.live;
+}
+function lxSaveOpts(){
+  try{
+    const o={ live:$("liveLightning").checked };
+    for(const id of LX_OPT_IDS){ const el=$(id); o[id]=el.type==="checkbox" ? el.checked : el.value; }
+    if(!LX.ref.def) o.ref={ lat:LX.ref.lat, lon:LX.ref.lon, name:LX.ref.name };
+    localStorage.setItem("lxOpts", JSON.stringify(o));
+  }catch(_){ /* archiviazione non disponibile (navigazione privata): si usa senza salvare */ }
+}
+function lxSetRef(lat,lon,name){
+  LX.ref=lat==null ? LX_DEFAULT_REF : { lat, lon, name, def:false };
+  lxSaveOpts();
+  lxRefText(); lxAlertFromHistory(); lxComputeCells();
+  LX.dirty=true; lxRender(); lxUpdateStats();
+  if(LX.selected) lxRenderInfo();
+}
+function lxRefText(){
+  const r=LX.ref, el=$("lxRefTxt");
+  let h="📍 <b>"+lxEsc(r.name)+"</b>"+(r.def ? " (predefinito)" : "")+" · "+lxLat(r.lat)+", "+lxLon(r.lon)+"<br>";
+  if(r.def) h+="Scegli il tuo punto con 📍 o 📡: resta salvato solo in questo browser.";
+  else h+="Salvato solo in questo browser · <a href='#' id='lxRefReset' style='color:var(--acc)'>torna a Udine</a>";
+  el.innerHTML=h;
+  const a=document.getElementById("lxRefReset");
+  if(a) a.onclick=e=>{ e.preventDefault(); lxSetRef(null); };
+}
+function lxGpsClick(){
+  const say=t=>{ $("lxRefTxt").textContent=t; setTimeout(()=>{ if(!LX.placingRef) lxRefText(); },4000); };
+  if(!navigator.geolocation){ say("📡 GPS non disponibile in questo browser."); return; }
+  $("lxRefTxt").textContent="📡 chiedo la posizione…";
+  navigator.geolocation.getCurrentPosition(
+    p=>{ lxSetPlacing(false); lxSetRef(Math.round(p.coords.latitude*1e4)/1e4, Math.round(p.coords.longitude*1e4)/1e4, "la mia posizione (GPS)"); },
+    err=>say(err && err.code===1 ? "📡 permesso negato: la posizione non viene letta." : "📡 posizione non ottenuta: riprova o scegli sulla mappa."),
+    { timeout:10000, maximumAge:600000, enableHighAccuracy:false });
+}
+function lxSetPlacing(on){
+  LX.placingRef=on;
+  cv.classList.toggle("placing", on);
+  $("lxPick").textContent=on ? "✖ Annulla scelta" : "📍 Scegli sulla mappa";
+  if(on) $("lxRefTxt").textContent="Clic sulla mappa nel punto da usare come riferimento (Esc per annullare).";
+  else lxRefText();
+}
+// Modalita' fulmini: infrarosso (nubi anche di notte) inquadrato sul Nord
+// Italia, con il live acceso. Anche da link diretto: ?fulmini
+$("lxMode").onclick=()=>{
+  configureEuropeImage("infrared");
+  if(!$("liveLightning").checked){ $("liveLightning").checked=true; lxConnect(); }
+  lxUpdateStats();                               // accende il pannello prima di misurarlo
+  // Il Nord Italia coperto dal feed deve stare TUTTO nella parte di mappa non
+  // coperta dal pannello statistiche (a destra): la vista si allarga a est,
+  // sopra Slovenia e Croazia, fuori copertura, invece di nascondere il Friuli.
+  // Poi stessa scala in km su x e y, cosi' cerchi e distanze non escono
+  // schiacciati (la proiezione della pagina stira il bbox sul canvas).
+  const want={ latMin:43.9, latMax:47.2, lonMin:6.9, lonMax:14.5 };
+  const W=cv.clientWidth||cv.width, H=cv.clientHeight||cv.height;
+  const st=$("lxStats"), panel=st.classList.contains("on") ? W-st.offsetLeft+8 : 0;
+  const free=Math.max(0.45, (W-panel)/W);
+  const kx=Math.cos(lxRad((want.latMin+want.latMax)/2));
+  let spanLon=(want.lonMax-want.lonMin)/free, spanLat=want.latMax-want.latMin;
+  if(spanLon*kx/W > spanLat/H) spanLat=spanLon*kx/W*H; else spanLon=spanLat/H*W/kx;
+  const cLat=(want.latMin+want.latMax)/2, cLon=(want.lonMin+want.lonMax)/2;
+  const lonMin=cLon-spanLon*free/2;              // centrato nella parte libera
+  view={ latMin:cLat-spanLat/2, latMax:cLat+spanLat/2, lonMin, lonMax:lonMin+spanLon }; clampView();
+  draw(); loadTimes(); lxSaveOpts(); lxUpdateStats();
+};
+$("lxPick").onclick=()=>lxSetPlacing(!LX.placingRef);
+$("lxGps").onclick=lxGpsClick;
+for(const id of LX_OPT_IDS) $(id).addEventListener("change",()=>{
+  lxSaveOpts(); lxAlertFromHistory(); lxComputeCells();
+  LX.dirty=true; lxRender(); lxUpdateStats();
+  if(LX.selected) lxRenderInfo();
+});
+const lxWasOn=lxLoadOpts();
+lxRefText();
+if(lxWasOn){ $("liveLightning").checked=true; lxConnect(); }
+setInterval(lxTick,1000);
 
 async function initCatalog(){
   $("st-msg").textContent="carico il catalogo EUMETView…";
@@ -4916,7 +5919,7 @@ document.querySelectorAll("button[data-bbox]").forEach(b=>b.onclick=()=>{
 });
 $("quickEurope").onclick=()=>{ configureEuropeImage(); loadTimes(); };
 $("fetch").onclick=()=>fetchImage();
-$("save").onclick=()=>{ const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=cv.toDataURL("image/png"); a.click(); };
+$("save").onclick=()=>{ const o=document.createElement("canvas"); o.width=cv.width; o.height=cv.height; const g=o.getContext("2d"); g.drawImage(cv,0,0); if($("liveLightning").checked) g.drawImage(lxCv,0,0); const a=document.createElement("a"); a.download="metop_"+Date.now()+".png"; a.href=o.toDataURL("image/png"); a.click(); };
 window.addEventListener("resize",()=>{ fitDPR(); draw(); });
 
 // --------------------------------------------------------------------------
@@ -4951,10 +5954,10 @@ function scheduleLiveTimer(){
   liveTimer=setInterval(liveTick, 60*1000);
 }
 $("live").onchange=()=>{ updateLiveHint(); if($("live").checked) liveTick(); };
-$("liveLightning").onchange=()=>{ if($("liveLightning").checked) connectLiveLightning(); else disconnectLiveLightning(); };
+$("liveLightning").onchange=()=>{ $("liveLightning").checked ? lxConnect() : lxDisconnect(); lxSaveOpts(); };
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) liveTick(); });
 
-fitDPR(); draw(); initCatalog().then(()=>{ configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });
+fitDPR(); draw(); initCatalog().then(()=>{ if(new URLSearchParams(location.search).has("fulmini")) $("lxMode").onclick(); else configureEuropeImage(); updateLiveHint(); scheduleLiveTimer(); });
 </script>
 `;
 // <<<METOP_HTML
@@ -5243,6 +6246,70 @@ class MqttByteReader {
   }
 }
 
+// --- Storico in memoria e forma compatta delle scariche.
+// Il piano gratuito non regge una scrittura per ogni fulmine (e la regola
+// della diagnostica vieta comunque una riga per dato), quindi lo storico vive
+// SOLO nella memoria del Durable Object: esiste finche' qualcuno guarda e
+// sparisce quando il DO viene sfrattato a relay spento. Il viewer lo sa
+// (messaggio "hello" con i tratti di copertura) e non finge uno storico che
+// non c'e'.
+const LIGHTNING_BUFFER_MS = 60 * 60 * 1000;   // un'ora, come le mappe pro
+const LIGHTNING_BUFFER_MAX = 6000;            // tetto anche durante un temporale forte
+const LIGHTNING_SIG_KEEP = 400;               // dettaglio stazioni solo per le ultime N
+const LIGHTNING_SIG_MAX = 60;                 // stazioni per scarica tenute/spedite
+const LIGHTNING_BACKFILL_CHUNK = 1000;        // scariche per messaggio WebSocket (~60 KB)
+// Ordine delle colonne nelle righe del backfill (array invece di oggetti:
+// un terzo dei byte). Il viewer legge "cols" dal messaggio, non questo array.
+const LIGHTNING_COLS = ["id", "t", "rx", "lat", "lon", "alt", "pol", "mds", "mcg", "st", "reg", "dly", "n"];
+
+// Il tempo del feed Blitzortung e' in nanosecondi (19 cifre). JSON.parse lo
+// arrotonda a ~256 ns, irrilevante: a noi servono i millisecondi. Se l'unita'
+// fosse diversa (o il valore assurdo) si ripiega sull'ora di ricezione.
+function lightningTimeMs(v, fallbackMs) {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return fallbackMs;
+  let ms;
+  if (n > 1e17) ms = n / 1e6;          // ns
+  else if (n > 1e14) ms = n / 1e3;     // us
+  else if (n > 1e11) ms = n;           // ms
+  else if (n > 1e8) ms = n * 1e3;      // s
+  else return fallbackMs;
+  ms = Math.round(ms);
+  // Piu' di 6 ore nel passato o 10 minuti nel futuro rispetto alla ricezione:
+  // non e' un'ora plausibile per un dato "live", meglio l'ora di arrivo.
+  if (ms < fallbackMs - 6 * 3600 * 1000 || ms > fallbackMs + 10 * 60 * 1000) return fallbackMs;
+  return ms;
+}
+
+// Dal payload grezzo alla forma compatta. SOLO campi con nome noto dal
+// formato pubblico Blitzortung (lat, lon, time, alt, pol, mds, mcg, status,
+// region, delay, sig): niente viene inoltrato "alla cieca". Un campo assente
+// resta assente (non 0): il viewer mostra "non fornito", non un numero finto.
+// Non c'e' la corrente di picco (kA): il feed pubblico non la trasmette.
+function compactStrike(d, id, nowMs) {
+  const num = v => (typeof v === "number" && isFinite(v)) ? v : undefined;
+  const s = {
+    id, t: lightningTimeMs(d.time, nowMs), rx: nowMs,
+    lat: d.lat, lon: d.lon,
+    alt: num(d.alt), pol: num(d.pol), mds: num(d.mds), mcg: num(d.mcg),
+    st: num(d.status), reg: num(d.region), dly: num(d.delay),
+  };
+  if (Array.isArray(d.sig)) {
+    s.n = d.sig.length;                // stazioni totali, anche oltre il tetto
+    const sig = [];
+    for (const x of d.sig) {
+      if (sig.length >= LIGHTNING_SIG_MAX) break;
+      if (!x || typeof x.lat !== "number" || typeof x.lon !== "number") continue;
+      // [stazione, lat, lon, alt, status, ritardo di arrivo in ns]
+      sig.push([num(x.sta) ?? null, x.lat, x.lon, num(x.alt) ?? null, num(x.status) ?? null, num(x.time) ?? null]);
+    }
+    s.sig = sig;
+  }
+  return s;
+}
+
+function strikeRow(s) { return LIGHTNING_COLS.map(k => (s[k] === undefined ? null : s[k])); }
+
 export class LightningRelay {
   constructor(state, env) {
     this.state = state; this.env = env;
@@ -5264,9 +6331,112 @@ export class LightningRelay {
     // Calcolate una volta e riusate sia per il SUBSCRIBE sia per lo status:
     // cosi' quello che dichiariamo e' esattamente quello che chiediamo.
     this.tiles = geohashTilesForBounds(NORTH_ITALY_BOUNDS, LIGHTNING_GEOHASH_PRECISION);
+    // Storico dell'ultima ora (vedi LIGHTNING_BUFFER_MS) e dettaglio stazioni
+    // tenuto a parte, solo per le ultime LIGHTNING_SIG_KEEP scariche: 60
+    // stazioni x 6000 scariche peserebbero decine di MB nel DO.
+    this.buffer = [];
+    this.sigById = new Map();
+    this.nextId = 1;
+    // Tratti in cui il relay era DAVVERO collegato al broker: fuori da questi
+    // lo storico e' vuoto perche' nessuno ascoltava, non perche' era sereno.
+    this.coverage = [];
+    // Quali chiavi arrivano davvero nel payload (conteggio), e quante
+    // scariche portano la lista stazioni: lo si legge da /lightning/status
+    // invece di fidarsi della documentazione.
+    this.fieldsSeen = {};
+    this.sigSeen = 0;
+    this.keysLogged = false;      // una riga payload_keys per connessione
+    this.latencies = [];          // ricezione - ora del fulmine, ultime 200 (ms)
   }
 
   _diag(evento, dettaglio, gravita = null) { return logDiag(this.env && this.env.DB, "lightning", evento, dettaglio, gravita); }
+
+  _prune(nowMs) {
+    const cut = nowMs - LIGHTNING_BUFFER_MS;
+    let drop = 0;
+    while (drop < this.buffer.length && this.buffer[drop].rx < cut) drop++;
+    if (this.buffer.length - drop > LIGHTNING_BUFFER_MAX) drop = this.buffer.length - LIGHTNING_BUFFER_MAX;
+    if (drop > 0) this.buffer.splice(0, drop);
+    this.coverage = this.coverage.filter(c => c.to === null || c.to >= cut);
+  }
+
+  _latencyStats() {
+    if (this.latencies.length === 0) return null;
+    const a = [...this.latencies].sort((x, y) => x - y);
+    const q = p => a[Math.min(a.length - 1, Math.floor(p * a.length))];
+    return { samples: a.length, p50: q(0.5), p90: q(0.9) };
+  }
+
+  // Appena un visitatore si collega: stato del relay + storico disponibile,
+  // a pezzi (limite ~1 MiB per messaggio WebSocket su Cloudflare).
+  _greet(ws) {
+    const now = Date.now();
+    this._prune(now);
+    const send = o => { try { ws.send(JSON.stringify(o)); } catch (_) {} };
+    send({
+      type: "hello", version: ECHO_VERSION, inst: this.startedAt, now,
+      connected: this.connected, bounds: NORTH_ITALY_BOUNDS,
+      coverage: this.coverage, bufferMs: LIGHTNING_BUFFER_MS,
+      fieldsSeen: this.fieldsSeen, sigSeen: this.sigSeen, strikeCount: this.strikeCount,
+      latency: this._latencyStats(),
+    });
+    const rows = this.buffer.map(strikeRow);
+    if (rows.length === 0) { send({ type: "backfill", cols: LIGHTNING_COLS, strikes: [], done: true }); return; }
+    for (let i = 0; i < rows.length; i += LIGHTNING_BACKFILL_CHUNK) {
+      const part = rows.slice(i, i + LIGHTNING_BACKFILL_CHUNK);
+      send({ type: "backfill", cols: LIGHTNING_COLS, strikes: part, done: i + LIGHTNING_BACKFILL_CHUNK >= rows.length });
+    }
+  }
+
+  // Unico messaggio accettato dal viewer: "dammi il dettaglio della scarica
+  // N" (stazioni comprese, se le abbiamo ancora). Tutto il resto e' ignorato.
+  _onClientMessage(ws, data) {
+    if (typeof data !== "string" || data.length > 200) return;
+    let m; try { m = JSON.parse(data); } catch (_) { return; }
+    if (!m || m.type !== "detail" || !Number.isInteger(m.id)) return;
+    const s = this.buffer.find(x => x.id === m.id);
+    const reply = s ? { type: "detail", id: m.id, strike: { ...s, sig: this.sigById.get(m.id) } }
+                    : { type: "detail", id: m.id, missing: true };
+    try { ws.send(JSON.stringify(reply)); } catch (_) {}
+  }
+
+  _onStrike(d) {
+    const nowMs = Date.now();
+    for (const k of Object.keys(d)) this.fieldsSeen[k] = (this.fieldsSeen[k] || 0) + 1;
+    const s = compactStrike(d, this.nextId++, nowMs);
+    const sig = s.sig; delete s.sig;
+    if (sig && sig.length > 0) {
+      this.sigSeen++;
+      this.sigById.set(s.id, sig);
+      if (this.sigById.size > LIGHTNING_SIG_KEEP) this.sigById.delete(this.sigById.keys().next().value);
+    }
+    if (s.t !== nowMs) {
+      this.latencies.push(nowMs - s.t);
+      if (this.latencies.length > 200) this.latencies.shift();
+    }
+    this.buffer.push(s);
+    if (this.buffer.length > LIGHTNING_BUFFER_MAX + 200) this._prune(nowMs);
+
+    const at = new Date(nowMs).toISOString();
+    this.strikeCount++; this.strikesSinceBeat++; this.lastStrikeAt = at;
+    this.lastStrikes.unshift({ lat: d.lat, lon: d.lon, time: d.time ?? null, at, n: s.n ?? null });
+    if (this.lastStrikes.length > 20) this.lastStrikes.length = 20;
+    // lat/lon/time in chiaro restano per compatibilita' coi viewer vecchi
+    // ancora in cache (leggono solo quelli e ignorano il resto).
+    this._broadcast({ type: "strike", ...s, sig, time: d.time ?? null });
+
+    if (!this.keysLogged) {
+      this.keysLogged = true;
+      // Una sola riga per connessione, con un campione del payload vero:
+      // cosi' da D1 si vede che formato manda il broker, senza indovinare.
+      this._diag("payload_keys", {
+        keys: Object.keys(d),
+        sig: Array.isArray(d.sig) ? d.sig.length : null,
+        sigKeys: Array.isArray(d.sig) && d.sig[0] && typeof d.sig[0] === "object" ? Object.keys(d.sig[0]) : null,
+        sample: JSON.stringify(d).slice(0, 600),
+      });
+    }
+  }
 
   async fetch(request) {
     if (request.headers.get("Upgrade") === "websocket") {
@@ -5277,12 +6447,17 @@ export class LightningRelay {
       const onGone = () => { this.clients.delete(server); this._maybeDisconnect(); };
       server.addEventListener("close", onGone);
       server.addEventListener("error", onGone);
+      server.addEventListener("message", ev => this._onClientMessage(server, ev.data));
+      this._greet(server);
       this._ensureConnected();
       return new Response(null, { status: 101, webSocket: client });
     }
     // /lightning/status — debug in chiaro, nessun dato sensibile. Dice cosa e'
     // sottoscritto DAVVERO (tessere), non solo se e' connesso: cosi' dopo un
-    // deploy si verifica la copertura senza fidarsi del commit.
+    // deploy si verifica la copertura senza fidarsi del commit. fieldsSeen e
+    // sigSeen dicono quali campi manda DAVVERO il broker (es. se la lista
+    // stazioni "sig" arriva o viene tagliata dal proxy MQTT).
+    this._prune(Date.now());
     return new Response(JSON.stringify({
       version: ECHO_VERSION,
       connected: this.connected, connectedSince: this.connectedSince,
@@ -5291,6 +6466,9 @@ export class LightningRelay {
       lastStrikes: this.lastStrikes,
       reconnects: Math.max(0, this.connects - 1),
       lastError: this.lastError, lastErrorAt: this.lastErrorAt,
+      fieldsSeen: this.fieldsSeen, sigSeen: this.sigSeen,
+      latency: this._latencyStats(),
+      bufferSize: this.buffer.length, coverage: this.coverage,
       subscription: {
         broker: BLITZORTUNG_HOST + ":" + BLITZORTUNG_PORT,
         bounds: NORTH_ITALY_BOUNDS, precision: LIGHTNING_GEOHASH_PRECISION,
@@ -5339,7 +6517,9 @@ export class LightningRelay {
 
       this.connected = true; this.connecting = false; this.lastError = null; this.reconnectDelayMs = 2000;
       this.connectedSince = new Date().toISOString(); this.connects++; wasConnected = true;
-      this.strikesSinceBeat = 0;
+      this.strikesSinceBeat = 0; this.keysLogged = false;
+      this.coverage.push({ from: Date.now(), to: null });
+      this._broadcast({ type: "state", connected: true, coverage: this.coverage });
       await this._diag("connect", { tiles: this.tiles.length, topics: topics.length, clients: this.clients.size,
                                     reconnects: Math.max(0, this.connects - 1) });
 
@@ -5357,16 +6537,9 @@ export class LightningRelay {
         if (pkt.type === 3) {                      // PUBLISH
           const { topic, payload } = parseMqttPublish(pkt.body);
           if (topic.startsWith("blitzortung/")) {
-            try {
-              const d = JSON.parse(payload);
-              if (typeof d.lat === "number" && typeof d.lon === "number") {
-                const at = new Date().toISOString();
-                this.strikeCount++; this.strikesSinceBeat++; this.lastStrikeAt = at;
-                this.lastStrikes.unshift({ lat: d.lat, lon: d.lon, time: d.time ?? null, at });
-                if (this.lastStrikes.length > 20) this.lastStrikes.length = 20;
-                this._broadcast({ lat: d.lat, lon: d.lon, time: d.time ?? null });
-              }
-            } catch (_) { /* payload non-JSON o formato diverso da quello atteso: scartato */ }
+            let d = null;
+            try { d = JSON.parse(payload); } catch (_) { /* payload non-JSON: scartato */ }
+            if (d && typeof d.lat === "number" && typeof d.lon === "number") this._onStrike(d);
           }
         }
         // PINGRESP e altri tipi: bastava leggerli per svuotare lo stream.
@@ -5390,6 +6563,11 @@ export class LightningRelay {
       const stillOurs = this.socket === socket || this.socket === null;
       if (socket) { try { socket.close(); } catch (_) {} }
       if (stillOurs) { this.socket = null; this.connecting = false; this.connected = false; }
+      if (wasConnected) {
+        const open = this.coverage.find(c => c.to === null);
+        if (open) open.to = Date.now();
+        this._broadcast({ type: "state", connected: this.connected, coverage: this.coverage });
+      }
       if (wasConnected)
         await this._diag("disconnect", { reason: this.closingByUs ? "nessun visitatore" : "connessione caduta",
                                          clients: this.clients.size, strikesSinceBeat: this.strikesSinceBeat });
