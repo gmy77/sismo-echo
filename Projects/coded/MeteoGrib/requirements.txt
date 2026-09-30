@@ -1,0 +1,15 @@
+# MeteoGrib — dipendenze
+# Installazione:  pip install -r requirements.txt
+#
+# eccodes include la libreria binaria dell'ECMWF: funziona anche su
+# Windows senza Cygwin (a differenza di wgrib2).
+numpy>=1.21
+matplotlib>=3.5
+eccodes>=1.6
+
+# Dipendenza base: coste, confini nazionali e fiumi in sottofondo alle mappe
+# (indispensabile per inquadrare regioni piccole come il FVG).
+# Per un'installazione MINIMA rimuovi questa riga: MeteoGrib rileva l'assenza
+# di cartopy e ripiega da solo su una griglia lat/lon, senza errori.
+# (Nota: cartopy può richiedere librerie di sistema GEOS/PROJ.)
+cartopy>=0.21
