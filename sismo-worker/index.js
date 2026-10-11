@@ -1399,6 +1399,16 @@ function renderRadiazione() {
       <div class="sub" id="ctxWindDensity">densità —</div>
     </div>
     <div class="mini">
+      <div class="lbl">🧲 Bz — campo magnetico</div>
+      <div class="val" id="ctxBz" style="color:#546e7a">—</div>
+      <div class="sub" id="ctxBzSub">componente nord-sud a L1 · negativo = porta aperta</div>
+    </div>
+    <div class="mini">
+      <div class="lbl">⏱ Arrivo a Terra</div>
+      <div class="val" id="ctxEta" style="font-size:1.1em">—</div>
+      <div class="sub" id="ctxEtaSub">tempo di volo da L1 (≈1,5 mln km)</div>
+    </div>
+    <div class="mini">
       <div class="lbl">⚡ Raggi X (livello attuale)</div>
       <div class="val" id="ctxFlare" style="color:#546e7a">—</div>
       <div class="sub">flusso GOES in classe A/B/C/M/X — non un brillamento in corso; un flare M/X spesso precede un evento protonico</div>
@@ -1434,6 +1444,16 @@ function renderRadiazione() {
   </div>
 
   <div class="panel">
+    <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">🧲 VENTO SOLARE A L1 — Bz ultime 3 ore (live NOAA RTSW)</div>
+    <div id="chartBz" style="overflow-x:auto"><div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">caricamento dati L1…</div></div>
+    <div class="legend">
+      <span><span style="color:#69f0ae">▬</span> Bz nord (&gt;0): magnetosfera chiusa</span>
+      <span><span style="color:#ff6d00">▬</span> Bz sud (&lt;0): il vento entra — conta la durata</span>
+    </div>
+    <div class="note" id="l1Note" style="display:none"></div>
+  </div>
+
+  <div class="panel">
     <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">📈 FLUSSO PROTONI &gt;10 MeV — scala logaritmica, soglie S1-S5</div>
     <div id="chartP" style="overflow-x:auto"></div>
     <div class="legend">
@@ -1449,7 +1469,17 @@ function renderRadiazione() {
     <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">📈 FLUSSO ELETTRONI &gt;2 MeV — scala logaritmica</div>
     <div id="chartE" style="overflow-x:auto"></div>
     <div class="legend">
-      <span><span style="color:#7cc7ff">▬</span> soglia rischio "surface charging" ≈ 1.000 pfu (convenzione operativa satelliti)</span>
+      <span><span style="color:#7cc7ff">▬</span> soglia allerta NOAA elettroni &gt;2 MeV = 1.000 pfu (rischio cariche interne nei satelliti)</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">🔮 PREVISIONE Kp — ultime 24h osservate + 3 giorni previsti (NOAA SWPC)</div>
+    <div id="chartKp" style="overflow-x:auto"><div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">caricamento previsione…</div></div>
+    <div class="legend">
+      <span>▮ pieno = osservato · ▮ medio = stimato · ▯ chiaro = previsto</span>
+      <span><span style="color:#ff6d00">▬</span> Kp 5 = tempesta G1</span>
+      <span><span style="color:#e040fb">▬</span> Kp 7 = soglia aurora alla latitudine del FVG</span>
     </div>
   </div>
 
@@ -1481,6 +1511,16 @@ function renderRadiazione() {
       <div class="val" id="derStreak" style="color:#69f0ae">—</div>
       <div class="sub">S0, dal giorno più recente a ritroso</div>
     </div>
+    <div class="mini">
+      <div class="lbl">⏳ Elettroni ≥1.000 pfu — 24h</div>
+      <div class="val" id="derE2Hours" style="color:#546e7a">—</div>
+      <div class="sub" id="derP10Hours">ore sopra soglia allerta · protoni ≥S1: —</div>
+    </div>
+    <div class="mini">
+      <div class="lbl">🌌 Aurora dal FVG — 3 giorni</div>
+      <div class="val" id="auroraVal" style="color:#546e7a">—</div>
+      <div class="sub" id="auroraSub">dalla previsione Kp NOAA</div>
+    </div>
   </aside>
 
 </div>
@@ -1495,9 +1535,9 @@ const flareColor = c => !c?'#546e7a':c[0]==='X'?'#ff1744':c[0]==='M'?'#ff6d00':c
 const trendLabel = t => t==='up'?'▲ in salita':t==='down'?'▼ in calo':t==='stable'?'▬ stabile':'—';
 const trendColor = t => t==='up'?'#ff6d00':t==='down'?'#26c6da':'#546e7a';
 
-function logChart(rows, field, thresholds, mainColor){
+function logChart(rows, field, thresholds, mainColor, thrColors){
   const vals = rows.map(r=>r[field]).filter(v=>v!=null && v>0);
-  if(vals.length<2) return '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Dati insufficienti — attendere il prossimo ciclo di aggiornamento (cron 5×/giorno)</div>';
+  if(vals.length<2) return '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Dati insufficienti — attendere il prossimo ciclo di aggiornamento (cron 4×/giorno)</div>';
   const W=860,H=200,PAD=46;
   const allVals = vals.concat(thresholds||[]);
   const logMin = Math.floor(Math.log10(Math.max(Math.min(...allVals),1e-3)));
@@ -1514,7 +1554,7 @@ function logChart(rows, field, thresholds, mainColor){
   });
   const thrLines = (thresholds||[]).map((t,i)=>{
     const y=yOf(t);
-    const colors=['#26c6da','#ffd600','#ff6d00','#ff1744','#d500f9'];
+    const colors=thrColors||['#26c6da','#ffd600','#ff6d00','#ff1744','#d500f9'];
     if(y<0||y>H) return '';
     return '<line x1="'+PAD+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+y.toFixed(1)+'" stroke="'+colors[i]+'" stroke-width="1" stroke-dasharray="5,4" opacity="0.5"/>';
   }).join('');
@@ -1550,7 +1590,7 @@ async function load(){
     $('p100Val').textContent = fmt(lastRow.proton_100mev);
     $('e2Val').textContent = fmt(lastRow.electron_2mev);
     $('chartP').innerHTML = logChart(rows, 'proton_10mev', [10,100,1000,10000,100000], '#7cc7ff');
-    $('chartE').innerHTML = logChart(rows, 'electron_2mev', [], '#66bb6a');
+    $('chartE').innerHTML = logChart(rows, 'electron_2mev', [1000], '#66bb6a', ['#7cc7ff']);
 
     // Contesto — sinistra
     if(ctx.kp_now!=null){
@@ -1571,11 +1611,167 @@ async function load(){
       $('derP10Trend').innerHTML = '<span class="trend" style="background:'+trendColor(der.proton10_trend)+'22;color:'+trendColor(der.proton10_trend)+';border:1px solid '+trendColor(der.proton10_trend)+'44">'+trendLabel(der.proton10_trend)+'</span>';
     }
     if(der.s0_streak_days!=null) $('derStreak').textContent = der.s0_streak_days;
+    if(der.e2_h_above_1000!=null){
+      $('derE2Hours').textContent = fmtH(der.e2_h_above_1000);
+      $('derE2Hours').style.color = der.e2_h_above_1000>0 ? '#ffd600' : '#69f0ae';
+    }
+    if(der.p10_h_above_s1!=null) $('derP10Hours').textContent = 'ore sopra soglia allerta · protoni ≥S1: '+fmtH(der.p10_h_above_s1);
   }catch(e){
     $('chartP').innerHTML = '<div style="color:#ff6d00;font-size:.85em">Errore caricamento dati: '+e.message+'</div>';
   }
 }
 load();
+
+// ── Dati live dal browser: i feed NOAA hanno CORS aperto e arrivano compressi (~250 KB),
+//    mentre farli parsare al worker (4 MB di JSON) sforerebbe la CPU del piano Free.
+const SWPC = 'https://services.swpc.noaa.gov';
+const L1_KM = 1.5e6;
+const fmtH = h => (h===0 ? '0' : h.toFixed(1).replace('.',','))+' h';
+const tUTC = t => new Date(String(t).endsWith('Z') ? t : t+'Z');
+const hhmm = d => d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'});
+const bzColor = b => b>=0?'#69f0ae':b>-5?'#ffd600':b>-10?'#ff6d00':'#ff1744';
+async function getJ(u){ const r=await fetch(u); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+
+// rtsw_*_1m: dal più recente, mescola più sonde → solo 'active', in ordine di tempo, ultimi N minuti
+function activeSeries(raw, field, minutes){
+  if(!Array.isArray(raw)) return [];
+  const out = raw.filter(r => r && r.active && r[field]!=null)
+    .map(r => ({t:tUTC(r.time_tag), v:parseFloat(r[field]), r:r}))
+    .filter(p => !isNaN(p.t) && Number.isFinite(p.v))
+    .sort((a,b) => a.t-b.t);
+  if(!out.length) return out;
+  const cut = out[out.length-1].t - minutes*60000;
+  return out.filter(p => p.t>=cut);
+}
+
+function bzChart(series){
+  if(series.length<2) return '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Dati Bz non disponibili</div>';
+  const W=860,H=150,PAD=46,MID=H/2;
+  const m = Math.max(5, ...series.map(p=>Math.abs(p.v)))*1.15;
+  const t0=series[0].t, t1=series[series.length-1].t, span=Math.max(1,t1-t0);
+  const x = t => PAD+(t-t0)/span*(W-PAD*2);
+  const y = v => MID - v/m*MID;
+  let path='', prev=null;
+  series.forEach(p => {
+    const gap = prev && (p.t-prev.t)>5*60000;
+    path += ((!prev||gap)?'M':'L')+x(p.t).toFixed(1)+','+y(p.v).toFixed(1)+' ';
+    prev = p;
+  });
+  const area = 'M'+x(t0).toFixed(1)+','+MID+' '
+    + series.map(p => 'L'+x(p.t).toFixed(1)+','+y(p.v).toFixed(1)).join(' ')
+    + ' L'+x(t1).toFixed(1)+','+MID+' Z';
+  const last = series[series.length-1];
+  return '<svg width="100%" viewBox="0 0 '+W+' '+(H+24)+'" style="overflow:visible;min-width:560px">'
+    + '<defs><clipPath id="bzSud"><rect x="0" y="'+MID+'" width="'+W+'" height="'+MID+'"/></clipPath></defs>'
+    + '<path d="'+area+'" fill="#ff6d00" opacity="0.28" clip-path="url(#bzSud)"/>'
+    + '<line x1="'+PAD+'" y1="'+MID+'" x2="'+(W-PAD)+'" y2="'+MID+'" stroke="#546e7a" stroke-width="1"/>'
+    + '<path d="'+path+'" fill="none" stroke="#7cc7ff" stroke-width="1.6"/>'
+    + '<circle cx="'+x(last.t).toFixed(1)+'" cy="'+y(last.v).toFixed(1)+'" r="4" fill="'+bzColor(last.v)+'"/>'
+    + '<text x="'+(PAD-6)+'" y="10" text-anchor="end" fill="#69f0ae" font-size="9" font-family="monospace">+'+m.toFixed(0)+'</text>'
+    + '<text x="'+(PAD-6)+'" y="'+(MID+3)+'" text-anchor="end" fill="#546e7a" font-size="9" font-family="monospace">0 nT</text>'
+    + '<text x="'+(PAD-6)+'" y="'+H+'" text-anchor="end" fill="#ff6d00" font-size="9" font-family="monospace">−'+m.toFixed(0)+'</text>'
+    + '<text x="'+PAD+'" y="'+(H+18)+'" fill="#455a64" font-size="9" font-family="monospace">'+hhmm(t0)+'</text>'
+    + '<text x="'+(W-PAD)+'" y="'+(H+18)+'" text-anchor="end" fill="#455a64" font-size="9" font-family="monospace">'+hhmm(t1)+' (ora italiana)</text>'
+    + '</svg>';
+}
+
+async function loadL1(){
+  const [wRes, mRes] = await Promise.allSettled([
+    getJ(SWPC+'/json/rtsw/rtsw_wind_1m.json'),
+    getJ(SWPC+'/json/rtsw/rtsw_mag_1m.json'),
+  ]);
+  const wind = wRes.status==='fulfilled' ? activeSeries(wRes.value, 'proton_speed', 180) : [];
+  const bz   = mRes.status==='fulfilled' ? activeSeries(mRes.value, 'bz_gsm', 180) : [];
+  let speed = null;
+
+  if(wind.length){
+    const w = wind[wind.length-1];
+    speed = w.v;
+    const dens = parseFloat(w.r.proton_density);
+    const vecchio = (Date.now()-w.t) > 15*60000;
+    $('ctxWindSpeed').textContent = Math.round(speed)+' km/s';
+    $('ctxWindSpeed').style.color = speed<400?'#69f0ae':speed<550?'#ffd600':speed<700?'#ff6d00':'#ff1744';
+    $('ctxWindDensity').textContent = (Number.isFinite(dens)?'densità '+dens.toFixed(1)+' n/cc · ':'')+(vecchio?'dato delle ':'live ')+hhmm(w.t);
+    const etaMin = L1_KM/speed/60;
+    $('ctxEta').textContent = '≈ '+Math.round(etaMin)+' min';
+    $('ctxEtaSub').textContent = 'il vento misurato alle '+hhmm(w.t)+' arriva verso le '+hhmm(new Date(w.t.getTime()+etaMin*60000));
+  }
+
+  $('chartBz').innerHTML = bzChart(bz);
+  if(bz.length){
+    const b = bz[bz.length-1];
+    const bt = parseFloat(b.r.bt);
+    $('ctxBz').textContent = (b.v>0?'+':'')+b.v.toFixed(1)+' nT';
+    $('ctxBz').style.color = bzColor(b.v);
+    // da quanto tempo Bz è a sud senza interruzioni
+    let i = bz.length-1;
+    while(i>0 && bz[i-1].v<0) i--;
+    const sudMin = b.v<0 ? Math.round((b.t-bz[i].t)/60000) : 0;
+    $('ctxBzSub').textContent = (Number.isFinite(bt)?'Bt '+bt.toFixed(1)+' nT · ':'')
+      + (b.v<0 ? 'a sud da '+(i===0?'oltre 3 h':sudMin+' min') : 'a nord: magnetosfera chiusa');
+
+    // accoppiamento: campo elettrico del vento Ey = v·Bs (Bs = parte sud di Bz), media 30 min
+    if(speed!=null){
+      const rec = bz.filter(p => p.t >= b.t-30*60000);
+      const bzMed = rec.reduce((a,p)=>a+p.v,0)/rec.length;
+      const ey = speed*Math.max(0,-bzMed)*1e-3;
+      const giudizio = ey<0.5?'trascurabile: il vento scivola attorno alla magnetosfera'
+        : ey<2?'debole'
+        : ey<5?'moderato: se dura ore può portare a una tempesta G1'
+        : 'forte: tempesta geomagnetica probabile nelle prossime ore';
+      $('l1Note').style.display = 'block';
+      $('l1Note').innerHTML = 'ACCOPPIAMENTO VENTO-MAGNETOSFERA (v·Bs, media 30 min): <b style="color:'+(ey<0.5?'#69f0ae':ey<2?'#26c6da':ey<5?'#ffd600':'#ff1744')+'">'
+        + ey.toFixed(2).replace('.',',')+' mV/m</b> — '+giudizio+'.<br>'
+        + 'La velocità da sola non basta: un vento veloce con Bz a nord fa poco, uno medio con Bz a sud per ore può scatenare una tempesta.';
+    }
+  }
+}
+
+async function loadKpForecast(){
+  const raw = await getJ(SWPC+'/products/noaa-planetary-k-index-forecast.json');
+  // il feed è passato nel tempo da array-di-array (header in [0]) ad array di oggetti
+  const rows = (Array.isArray(raw)?raw:[])
+    .map(r => Array.isArray(r) ? {t:r[0], kp:parseFloat(r[1]), obs:r[2]} : {t:r.time_tag, kp:parseFloat(r.kp), obs:r.observed})
+    .filter(r => r.t && r.t!=='time_tag' && Number.isFinite(r.kp))
+    .map(r => ({kp:r.kp, obs:String(r.obs), d:tUTC(r.t)}))
+    .filter(r => r.d.getTime() >= Date.now()-24*3600000);
+  if(!rows.length){ $('chartKp').innerHTML = '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Previsione non disponibile</div>'; return; }
+
+  const W=860,H=150,PAD=46,KMAX=9;
+  const bw = (W-PAD*2)/rows.length;
+  const y = k => H - k/KMAX*H;
+  let bars='', days='';
+  rows.forEach((r,i) => {
+    // NOAA: 'observed' = definitivo, 'estimated' = provvisorio (fascia in corso), 'predicted' = previsione
+    const prev = r.obs==='predicted', stim = r.obs==='estimated';
+    const c = kpColor(r.kp), top = Math.min(y(r.kp), H-2);
+    bars += '<rect x="'+(PAD+i*bw+1).toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+Math.max(1,bw-2).toFixed(1)+'" height="'+(H-top).toFixed(1)+'" fill="'+c+'" opacity="'+(prev?0.3:stim?0.6:0.9)+'"'+(prev?' stroke="'+c+'" stroke-width="1"':'')+'><title>'+r.d.toLocaleString('it-IT',{timeZone:'Europe/Rome',weekday:'short',hour:'2-digit',minute:'2-digit'})+' — Kp '+r.kp.toFixed(2)+' ('+(prev?'previsto':stim?'stimato':'osservato')+')</title></rect>';
+    if(r.d.getUTCHours()===0)
+      days += '<line x1="'+(PAD+i*bw).toFixed(1)+'" y1="0" x2="'+(PAD+i*bw).toFixed(1)+'" y2="'+H+'" stroke="#263238" stroke-width="1"/>'
+        + '<text x="'+(PAD+i*bw+3).toFixed(1)+'" y="'+(H+16)+'" fill="#546e7a" font-size="9" font-family="monospace">'+r.d.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',timeZone:'UTC'})+'</text>';
+  });
+  const hl = (k,c) => '<line x1="'+PAD+'" y1="'+y(k).toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+y(k).toFixed(1)+'" stroke="'+c+'" stroke-dasharray="5,4" opacity="0.6"/>'
+    + '<text x="'+(PAD-6)+'" y="'+(y(k)+3).toFixed(1)+'" text-anchor="end" fill="'+c+'" font-size="9" font-family="monospace">'+k+'</text>';
+  $('chartKp').innerHTML = '<svg width="100%" viewBox="0 0 '+W+' '+(H+24)+'" style="overflow:visible;min-width:560px">'
+    + days + bars + hl(5,'#ff6d00') + hl(7,'#e040fb') + '</svg>';
+
+  // Semaforo aurora: a ~46°N geografici (≈41° geomagnetici) serve Kp ≥7 per vederla in foto verso nord
+  const fut = rows.filter(r => r.obs!=='observed' && r.d.getTime() >= Date.now()-3*3600000);
+  if(fut.length){
+    const maxF = Math.max(...fut.map(r=>r.kp));
+    const quando = fut.find(r => r.kp===maxF).d.toLocaleString('it-IT',{timeZone:'Europe/Rome',weekday:'long',hour:'2-digit',minute:'2-digit'});
+    const [txt,col,sub] = maxF>=8 ? ['PROBABILE','#e040fb','Kp '+maxF.toFixed(1)+' previsto ('+quando+'): visibile anche a occhio nudo, cielo buio verso nord']
+      : maxF>=7 ? ['POSSIBILE','#69f0ae','Kp '+maxF.toFixed(1)+' previsto ('+quando+'): in foto a lunga esposizione, orizzonte nord libero']
+      : maxF>=6 ? ['IMPROBABILE','#ffd600','Kp massimo previsto '+maxF.toFixed(1)+': serve almeno Kp 7 alla nostra latitudine']
+      : ['NO','#546e7a','Kp massimo previsto '+maxF.toFixed(1)+': troppo basso per il FVG'];
+    $('auroraVal').textContent = txt;
+    $('auroraVal').style.color = col;
+    $('auroraSub').textContent = sub;
+  }
+}
+
+loadL1().catch(e => { $('chartBz').innerHTML = '<div style="color:#ff6d00;font-size:.85em">Dati L1 non disponibili: '+e.message+'</div>'; });
+loadKpForecast().catch(e => { $('chartKp').innerHTML = '<div style="color:#ff6d00;font-size:.85em">Previsione non disponibile: '+e.message+'</div>'; });
 </script>
 </body>
 </html>`;
@@ -6894,7 +7090,11 @@ const worker = {
           if (s==null || parseInt(s)===0) s0Streak++; else break;
         }
 
+        // campioni da 5 min sopra soglia nelle ultime 24h → ore
+        const hoursAbove = (field, thr) => !last24h.length ? null : last24h.filter(r => r[field]!=null && r[field]>=thr).length*5/60;
         const derived = {
+          p10_h_above_s1:   hoursAbove('proton_10mev', 10),
+          e2_h_above_1000:  hoursAbove('electron_2mev', 1000),
           proton10_24h:  range('proton_10mev'),
           electron2_24h: range('electron_2mev'),
           proton10_trend: trendOf('proton_10mev'),
