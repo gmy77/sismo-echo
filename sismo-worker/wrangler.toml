@@ -33,6 +33,12 @@ class_name = "LightningRelay"
 tag = "v1"
 new_sqlite_classes = ["LightningRelay"]
 
+# Workers Caching: le GET con Cache-Control cacheabile vengono servite dalla
+# cache del Worker senza eseguire il codice (zero CPU, vitale col limite di
+# 10 ms del piano Free). La politica per route e' in withCachePolicy (index.js).
+[cache]
+enabled = true
+
 [triggers]
 # Consolidati in un unico cron (stessi orari) per restare nel limite di 5 trigger/account del piano Free
 crons = ["0 8,13,18,23 * * *"]
