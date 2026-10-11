@@ -382,13 +382,34 @@ const sLabel   = s => s>=4?`S${s} TEMPESTA SEVERA`:s>=3?`S${s} FORTE`:s>=2?`S${s
 // ============================================================
 // HTML DASHBOARD v2
 // ============================================================
+// Date in ora italiana senza Intl: lato server, a freddo, toLocaleString con
+// timeZone costa decine di ms di CPU (inizializzazione ICU) — da solo sforava
+// il limite di 10 ms del piano Free. Ora legale UE: dall'ultima domenica di
+// marzo all'ultima di ottobre, cambio alle 01:00 UTC.
+function ultimaDomenicaUTC(anno, mese) {
+  const d = new Date(Date.UTC(anno, mese + 1, 0, 1));   // ultimo giorno del mese, 01:00 UTC
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  return d.getTime();
+}
+const p2 = n => String(n).padStart(2, "0");
+function fmtRoma(d, conOra = true, conSecondi = false) {
+  if (!(d instanceof Date)) d = new Date(d);
+  if (isNaN(d)) return "—";
+  const t = d.getTime(), anno = d.getUTCFullYear();
+  const legale = t >= ultimaDomenicaUTC(anno, 2) && t < ultimaDomenicaUTC(anno, 9);
+  const r = new Date(t + (legale ? 2 : 1) * 3600000);  // i campi UTC di r sono l'ora di Roma
+  let s = p2(r.getUTCDate()) + "/" + p2(r.getUTCMonth() + 1) + "/" + r.getUTCFullYear();
+  if (conOra) s += ", " + p2(r.getUTCHours()) + ":" + p2(r.getUTCMinutes()) + (conSecondi ? ":" + p2(r.getUTCSeconds()) : "");
+  return s;
+}
+
 function renderDashboard(data, cfData, ingvStatus) {
   const { ultimi, stats, mensile, top, solare30, sismi30, kpMax7, rad30, radUltimo } = data;
-  const now = new Date().toLocaleString("it-IT",{timeZone:"Europe/Rome"});
+  const now = fmtRoma(new Date(), true, true);
 
   const ultiRows = ultimi.slice(0,50).map(e => {
     const d = new Date(e.data_ora);
-    const dIT = d.toLocaleString("it-IT",{timeZone:"Europe/Rome",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    const dIT = fmtRoma(d);
     const m = e.magnitudine;
     return `<tr style="background:${magBg(m)};border-bottom:1px solid rgba(255,255,255,.04)">
       <td style="padding:9px 14px;font-weight:700;color:${magColor(m)};font-size:1.1em;font-family:'Share Tech Mono',monospace">M${m.toFixed(1)}</td>
@@ -405,7 +426,7 @@ function renderDashboard(data, cfData, ingvStatus) {
       <span style="font-size:1.5em;font-weight:800;color:${magColor(e.magnitudine)}">M${e.magnitudine.toFixed(1)}</span>
       <div style="flex:1;min-width:0">
         <div style="color:#eceff1;font-size:.88em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.localita}</div>
-        <div style="color:#546e7a;font-size:.75em">${new Date(e.data_ora).toLocaleDateString("it-IT")}</div>
+        <div style="color:#546e7a;font-size:.75em">${fmtRoma(e.data_ora, false)}</div>
       </div>
     </div>`;
   }).join("");
@@ -552,7 +573,7 @@ function renderDashboard(data, cfData, ingvStatus) {
 
   const cfUltiRows = cfUltimi.map(e=>{
     const d=new Date(e.data_ora);
-    const dIT=d.toLocaleString("it-IT",{timeZone:"Europe/Rome",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    const dIT=fmtRoma(d);
     const m=e.magnitudine;
     return `<tr style="background:${magBg(m)};border-bottom:1px solid rgba(255,255,255,.04)">
       <td style="padding:9px 14px;font-weight:700;color:${magColor(m)};font-size:1.1em;font-family:'Share Tech Mono',monospace">M${m.toFixed(1)}</td>
@@ -777,7 +798,7 @@ body{padding-bottom:84px}
 <body>
 <div class="container">
 
-${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStatus.last_check?` &bull; Ultimo controllo: ${new Date(ingvStatus.last_check).toLocaleString("it-IT",{timeZone:"Europe/Rome"})}`:"";const er=ingvStatus&&ingvStatus.last_error?` <span style="color:#37474f;font-size:.88em">[${ingvStatus.last_error}]</span>`:"";return `<div style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.4);border-radius:10px;padding:14px 20px;margin-bottom:22px;display:flex;align-items:flex-start;gap:14px">` +`<span style="font-size:1.5em;flex-shrink:0">&#x26A0;&#xFE0F;</span>` +`<div><div style="color:#ff5252;font-weight:700;font-size:.88em;letter-spacing:.05em;margin-bottom:5px;font-family:'Share Tech Mono',monospace">` +`INGV OFFLINE &#x2014; SERVIZIO SISMICO TEMPORANEAMENTE NON DISPONIBILE</div>` +`<div style="color:#90a4ae;font-size:.77em;line-height:1.65">` +`Il server <strong style="color:#cfd8dc">INGV</strong> non risponde al momento. ` +`I dati mostrati sono quelli dell'ultimo aggiornamento riuscito. ` +`<span style="color:#546e7a">Questo disservizio riguarda i sistemi INGV, non la nostra dashboard.</span>` +lc+er+`</div></div></div>`;}return "";})()}
+${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStatus.last_check?` &bull; Ultimo controllo: ${fmtRoma(ingvStatus.last_check, true, true)}`:"";const er=ingvStatus&&ingvStatus.last_error?` <span style="color:#37474f;font-size:.88em">[${ingvStatus.last_error}]</span>`:"";return `<div style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.4);border-radius:10px;padding:14px 20px;margin-bottom:22px;display:flex;align-items:flex-start;gap:14px">` +`<span style="font-size:1.5em;flex-shrink:0">&#x26A0;&#xFE0F;</span>` +`<div><div style="color:#ff5252;font-weight:700;font-size:.88em;letter-spacing:.05em;margin-bottom:5px;font-family:'Share Tech Mono',monospace">` +`INGV OFFLINE &#x2014; SERVIZIO SISMICO TEMPORANEAMENTE NON DISPONIBILE</div>` +`<div style="color:#90a4ae;font-size:.77em;line-height:1.65">` +`Il server <strong style="color:#cfd8dc">INGV</strong> non risponde al momento. ` +`I dati mostrati sono quelli dell'ultimo aggiornamento riuscito. ` +`<span style="color:#546e7a">Questo disservizio riguarda i sistemi INGV, non la nostra dashboard.</span>` +lc+er+`</div></div></div>`;}return "";})()}
 
 <header>
   <div class="logo">
@@ -800,7 +821,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div class="stat-card blue">
     <div class="stat-label">🌍 Totale eventi FVG</div>
     <div class="stat-value">${stats.totale||0}</div>
-    <div class="stat-sub">dal ${stats.primo?new Date(stats.primo).toLocaleDateString("it-IT"):'—'}</div>
+    <div class="stat-sub">dal ${stats.primo?fmtRoma(stats.primo, false):'—'}</div>
   </div>
   <div class="stat-card orange">
     <div class="stat-label">⚡ Magnitudo massima</div>
