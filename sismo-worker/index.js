@@ -162,7 +162,11 @@ async function fetchSolare() {
     let windData = null;
     if (windRes.status === 'fulfilled' && windRes.value.ok) {
       const raw = await windRes.value.json();
-      const last = raw[raw.length-1]||{};
+      // il feed è ordinato dal più recente e mescola più sonde (SOLAR1/ACE/IMAP):
+      // prendere l'ultimo elemento dava il dato di 24h prima e di una sonda non attiva
+      const last = (Array.isArray(raw) ? raw : [])
+        .filter(r => r.active && r.proton_speed != null)
+        .sort((a,b) => String(b.time_tag).localeCompare(String(a.time_tag)))[0] || {};
       windData = {
         speed:   parseFloat(last.proton_speed)||null,
         density: parseFloat(last.proton_density)||null,
@@ -219,7 +223,7 @@ async function fetchRadiazione(kpData, windData) {
     let radData = Object.entries(byTime)
       .map(([time, v]) => ({ time, proton10:v.proton10??null, proton100:v.proton100??null, electron2:v.electron2??null }))
       .sort((a,b)=> a.time.localeCompare(b.time))
-      .slice(-100);
+      .slice(-288); // 24h a 5 min: copre l'intervallo notturno tra cron (23→08) e l'upsert chiude i buchi
 
     // Scala tempeste di radiazione S (0-5). Formato NOAA: oggetto con chiavi "-1".."2" = giorni relativi, "0" = oggi.
     let sScale = null;
@@ -1402,9 +1406,9 @@ function renderRadiazione() {
       <div class="sub" id="ctxWindDensity">densità —</div>
     </div>
     <div class="mini">
-      <div class="lbl">⚡ Raggi X (flare)</div>
+      <div class="lbl">⚡ Raggi X (livello attuale)</div>
       <div class="val" id="ctxFlare" style="color:#546e7a">—</div>
-      <div class="sub">classe GOES A/B/C/M/X — spesso precede un evento protonico</div>
+      <div class="sub">flusso GOES in classe A/B/C/M/X — non un brillamento in corso; un flare M/X spesso precede un evento protonico</div>
     </div>
   </aside>
 
