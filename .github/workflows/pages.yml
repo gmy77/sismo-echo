@@ -1,0 +1,49 @@
+# SISMO ECHO su GitHub Pages: dati INGV/NOAA in JSON statici + pagine.
+# Sostituisce il cron e le API del worker sismo-fvg (vedi scripts/build-pages-data.mjs).
+# Nessun commit dei dati: lo storico si rilegge dalla pubblicazione precedente.
+# NB: GitHub sospende i workflow schedulati dopo 60 giorni senza attività sul repo.
+name: Pages — dati e sito
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "pages/**"
+      - "scripts/build-pages-data.mjs"
+      - ".github/workflows/pages.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Scarica INGV e NOAA
+        run: node scripts/build-pages-data.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
