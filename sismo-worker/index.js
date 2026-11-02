@@ -6233,6 +6233,8 @@ function compactStrike(d, id, nowMs) {
 
 function strikeRow(s) { return LIGHTNING_COLS.map(k => (s[k] === undefined ? null : s[k])); }
 
+const LIGHTNING_DISABLED = true;
+
 export class LightningRelay {
   constructor(state, env) {
     this.state = state; this.env = env;
@@ -6571,6 +6573,12 @@ const worker = {
     // viewer, /lightning/status e' un JSON di debug (connesso? quante
     // scariche viste? ultimo errore?).
     if (url.pathname === "/lightning/ws" || url.pathname === "/lightning/status") {
+      // Spento dal 2026-11-02: la connessione TCP diretta al broker MQTT e'
+      // la causa piu' probabile delle segnalazioni di abuso "Network" dell'11/10
+      // che hanno fatto bloccare il worker. Il DO non viene piu' svegliato.
+      if (LIGHTNING_DISABLED) return new Response(JSON.stringify({
+        error: "Fulmini live disattivati"
+      }), { status: 410, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" } });
       if (!env.LIGHTNING_RELAY) return new Response(JSON.stringify({
         error: "Durable Object LIGHTNING_RELAY non configurato: serve un wrangler deploy con la migrazione aggiunta a wrangler.toml"
       }), { status: 503, headers: { "Content-Type": "application/json" } });
