@@ -39,6 +39,11 @@ new_sqlite_classes = ["LightningRelay"]
 [cache]
 enabled = true
 
+# Piano Workers Paid (dal 2026-11): tetto di CPU per invocazione, cosi' un
+# bug o un picco anomalo non brucia ore di CPU a consumo (default Paid: 30 s).
+[limits]
+cpu_ms = 5000
+
 [triggers]
 # Consolidati in un unico cron (stessi orari) per restare nel limite di 5 trigger/account del piano Free
 crons = ["0 8,13,18,23 * * *"]
