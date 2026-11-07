@@ -350,6 +350,144 @@ async function initCFDB(db) {
   `).run();
 }
 
+// ============================================================
+// ARCHIVIO STORICO — terremoti dal 1985 + Kp dal 1932 (import
+// scripts/import-storico.py). Calcolato dal cron e tenuto in KV:
+// la dashboard lo legge già pronto, senza rileggere 280k righe Kp.
+// ============================================================
+const STORICO_KV_KEY = "storico_v1";
+const STORICO_DA     = "1985-01-01";
+const STORICO_MAG    = 2.0;   // soglia omogenea: sotto M2 la rete INGV di 40 anni fa non vedeva tutto
+const STORICO_KP     = 5;     // tempesta geomagnetica (G1+)
+
+async function calcolaStorico(db, dbCf) {
+  const qDays = `SELECT substr(data_ora,1,10) AS g FROM terremoti
+                 WHERE data_ora >= ? AND magnitudine >= ? GROUP BY g`;
+  const qYear = `SELECT substr(data_ora,1,4) AS a, COUNT(*) AS n, MAX(magnitudine) AS m
+                 FROM terremoti WHERE data_ora >= ? GROUP BY a ORDER BY a`;
+  const [kpD, fvgD, fvgY, cfD, cfY] = await Promise.all([
+    db.prepare(`SELECT substr(time_tag,1,10) AS g, MAX(kp_index) AS k FROM dati_solari
+                WHERE time_tag >= ? GROUP BY g ORDER BY g`).bind(STORICO_DA).all(),
+    db.prepare(qDays).bind(STORICO_DA, STORICO_MAG).all(),
+    db.prepare(qYear).bind(STORICO_DA).all(),
+    dbCf ? dbCf.prepare(qDays).bind(STORICO_DA, STORICO_MAG).all() : { results: [] },
+    dbCf ? dbCf.prepare(qYear).bind(STORICO_DA).all()              : { results: [] },
+  ]);
+
+  const kpGiorni = kpD.results.map(r => ({ g: r.g, k: +r.k || 0 }));
+  const giornoDopo = (g, n) => new Date(Date.parse(g + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+
+  // P(almeno un sisma M>=STORICO_MAG nel giorno d+lag | giorno d con Kp max >= STORICO_KP)
+  // contro la stessa probabilità su tutti i giorni: rapporto ~1 = nessun legame.
+  const correla = (giorniSisma) => {
+    const conSisma = new Set(giorniSisma.map(r => r.g));
+    const tutti = kpGiorni.length || 1;
+    const base = kpGiorni.filter(d => conSisma.has(d.g)).length / tutti;
+    const tempeste = kpGiorni.filter(d => d.k >= STORICO_KP);
+    const lag = [0, 1, 2, 3].map(n => {
+      const p = tempeste.length ? tempeste.filter(d => conSisma.has(giornoDopo(d.g, n))).length / tempeste.length : 0;
+      return { lag: n, p, rapporto: base ? p / base : 0 };
+    });
+    return { base, giorni: tutti, tempeste: tempeste.length, lag };
+  };
+
+  // Kp medio annuo: mostra i cicli solari sotto i conteggi dei terremoti
+  const kpAnno = {};
+  for (const d of kpGiorni) { const a = d.g.slice(0, 4); (kpAnno[a] ||= []).push(d.k); }
+  const anni = [...new Set([...fvgY.results.map(r => r.a), ...cfY.results.map(r => r.a), ...Object.keys(kpAnno)])]
+    .filter(a => a >= STORICO_DA.slice(0, 4)).sort();
+  const perAnno = (rows) => Object.fromEntries(rows.map(r => [r.a, { n: r.n, m: r.m }]));
+  const fvgA = perAnno(fvgY.results), cfA = perAnno(cfY.results);
+
+  return {
+    calcolato: new Date().toISOString(),
+    da: STORICO_DA, mag: STORICO_MAG, kp: STORICO_KP,
+    anni: anni.map(a => ({
+      a,
+      fvg: fvgA[a]?.n || 0, fvgMax: fvgA[a]?.m || 0,
+      cf:  cfA[a]?.n  || 0, cfMax:  cfA[a]?.m  || 0,
+      kp:  kpAnno[a] ? kpAnno[a].reduce((s, x) => s + x, 0) / kpAnno[a].length : null,
+    })),
+    fvg: correla(fvgD.results),
+    cf:  correla(cfD.results),
+  };
+}
+
+async function leggiStorico(env) {
+  try {
+    if (env.F4_LEARN) {
+      const raw = await env.F4_LEARN.get(STORICO_KV_KEY);
+      if (raw) return JSON.parse(raw);
+    }
+    const st = await calcolaStorico(env.DB, env.DB_CF);
+    if (env.F4_LEARN) await env.F4_LEARN.put(STORICO_KV_KEY, JSON.stringify(st));
+    return st;
+  } catch (_) { return null; }  // lo storico è un extra: non deve mai rompere la dashboard
+}
+
+function renderStorico(st) {
+  if (!st || !st.anni?.length) return "";
+  const W = 780, H = 150, PAD = 44, n = st.anni.length;
+  const passo = (W - PAD * 2) / n, bw = Math.max(2, passo / 2 - 1);
+  const maxN = Math.max(1, ...st.anni.map(a => Math.max(a.fvg, a.cf)));
+  const kpVals = st.anni.map(a => a.kp).filter(x => x != null);
+  const kpMin = Math.min(...kpVals), kpMax = Math.max(...kpVals);
+  const yKp = k => 18 + H - ((k - kpMin) / ((kpMax - kpMin) || 1)) * (H - 10);
+  const barre = st.anni.map((a, i) => {
+    const x = PAD + i * passo, hF = Math.round(a.fvg / maxN * H), hC = Math.round(a.cf / maxN * H);
+    return `<rect x="${x.toFixed(1)}" y="${18 + H - hF}" width="${bw.toFixed(1)}" height="${hF}" fill="#26c6da" opacity=".85" rx="1"><title>${a.a} FVG: ${a.fvg} eventi, max M${(+a.fvgMax).toFixed(1)}</title></rect>`
+         + `<rect x="${(x + bw + 1).toFixed(1)}" y="${18 + H - hC}" width="${bw.toFixed(1)}" height="${hC}" fill="#e040fb" opacity=".8" rx="1"><title>${a.a} Campi Flegrei: ${a.cf} eventi, max M${(+a.cfMax).toFixed(1)}</title></rect>`;
+  }).join("");
+  const linea = st.anni.map((a, i) => a.kp == null ? null : `${(PAD + i * passo + bw).toFixed(1)},${yKp(a.kp).toFixed(1)}`).filter(Boolean).join(" ");
+  // ogni 5 anni + l'ultimo, ma non se cade a ridosso di un multiplo di 5 (2025/2026 si sovrapponevano)
+  const etich = st.anni.map((a, i) => (+a.a % 5 === 0 || (i === n - 1 && +a.a % 5 >= 3))
+    ? `<text x="${(PAD + i * passo + bw).toFixed(1)}" y="${18 + H + 14}" text-anchor="middle" fill="#455a64" font-size="9" font-family="monospace">${a.a}</text>` : "").join("");
+  const pct = x => (x * 100).toFixed(1) + "%";
+  const col = r => r >= 1.3 ? "#ff6d00" : r >= 1.1 ? "#ffd600" : "#69f0ae";
+  const riga = (nome, c) => `<tr><td style="padding:6px 10px;color:#b0bec5">${nome}</td>
+      <td style="padding:6px 10px;text-align:right;color:#78909c">${pct(c.base)}</td>
+      ${c.lag.map(l => `<td style="padding:6px 10px;text-align:right"><span style="color:#cfd8dc">${pct(l.p)}</span> <span style="color:${col(l.rapporto)};font-size:.85em">×${l.rapporto.toFixed(2)}</span></td>`).join("")}</tr>`;
+  return `
+<!-- ARCHIVIO STORICO -->
+<div class="panel">
+  <div class="panel-header">
+    <span>📚 <span class="acc">ARCHIVIO STORICO</span> — terremoti dal ${st.da.slice(0, 4)} · Kp dal 1932</span>
+    <span style="color:#455a64">INGV · GFZ Potsdam</span>
+  </div>
+  <div class="panel-body" style="overflow-x:auto">
+    <svg width="100%" viewBox="0 0 ${W} ${H + 40}" style="overflow:visible;min-width:520px">
+      <text x="${PAD}" y="11" fill="#26c6da" font-size="10" font-family="monospace" font-weight="700">🌍 Eventi per anno — FVG (M≥0.5) e <tspan fill="#e040fb">Campi Flegrei (M≥0)</tspan> · <tspan fill="#ffd600">— Kp medio annuo</tspan></text>
+      ${barre}
+      <polyline points="${linea}" fill="none" stroke="#ffd600" stroke-width="1.6" opacity=".9"/>
+      <text x="${W - PAD + 5}" y="${yKp(kpMax) + 3}" fill="#ffd600" font-size="8" font-family="monospace">Kp ${kpMax.toFixed(1)}</text>
+      <text x="${W - PAD + 5}" y="${yKp(kpMin) + 3}" fill="#ffd600" font-size="8" font-family="monospace">Kp ${kpMin.toFixed(1)}</text>
+      <text x="${PAD - 6}" y="${18 + 8}" text-anchor="end" fill="#455a64" font-size="8" font-family="monospace">${maxN}</text>
+      ${etich}
+    </svg>
+    <div style="margin-top:18px;font-size:.73em;font-weight:600;color:#26c6da;text-transform:uppercase;letter-spacing:.12em;font-family:'Share Tech Mono',monospace">
+      🔬 Dopo una tempesta geomagnetica (Kp≥${st.kp}) aumentano i terremoti M≥${st.mag.toFixed(1)}?
+    </div>
+    <table style="width:100%;margin-top:8px;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:.78em">
+      <tr style="color:#546e7a;border-bottom:1px solid rgba(255,255,255,.06)">
+        <th style="padding:6px 10px;text-align:left;font-weight:400">Area</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">Giorno qualsiasi</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">Stesso giorno</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">+1 giorno</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">+2 giorni</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">+3 giorni</th>
+      </tr>
+      ${riga("Friuli Venezia Giulia", st.fvg)}
+      ${riga("Campi Flegrei", st.cf)}
+    </table>
+    <div style="margin-top:12px;font-size:.72em;color:#546e7a;font-family:'Share Tech Mono',monospace;line-height:1.8">
+      ℹ Probabilità che ci sia almeno un sisma M≥${st.mag.toFixed(1)} nel giorno indicato, su ${st.fvg.tempeste} giorni di tempesta e ${st.fvg.giorni} giorni totali dal ${st.da.slice(0, 4)}.
+      Il numero ×N confronta con un giorno qualsiasi: <b>×1.00 = nessun legame</b>. Soglia M${st.mag.toFixed(1)} per avere un catalogo omogeneo in 40 anni.
+      Aggiornato ${st.calcolato.slice(0, 16).replace("T", " ")} UTC.
+    </div>
+  </div>
+</div>`;
+}
+
 async function getCFData(db_cf) {
   const [ultimi, stats, top, sismi30, n30d] = await Promise.all([
     db_cf.prepare("SELECT * FROM terremoti ORDER BY data_ora DESC LIMIT 20").all(),
@@ -403,7 +541,7 @@ function fmtRoma(d, conOra = true, conSecondi = false) {
   return s;
 }
 
-function renderDashboard(data, cfData, ingvStatus) {
+function renderDashboard(data, cfData, ingvStatus, storico = null) {
   const { ultimi, stats, mensile, top, solare30, sismi30, kpMax7, rad30, radUltimo } = data;
   const now = fmtRoma(new Date(), true, true);
 
@@ -886,13 +1024,13 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
     ${coincRows}
     <div style="margin-top:16px;padding:12px 16px;background:rgba(38,198,218,.04);border-radius:8px;border-left:3px solid rgba(38,198,218,.25)">
       <div style="font-size:.72em;color:#546e7a;font-family:'Share Tech Mono',monospace;line-height:1.9">
-        ℹ METODOLOGIA: correlazione osservazionale. Il dataset cresce ogni giorno.<br>
-        Delay +24h/+48h/+72h post-tempesta in sviluppo (TODO 2 — Progetto ECHO).<br>
-        Significatività statistica aumenta con l'accumulo dei dati.
+        ℹ METODOLOGIA: correlazione osservazionale sugli ultimi 30 giorni.<br>
+        Il ritardo +24h/+48h/+72h dopo una tempesta, su 40 anni di dati, è nell'Archivio storico qui sotto.
       </div>
     </div>
   </div>
 </div>
+${renderStorico(storico)}
 
 <!-- ============================================================ -->
 <!-- SEZIONE CAMPI FLEGREI                                       -->
@@ -7361,7 +7499,8 @@ const worker = {
       }
       let ingvStatus = null;
       try { if (env.F4_LEARN) { const raw = await env.F4_LEARN.get("ingv_status"); if (raw) ingvStatus = JSON.parse(raw); } } catch(_) {}
-      const html = renderDashboard(d, cfData, ingvStatus);
+      const storico = await leggiStorico(env);
+      const html = renderDashboard(d, cfData, ingvStatus, storico);
       return new Response(html,{headers:{"Content-Type":"text/html;charset=UTF-8"}});
     } catch(e) {
       return new Response(`<h1>Errore dashboard</h1><pre>${e.message}</pre>`,{status:500,headers:{"Content-Type":"text/html"}});
@@ -7404,9 +7543,12 @@ const worker = {
       if (env.DB_CF) await initCFDB(env.DB_CF);
 
       try {
+        // 7 giorni (era 2): INSERT OR IGNORE non duplica, e se il worker resta
+        // fermo qualche giorno il buco si richiude da solo (vedi incidente
+        // dell'11/10-7/11/2026 in MAINTENANCE.md, un mese di dati perso).
         [eventi, eventiCF] = await Promise.all([
-          fetchINGV(2),
-          fetchINGVCF(2),
+          fetchINGV(7),
+          fetchINGVCF(7),
         ]);
         if (env.F4_LEARN) await env.F4_LEARN.put("ingv_status", JSON.stringify({online:true, last_check:new Date().toISOString()}));
       } catch(ingvErr) {
@@ -7420,6 +7562,12 @@ const worker = {
       if (solare.kpData.length>0) await salvaSolare(env.DB, solare.kpData);
       radiazione = await fetchRadiazione(solare.kpData, solare.windData);
       if (radiazione.length>0) await salvaRadiazione(env.DB, radiazione);
+      // Archivio storico: ricalcolato dopo i nuovi dati, letto dalla dashboard da KV
+      try {
+        if (env.F4_LEARN) await env.F4_LEARN.put(STORICO_KV_KEY, JSON.stringify(await calcolaStorico(env.DB, env.DB_CF)));
+      } catch (eSt) {
+        await logDiag(env.DB, "cron", "storico_error", { error: String(eSt) }, "da_guardare");
+      }
       // kp/radiazione a 0 = NOAA non ha risposto (fetchSolare/fetchRadiazione
       // inghiottono i propri errori); ingvOk=false = INGV giu', non "nessun sisma".
       await logDiag(env.DB, "cron", "run", { ingvOk, eventi: eventi.length, eventiCF: eventiCF.length,
