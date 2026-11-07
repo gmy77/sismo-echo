@@ -440,6 +440,9 @@ function renderDashboard(data, cfData, ingvStatus) {
   const maxKp  = Math.max(...solare30.map(r=>parseFloat(r.kp_max)||0), 6);
   const maxN   = Math.max(...sismi30.map(r=>parseInt(r.n)||0), 1);
   const W=780, H_KP=90, H_SISMO=75, PAD=44, GAP=28, totalH=H_KP+GAP+H_SISMO+24;
+  // Fascia riservata ai titoli sopra ogni grafico: prima i titoli stavano
+  // dentro l'area delle barre e quelle alte li coprivano.
+  const T_TIT=18, Y_SISMO=T_TIT*2, svgH=totalH+14+Y_SISMO;
   const nDays  = allDays.length||1;
   const barW   = Math.max(2, Math.floor((W-PAD*2)/nDays)-2);
 
@@ -847,15 +850,19 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
     <span style="color:#455a64">☀ Kp index &nbsp;·&nbsp; 🌍 eventi FVG/giorno</span>
   </div>
   <div class="panel-body" style="overflow-x:auto">
-    <svg width="100%" viewBox="0 0 ${W} ${totalH+14}" style="overflow:visible;min-width:520px">
+    <svg width="100%" viewBox="0 0 ${W} ${svgH}" style="overflow:visible;min-width:520px">
       <defs><filter id="glow"><feGaussianBlur stdDeviation="3" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
       <text x="${PAD}" y="11" fill="#26c6da" font-size="10" font-family="monospace" font-weight="700">☀ SOLARE — Kp index (max/giorno)</text>
-      ${kpBars}
-      <line x1="${PAD}" y1="${H_KP+GAP/2}" x2="${W-PAD}" y2="${H_KP+GAP/2}" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
-      <text x="${PAD}" y="${H_KP+GAP+11}" fill="#69f0ae" font-size="10" font-family="monospace" font-weight="700">🌍 SISMICITÀ FVG — eventi/giorno</text>
-      ${sismoBars}
-      ${xLabels}
-      <text x="${W-PAD+5}" y="${H_KP}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
+      <g transform="translate(0,${T_TIT})">
+        ${kpBars}
+        <text x="${W-PAD+5}" y="${H_KP}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
+      </g>
+      <line x1="${PAD}" y1="${T_TIT+H_KP+GAP/2}" x2="${W-PAD}" y2="${T_TIT+H_KP+GAP/2}" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
+      <text x="${PAD}" y="${T_TIT+H_KP+GAP+11}" fill="#69f0ae" font-size="10" font-family="monospace" font-weight="700">🌍 SISMICITÀ FVG — eventi/giorno</text>
+      <g transform="translate(0,${Y_SISMO})">
+        ${sismoBars}
+        ${xLabels}
+      </g>
     </svg>
     <div style="display:flex;gap:18px;margin-top:14px;font-size:.7em;font-family:'Share Tech Mono',monospace;flex-wrap:wrap;color:#546e7a">
       <span><span style="color:#ff1744">■</span> Kp≥7 Tempesta forte</span>
@@ -924,14 +931,18 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
       📡 TIMELINE CORRELAZIONE CF — ultimi 30 giorni
     </div>
     <div style="overflow-x:auto">
-      <svg width="100%" viewBox="0 0 ${W} ${totalH+14}" style="overflow:visible;min-width:520px">
+      <svg width="100%" viewBox="0 0 ${W} ${svgH}" style="overflow:visible;min-width:520px">
         <text x="${PAD}" y="11" fill="${kpColor(parseFloat(kpNow)||0)}" font-size="10" font-family="monospace" font-weight="700">☀ SOLARE — Kp index (max/giorno)</text>
-        ${cfKpBarsSync}
-        <text x="${W-PAD+4}" y="${H_KP-1}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
-        <line x1="${PAD}" y1="${H_KP+GAP/2}" x2="${W-PAD}" y2="${H_KP+GAP/2}" stroke="rgba(224,64,251,.12)" stroke-width="1" stroke-dasharray="4,3"/>
-        <text x="${PAD}" y="${H_KP+GAP-4}" fill="#e040fb" font-size="10" font-family="monospace" font-weight="700">🌋 SISMICITÀ CF — eventi/giorno (M≥0.0)</text>
-        ${cfBars}
-        ${cfXLabels}
+        <g transform="translate(0,${T_TIT})">
+          ${cfKpBarsSync}
+          <text x="${W-PAD+4}" y="${H_KP-1}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
+        </g>
+        <line x1="${PAD}" y1="${T_TIT+H_KP+GAP/2}" x2="${W-PAD}" y2="${T_TIT+H_KP+GAP/2}" stroke="rgba(224,64,251,.12)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="${PAD}" y="${T_TIT+H_KP+GAP+11}" fill="#e040fb" font-size="10" font-family="monospace" font-weight="700">🌋 SISMICITÀ CF — eventi/giorno (M≥0.0)</text>
+        <g transform="translate(0,${Y_SISMO})">
+          ${cfBars}
+          ${cfXLabels}
+        </g>
       </svg>
       <div style="display:flex;gap:18px;margin-top:14px;font-size:.7em;font-family:'Share Tech Mono',monospace;flex-wrap:wrap;color:#546e7a">
         <span><span style="color:#ff1744">■</span> Kp≥7</span>
