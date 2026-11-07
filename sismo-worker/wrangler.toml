@@ -3,6 +3,15 @@ main = "index.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Domini personalizzati del worker. Prima erano collegati solo dalla dashboard
+# e si sono persi quando lo script è stato ricreato (incidente 1101 del
+# 2026-11-07): qui il deploy li rimette sempre.
+routes = [
+  { pattern = "gimmycloud.net", custom_domain = true },
+  { pattern = "www.gimmycloud.net", custom_domain = true },
+  { pattern = "echo.gimmycloud.net", custom_domain = true },
+]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "terremoti-fvg"
