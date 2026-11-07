@@ -6,6 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 # Domini personalizzati del worker. Prima erano collegati solo dalla dashboard
 # e si sono persi quando lo script è stato ricreato (incidente 1101 del
 # 2026-11-07): qui il deploy li rimette sempre.
+# Con delle routes nel file, wrangler spegne workers.dev se non è esplicito:
+# va tenuto acceso (SismoGlobe e il viewer METOP usano sismo-fvg.gimmy077.workers.dev).
+workers_dev = true
+preview_urls = true
 routes = [
   { pattern = "gimmycloud.net", custom_domain = true },
   { pattern = "www.gimmycloud.net", custom_domain = true },
