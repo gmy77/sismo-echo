@@ -141,6 +141,11 @@ CREATE TABLE dati_solari (
 | `GET /update?token=SECRET` | Trigger manuale aggiornamento |
 | `GET /update?token=SECRET&giorni=7` | Fetch ultimi N giorni |
 | `GET /api/solar` | JSON dati solari raw |
+| `GET /api/radiation` | Rilevatore radiazione: ultimi 300 campioni (5 min) + contesto e derivati |
+| `GET /api/radiation/history` | Storico giornaliero del rilevatore + attività solare GFZ dal 1932 (vedi [RADIAZIONE.md](RADIAZIONE.md)) |
+| `GET /radiazione` | Pagina radiazione del worker |
+
+Altre tabelle (`radiazione_spaziale`, `attivita_solare`, `diagnostica`) e lo storico sono descritti in [RADIAZIONE.md](RADIAZIONE.md); manutenzione, secret, incidenti e cartella di deploy in [MAINTENANCE.md](MAINTENANCE.md).
 
 ---
 
