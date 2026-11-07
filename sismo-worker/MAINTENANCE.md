@@ -39,3 +39,38 @@ Per deploy automatizzato tramite GitHub Actions servono secret GitHub o variabil
 - `CLOUDFLARE_ACCOUNT_ID`
 
 Il token deve avere permessi minimi e revocabili. Non salvare mai token nel codice sorgente.
+
+Secret del Worker (Cloudflare, `npx wrangler secret put <NOME>` da questa cartella):
+
+- `UPDATE_SECRET` — **obbligatorio**. Protegge `/update`, `/update-solar`, `/diag/ingest` (`?token=`). Se manca, `getUpdateSecret()` restituisce `""` e un `?token=` vuoto passa: va sempre impostato. Rigenerato il 2026-11-07 (copia cartacea + Documenti + OneDrive del proprietario).
+- `PIXELDRAIN_KEY` — non più usato (Pixeldrain dismesso); la rotta relativa risponde con errore.
+
+## Cartella di deploy
+
+Il deploy si fa **solo** da `C:\ph\sismo-echo\sismo-worker` (questo repo). Sul PC esistono altre cartelle con `name = "sismo-fvg"` nel `wrangler.toml` (copie vecchie e un progetto diverso, `repos\Cloudflare-MCP-Worker`): un `wrangler deploy` lanciato da lì sovrascrive il sito.
+
+## Incidenti
+
+### 2026-11-07 — errore 1101 su tutte le pagine
+
+**Sintomo.** Ogni indirizzo di `sismo-fvg.gimmy077.workers.dev` rispondeva `500 — error code: 1101` ("il Worker ha lanciato un'eccezione"). `wrangler tail` non mostrava nessun log: il codice non arrivava nemmeno a partire. Il problema è emerso subito dopo il passaggio al piano Workers Paid, ma il pagamento non c'entrava.
+
+**Diagnosi (cosa è stato escluso, provandolo).**
+
+- Il codice era sano: girava sia con `wrangler dev` in locale sia con `wrangler dev --remote` sui server Cloudflare.
+- Non erano `[limits] cpu_ms`, `[cache]`, le traces, l'issue detection, il binding del Durable Object `LightningRelay`, né l'account (un Worker nuovo con la stessa identica configurazione funzionava).
+- Prova decisiva: un Worker di una riga (`return new Response("ciao")`) pubblicato **con il nome `sismo-fvg`** dava ugualmente 1101. Il guasto era quindi nell'entità "script sismo-fvg" registrata su Cloudflare, non visibile dalle API.
+- Cancellare 3 secret con nomi anomali (chiavi incollate per sbaglio nel campo nome) non è bastato.
+
+**Soluzione.** Eliminare lo script e ricrearlo con lo stesso nome:
+
+```bash
+npx wrangler delete --name sismo-fvg --force
+npx wrangler deploy
+```
+
+URL workers.dev, database D1, KV e cron sono rimasti intatti (sono risorse separate). **Si sono staccati i domini personalizzati** `gimmycloud.net`, `www.gimmycloud.net`, `echo.gimmycloud.net`, che erano collegati solo dalla dashboard: ora sono in `wrangler.toml` (`routes` con `custom_domain = true`) e ogni deploy li ricollega. Si sono persi anche i secret (reimpostato solo `UPDATE_SECRET`, l'unico usato), la cronologia delle versioni e i dati del Durable Object del relay fulmini (già spento).
+
+**Causa (confermata dalle email).** L'11/10/2026 Cloudflare Trust & Safety ha inviato 4 segnalazioni automatiche di abuso "Network" (ID 605b7c4ca410933e su sismo-fvg; 2c5f30b3bbc0d108, ca166206d5bbba63, d3e7d1de8057bcce sulle copie di test -test, -test2, -test3) e ha bloccato il worker. Il 2/11 Gimmy ha scritto ad abusereply@cloudflare.com chiedendo la revisione: al 7/11 nessuna risposta. Il sospetto era il relay fulmini (`LightningRelay`), che apre una connessione TCP diretta verso il broker MQTT comunitario Blitzortung (porta 1883); per questo il 2/11 è stato spento (`LIGHTNING_DISABLED`, commit bf2d097). Un worker bloccato da Cloudflare si comporta esattamente così: 1101 ovunque, nessun log, anche un hello world col suo nome fallisce. Il piano Paid non sblocca un worker segnalato. **Non riaccendere il relay così com'è**: rischio di nuovo blocco, anche sull'intero account. Prima chiedere al supporto Cloudflare cosa aveva fatto scattare la segnalazione, oppure spostare il relay fuori da Cloudflare (es. sul PC).
+
+**Lezione.** Se il Worker dà 1101 senza nessun log e anche un "hello world" pubblicato col suo nome fallisce, non cercare nel codice: ricreare lo script. Prima di farlo, annotare l'elenco dei secret (`npx wrangler secret list`) e avere a portata di mano i loro valori.

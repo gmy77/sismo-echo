@@ -9,13 +9,14 @@ const ECHO_VERSION = "3.13";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
-const NOAA_WIND   = "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json";
+// riassunto NOAA da ~60 byte: rtsw_wind_1m.json pesa 2,7 MB e il solo parse sforava i 10 ms di CPU del piano Free
+const NOAA_WIND   = "https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json";
 // Radiazione spaziale — GOES (protoni/elettroni fascia di Van Allen) + scala tempeste di radiazione NOAA
 // Dati pubblici, nessuna chiave richiesta. Sostituto "open" ai dati NORM/ASBM2 (accesso riservato, vedi README).
 const NOAA_PROTON  = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json";
 const NOAA_ELECTRON= "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-1-day.json";
 const NOAA_SCALES  = "https://services.swpc.noaa.gov/products/noaa-scales.json";
-const NOAA_XRAY    = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json";
+const NOAA_XRAY    = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json"; // serve solo l'ultimo valore: 160 KB invece di 650
 
 // Aggiunge una colonna se manca — D1/SQLite non supporta ADD COLUMN IF NOT EXISTS,
 // quindi tentiamo e ignoriamo l'errore "duplicate column" se esiste già (tabelle già in produzione).
@@ -121,14 +122,12 @@ async function fetchINGV(giorni = 2) { return fetchINGVArea(FVG, giorni, 0.5); }
 async function fetchINGVCF(giorni = 2) { return fetchINGVArea(CF, giorni, 0.0); }
 
 async function salvaEventi(db, eventi) {
-  let nuovi = 0;
-  for (const e of eventi) {
-    const r = await db.prepare(
-      `INSERT OR IGNORE INTO terremoti (event_id,data_ora,magnitudine,latitudine,longitudine,profondita,localita)
-       VALUES (?,?,?,?,?,?,?)`
-    ).bind(e.id,e.data_ora,e.magnitudine,e.latitudine,e.longitudine,e.profondita,e.localita).run();
-    if (r.meta.changes > 0) nuovi++;
-  }
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO terremoti (event_id,data_ora,magnitudine,latitudine,longitudine,profondita,localita)
+     VALUES (?,?,?,?,?,?,?)`);
+  const res = eventi.length ? await db.batch(eventi.map(e =>
+    ins.bind(e.id,e.data_ora,e.magnitudine,e.latitudine,e.longitudine,e.profondita,e.localita))) : [];
+  const nuovi = res.filter(r => r.meta && r.meta.changes > 0).length;
   const { results } = await db.prepare("SELECT COUNT(*) as n FROM terremoti").all();
   const totale = results[0].n;
   await db.prepare("INSERT INTO fetch_log (data_fetch,nuovi,totale) VALUES (?,?,?)")
@@ -162,14 +161,11 @@ async function fetchSolare() {
     let windData = null;
     if (windRes.status === 'fulfilled' && windRes.value.ok) {
       const raw = await windRes.value.json();
-      // il feed è ordinato dal più recente e mescola più sonde (SOLAR1/ACE/IMAP):
-      // prendere l'ultimo elemento dava il dato di 24h prima e di una sonda non attiva
-      const last = (Array.isArray(raw) ? raw : [])
-        .filter(r => r.active && r.proton_speed != null)
-        .sort((a,b) => String(b.time_tag).localeCompare(String(a.time_tag)))[0] || {};
+      // riassunto NOAA della sonda attiva: [{proton_speed, time_tag}]
+      const last = (Array.isArray(raw) ? raw[0] : raw) || {};
       windData = {
         speed:   parseFloat(last.proton_speed)||null,
-        density: parseFloat(last.proton_density)||null,
+        density: null,
         time:    last.time_tag||null,
       };
     }
@@ -181,11 +177,9 @@ async function fetchSolare() {
 }
 
 async function salvaSolare(db, kpData) {
-  for (const r of kpData) {
-    await db.prepare(
-      `INSERT OR IGNORE INTO dati_solari (time_tag, kp_index) VALUES (?,?)`
-    ).bind(r.time, r.kp).run();
-  }
+  if (!kpData.length) return;
+  const ins = db.prepare(`INSERT OR IGNORE INTO dati_solari (time_tag, kp_index) VALUES (?,?)`);
+  await db.batch(kpData.map(r => ins.bind(r.time, r.kp)));
 }
 
 // ============================================================
@@ -266,8 +260,8 @@ async function fetchRadiazione(kpData, windData) {
 }
 
 async function salvaRadiazione(db, radData) {
-  for (const r of radData) {
-    await db.prepare(
+  if (!radData.length) return;
+  const up = db.prepare(
       `INSERT INTO radiazione_spaziale
          (time_tag, proton_10mev, proton_100mev, electron_2mev, s_scale, kp_now, wind_speed, wind_density, xray_flux, flare_class)
        VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -280,12 +274,11 @@ async function salvaRadiazione(db, radData) {
          wind_speed    = COALESCE(excluded.wind_speed,    radiazione_spaziale.wind_speed),
          wind_density  = COALESCE(excluded.wind_density,  radiazione_spaziale.wind_density),
          xray_flux     = COALESCE(excluded.xray_flux,     radiazione_spaziale.xray_flux),
-         flare_class   = COALESCE(excluded.flare_class,   radiazione_spaziale.flare_class)`
-    ).bind(
-      r.time, r.proton10, r.proton100, r.electron2, r.s_scale??null,
-      r.kp_now??null, r.wind_speed??null, r.wind_density??null, r.xray_flux??null, r.flare_class??null
-    ).run();
-  }
+         flare_class   = COALESCE(excluded.flare_class,   radiazione_spaziale.flare_class)`);
+  await db.batch(radData.map(r => up.bind(
+    r.time, r.proton10, r.proton100, r.electron2, r.s_scale??null,
+    r.kp_now??null, r.wind_speed??null, r.wind_density??null, r.xray_flux??null, r.flare_class??null
+  )));
 }
 
 // ============================================================
@@ -357,6 +350,144 @@ async function initCFDB(db) {
   `).run();
 }
 
+// ============================================================
+// ARCHIVIO STORICO — terremoti dal 1985 + Kp dal 1932 (import
+// scripts/import-storico.py). Calcolato dal cron e tenuto in KV:
+// la dashboard lo legge già pronto, senza rileggere 280k righe Kp.
+// ============================================================
+const STORICO_KV_KEY = "storico_v1";
+const STORICO_DA     = "1985-01-01";
+const STORICO_MAG    = 2.0;   // soglia omogenea: sotto M2 la rete INGV di 40 anni fa non vedeva tutto
+const STORICO_KP     = 5;     // tempesta geomagnetica (G1+)
+
+async function calcolaStorico(db, dbCf) {
+  const qDays = `SELECT substr(data_ora,1,10) AS g FROM terremoti
+                 WHERE data_ora >= ? AND magnitudine >= ? GROUP BY g`;
+  const qYear = `SELECT substr(data_ora,1,4) AS a, COUNT(*) AS n, MAX(magnitudine) AS m
+                 FROM terremoti WHERE data_ora >= ? GROUP BY a ORDER BY a`;
+  const [kpD, fvgD, fvgY, cfD, cfY] = await Promise.all([
+    db.prepare(`SELECT substr(time_tag,1,10) AS g, MAX(kp_index) AS k FROM dati_solari
+                WHERE time_tag >= ? GROUP BY g ORDER BY g`).bind(STORICO_DA).all(),
+    db.prepare(qDays).bind(STORICO_DA, STORICO_MAG).all(),
+    db.prepare(qYear).bind(STORICO_DA).all(),
+    dbCf ? dbCf.prepare(qDays).bind(STORICO_DA, STORICO_MAG).all() : { results: [] },
+    dbCf ? dbCf.prepare(qYear).bind(STORICO_DA).all()              : { results: [] },
+  ]);
+
+  const kpGiorni = kpD.results.map(r => ({ g: r.g, k: +r.k || 0 }));
+  const giornoDopo = (g, n) => new Date(Date.parse(g + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+
+  // P(almeno un sisma M>=STORICO_MAG nel giorno d+lag | giorno d con Kp max >= STORICO_KP)
+  // contro la stessa probabilità su tutti i giorni: rapporto ~1 = nessun legame.
+  const correla = (giorniSisma) => {
+    const conSisma = new Set(giorniSisma.map(r => r.g));
+    const tutti = kpGiorni.length || 1;
+    const base = kpGiorni.filter(d => conSisma.has(d.g)).length / tutti;
+    const tempeste = kpGiorni.filter(d => d.k >= STORICO_KP);
+    const lag = [0, 1, 2, 3].map(n => {
+      const p = tempeste.length ? tempeste.filter(d => conSisma.has(giornoDopo(d.g, n))).length / tempeste.length : 0;
+      return { lag: n, p, rapporto: base ? p / base : 0 };
+    });
+    return { base, giorni: tutti, tempeste: tempeste.length, lag };
+  };
+
+  // Kp medio annuo: mostra i cicli solari sotto i conteggi dei terremoti
+  const kpAnno = {};
+  for (const d of kpGiorni) { const a = d.g.slice(0, 4); (kpAnno[a] ||= []).push(d.k); }
+  const anni = [...new Set([...fvgY.results.map(r => r.a), ...cfY.results.map(r => r.a), ...Object.keys(kpAnno)])]
+    .filter(a => a >= STORICO_DA.slice(0, 4)).sort();
+  const perAnno = (rows) => Object.fromEntries(rows.map(r => [r.a, { n: r.n, m: r.m }]));
+  const fvgA = perAnno(fvgY.results), cfA = perAnno(cfY.results);
+
+  return {
+    calcolato: new Date().toISOString(),
+    da: STORICO_DA, mag: STORICO_MAG, kp: STORICO_KP,
+    anni: anni.map(a => ({
+      a,
+      fvg: fvgA[a]?.n || 0, fvgMax: fvgA[a]?.m || 0,
+      cf:  cfA[a]?.n  || 0, cfMax:  cfA[a]?.m  || 0,
+      kp:  kpAnno[a] ? kpAnno[a].reduce((s, x) => s + x, 0) / kpAnno[a].length : null,
+    })),
+    fvg: correla(fvgD.results),
+    cf:  correla(cfD.results),
+  };
+}
+
+async function leggiStorico(env) {
+  try {
+    if (env.F4_LEARN) {
+      const raw = await env.F4_LEARN.get(STORICO_KV_KEY);
+      if (raw) return JSON.parse(raw);
+    }
+    const st = await calcolaStorico(env.DB, env.DB_CF);
+    if (env.F4_LEARN) await env.F4_LEARN.put(STORICO_KV_KEY, JSON.stringify(st));
+    return st;
+  } catch (_) { return null; }  // lo storico è un extra: non deve mai rompere la dashboard
+}
+
+function renderStorico(st) {
+  if (!st || !st.anni?.length) return "";
+  const W = 780, H = 150, PAD = 44, n = st.anni.length;
+  const passo = (W - PAD * 2) / n, bw = Math.max(2, passo / 2 - 1);
+  const maxN = Math.max(1, ...st.anni.map(a => Math.max(a.fvg, a.cf)));
+  const kpVals = st.anni.map(a => a.kp).filter(x => x != null);
+  const kpMin = Math.min(...kpVals), kpMax = Math.max(...kpVals);
+  const yKp = k => 18 + H - ((k - kpMin) / ((kpMax - kpMin) || 1)) * (H - 10);
+  const barre = st.anni.map((a, i) => {
+    const x = PAD + i * passo, hF = Math.round(a.fvg / maxN * H), hC = Math.round(a.cf / maxN * H);
+    return `<rect x="${x.toFixed(1)}" y="${18 + H - hF}" width="${bw.toFixed(1)}" height="${hF}" fill="#26c6da" opacity=".85" rx="1"><title>${a.a} FVG: ${a.fvg} eventi, max M${(+a.fvgMax).toFixed(1)}</title></rect>`
+         + `<rect x="${(x + bw + 1).toFixed(1)}" y="${18 + H - hC}" width="${bw.toFixed(1)}" height="${hC}" fill="#e040fb" opacity=".8" rx="1"><title>${a.a} Campi Flegrei: ${a.cf} eventi, max M${(+a.cfMax).toFixed(1)}</title></rect>`;
+  }).join("");
+  const linea = st.anni.map((a, i) => a.kp == null ? null : `${(PAD + i * passo + bw).toFixed(1)},${yKp(a.kp).toFixed(1)}`).filter(Boolean).join(" ");
+  // ogni 5 anni + l'ultimo, ma non se cade a ridosso di un multiplo di 5 (2025/2026 si sovrapponevano)
+  const etich = st.anni.map((a, i) => (+a.a % 5 === 0 || (i === n - 1 && +a.a % 5 >= 3))
+    ? `<text x="${(PAD + i * passo + bw).toFixed(1)}" y="${18 + H + 14}" text-anchor="middle" fill="#455a64" font-size="9" font-family="monospace">${a.a}</text>` : "").join("");
+  const pct = x => (x * 100).toFixed(1) + "%";
+  const col = r => r >= 1.3 ? "#ff6d00" : r >= 1.1 ? "#ffd600" : "#69f0ae";
+  const riga = (nome, c) => `<tr><td style="padding:6px 10px;color:#b0bec5">${nome}</td>
+      <td style="padding:6px 10px;text-align:right;color:#78909c">${pct(c.base)}</td>
+      ${c.lag.map(l => `<td style="padding:6px 10px;text-align:right"><span style="color:#cfd8dc">${pct(l.p)}</span> <span style="color:${col(l.rapporto)};font-size:.85em">×${l.rapporto.toFixed(2)}</span></td>`).join("")}</tr>`;
+  return `
+<!-- ARCHIVIO STORICO -->
+<div class="panel">
+  <div class="panel-header">
+    <span>📚 <span class="acc">ARCHIVIO STORICO</span> — terremoti dal ${st.da.slice(0, 4)} · Kp dal 1932</span>
+    <span style="color:#455a64">INGV · GFZ Potsdam</span>
+  </div>
+  <div class="panel-body" style="overflow-x:auto">
+    <svg width="100%" viewBox="0 0 ${W} ${H + 40}" style="overflow:visible;min-width:520px">
+      <text x="${PAD}" y="11" fill="#26c6da" font-size="10" font-family="monospace" font-weight="700">🌍 Eventi per anno — FVG (M≥0.5) e <tspan fill="#e040fb">Campi Flegrei (M≥0)</tspan> · <tspan fill="#ffd600">— Kp medio annuo</tspan></text>
+      ${barre}
+      <polyline points="${linea}" fill="none" stroke="#ffd600" stroke-width="1.6" opacity=".9"/>
+      <text x="${W - PAD + 5}" y="${yKp(kpMax) + 3}" fill="#ffd600" font-size="8" font-family="monospace">Kp ${kpMax.toFixed(1)}</text>
+      <text x="${W - PAD + 5}" y="${yKp(kpMin) + 3}" fill="#ffd600" font-size="8" font-family="monospace">Kp ${kpMin.toFixed(1)}</text>
+      <text x="${PAD - 6}" y="${18 + 8}" text-anchor="end" fill="#455a64" font-size="8" font-family="monospace">${maxN}</text>
+      ${etich}
+    </svg>
+    <div style="margin-top:18px;font-size:.73em;font-weight:600;color:#26c6da;text-transform:uppercase;letter-spacing:.12em;font-family:'Share Tech Mono',monospace">
+      🔬 Dopo una tempesta geomagnetica (Kp≥${st.kp}) aumentano i terremoti M≥${st.mag.toFixed(1)}?
+    </div>
+    <table style="width:100%;margin-top:8px;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:.78em">
+      <tr style="color:#546e7a;border-bottom:1px solid rgba(255,255,255,.06)">
+        <th style="padding:6px 10px;text-align:left;font-weight:400">Area</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">Giorno qualsiasi</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">Stesso giorno</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">+1 giorno</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">+2 giorni</th>
+        <th style="padding:6px 10px;text-align:right;font-weight:400">+3 giorni</th>
+      </tr>
+      ${riga("Friuli Venezia Giulia", st.fvg)}
+      ${riga("Campi Flegrei", st.cf)}
+    </table>
+    <div style="margin-top:12px;font-size:.72em;color:#546e7a;font-family:'Share Tech Mono',monospace;line-height:1.8">
+      ℹ Probabilità che ci sia almeno un sisma M≥${st.mag.toFixed(1)} nel giorno indicato, su ${st.fvg.tempeste} giorni di tempesta e ${st.fvg.giorni} giorni totali dal ${st.da.slice(0, 4)}.
+      Il numero ×N confronta con un giorno qualsiasi: <b>×1.00 = nessun legame</b>. Soglia M${st.mag.toFixed(1)} per avere un catalogo omogeneo in 40 anni.
+      Aggiornato ${st.calcolato.slice(0, 16).replace("T", " ")} UTC.
+    </div>
+  </div>
+</div>`;
+}
+
 async function getCFData(db_cf) {
   const [ultimi, stats, top, sismi30, n30d] = await Promise.all([
     db_cf.prepare("SELECT * FROM terremoti ORDER BY data_ora DESC LIMIT 20").all(),
@@ -389,13 +520,34 @@ const sLabel   = s => s>=4?`S${s} TEMPESTA SEVERA`:s>=3?`S${s} FORTE`:s>=2?`S${s
 // ============================================================
 // HTML DASHBOARD v2
 // ============================================================
-function renderDashboard(data, cfData, ingvStatus) {
+// Date in ora italiana senza Intl: lato server, a freddo, toLocaleString con
+// timeZone costa decine di ms di CPU (inizializzazione ICU) — da solo sforava
+// il limite di 10 ms del piano Free. Ora legale UE: dall'ultima domenica di
+// marzo all'ultima di ottobre, cambio alle 01:00 UTC.
+function ultimaDomenicaUTC(anno, mese) {
+  const d = new Date(Date.UTC(anno, mese + 1, 0, 1));   // ultimo giorno del mese, 01:00 UTC
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  return d.getTime();
+}
+const p2 = n => String(n).padStart(2, "0");
+function fmtRoma(d, conOra = true, conSecondi = false) {
+  if (!(d instanceof Date)) d = new Date(d);
+  if (isNaN(d)) return "—";
+  const t = d.getTime(), anno = d.getUTCFullYear();
+  const legale = t >= ultimaDomenicaUTC(anno, 2) && t < ultimaDomenicaUTC(anno, 9);
+  const r = new Date(t + (legale ? 2 : 1) * 3600000);  // i campi UTC di r sono l'ora di Roma
+  let s = p2(r.getUTCDate()) + "/" + p2(r.getUTCMonth() + 1) + "/" + r.getUTCFullYear();
+  if (conOra) s += ", " + p2(r.getUTCHours()) + ":" + p2(r.getUTCMinutes()) + (conSecondi ? ":" + p2(r.getUTCSeconds()) : "");
+  return s;
+}
+
+function renderDashboard(data, cfData, ingvStatus, storico = null) {
   const { ultimi, stats, mensile, top, solare30, sismi30, kpMax7, rad30, radUltimo } = data;
-  const now = new Date().toLocaleString("it-IT",{timeZone:"Europe/Rome"});
+  const now = fmtRoma(new Date(), true, true);
 
   const ultiRows = ultimi.slice(0,50).map(e => {
     const d = new Date(e.data_ora);
-    const dIT = d.toLocaleString("it-IT",{timeZone:"Europe/Rome",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    const dIT = fmtRoma(d);
     const m = e.magnitudine;
     return `<tr style="background:${magBg(m)};border-bottom:1px solid rgba(255,255,255,.04)">
       <td style="padding:9px 14px;font-weight:700;color:${magColor(m)};font-size:1.1em;font-family:'Share Tech Mono',monospace">M${m.toFixed(1)}</td>
@@ -412,7 +564,7 @@ function renderDashboard(data, cfData, ingvStatus) {
       <span style="font-size:1.5em;font-weight:800;color:${magColor(e.magnitudine)}">M${e.magnitudine.toFixed(1)}</span>
       <div style="flex:1;min-width:0">
         <div style="color:#eceff1;font-size:.88em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.localita}</div>
-        <div style="color:#546e7a;font-size:.75em">${new Date(e.data_ora).toLocaleDateString("it-IT")}</div>
+        <div style="color:#546e7a;font-size:.75em">${fmtRoma(e.data_ora, false)}</div>
       </div>
     </div>`;
   }).join("");
@@ -426,6 +578,9 @@ function renderDashboard(data, cfData, ingvStatus) {
   const maxKp  = Math.max(...solare30.map(r=>parseFloat(r.kp_max)||0), 6);
   const maxN   = Math.max(...sismi30.map(r=>parseInt(r.n)||0), 1);
   const W=780, H_KP=90, H_SISMO=75, PAD=44, GAP=28, totalH=H_KP+GAP+H_SISMO+24;
+  // Fascia riservata ai titoli sopra ogni grafico: prima i titoli stavano
+  // dentro l'area delle barre e quelle alte li coprivano.
+  const T_TIT=18, Y_SISMO=T_TIT*2, svgH=totalH+14+Y_SISMO;
   const nDays  = allDays.length||1;
   const barW   = Math.max(2, Math.floor((W-PAD*2)/nDays)-2);
 
@@ -559,7 +714,7 @@ function renderDashboard(data, cfData, ingvStatus) {
 
   const cfUltiRows = cfUltimi.map(e=>{
     const d=new Date(e.data_ora);
-    const dIT=d.toLocaleString("it-IT",{timeZone:"Europe/Rome",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    const dIT=fmtRoma(d);
     const m=e.magnitudine;
     return `<tr style="background:${magBg(m)};border-bottom:1px solid rgba(255,255,255,.04)">
       <td style="padding:9px 14px;font-weight:700;color:${magColor(m)};font-size:1.1em;font-family:'Share Tech Mono',monospace">M${m.toFixed(1)}</td>
@@ -784,7 +939,7 @@ body{padding-bottom:84px}
 <body>
 <div class="container">
 
-${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStatus.last_check?` &bull; Ultimo controllo: ${new Date(ingvStatus.last_check).toLocaleString("it-IT",{timeZone:"Europe/Rome"})}`:"";const er=ingvStatus&&ingvStatus.last_error?` <span style="color:#37474f;font-size:.88em">[${ingvStatus.last_error}]</span>`:"";return `<div style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.4);border-radius:10px;padding:14px 20px;margin-bottom:22px;display:flex;align-items:flex-start;gap:14px">` +`<span style="font-size:1.5em;flex-shrink:0">&#x26A0;&#xFE0F;</span>` +`<div><div style="color:#ff5252;font-weight:700;font-size:.88em;letter-spacing:.05em;margin-bottom:5px;font-family:'Share Tech Mono',monospace">` +`INGV OFFLINE &#x2014; SERVIZIO SISMICO TEMPORANEAMENTE NON DISPONIBILE</div>` +`<div style="color:#90a4ae;font-size:.77em;line-height:1.65">` +`Il server <strong style="color:#cfd8dc">INGV</strong> non risponde al momento. ` +`I dati mostrati sono quelli dell'ultimo aggiornamento riuscito. ` +`<span style="color:#546e7a">Questo disservizio riguarda i sistemi INGV, non la nostra dashboard.</span>` +lc+er+`</div></div></div>`;}return "";})()}
+${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStatus.last_check?` &bull; Ultimo controllo: ${fmtRoma(ingvStatus.last_check, true, true)}`:"";const er=ingvStatus&&ingvStatus.last_error?` <span style="color:#37474f;font-size:.88em">[${ingvStatus.last_error}]</span>`:"";return `<div style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.4);border-radius:10px;padding:14px 20px;margin-bottom:22px;display:flex;align-items:flex-start;gap:14px">` +`<span style="font-size:1.5em;flex-shrink:0">&#x26A0;&#xFE0F;</span>` +`<div><div style="color:#ff5252;font-weight:700;font-size:.88em;letter-spacing:.05em;margin-bottom:5px;font-family:'Share Tech Mono',monospace">` +`INGV OFFLINE &#x2014; SERVIZIO SISMICO TEMPORANEAMENTE NON DISPONIBILE</div>` +`<div style="color:#90a4ae;font-size:.77em;line-height:1.65">` +`Il server <strong style="color:#cfd8dc">INGV</strong> non risponde al momento. ` +`I dati mostrati sono quelli dell'ultimo aggiornamento riuscito. ` +`<span style="color:#546e7a">Questo disservizio riguarda i sistemi INGV, non la nostra dashboard.</span>` +lc+er+`</div></div></div>`;}return "";})()}
 
 <header>
   <div class="logo">
@@ -807,7 +962,7 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
   <div class="stat-card blue">
     <div class="stat-label">🌍 Totale eventi FVG</div>
     <div class="stat-value">${stats.totale||0}</div>
-    <div class="stat-sub">dal ${stats.primo?new Date(stats.primo).toLocaleDateString("it-IT"):'—'}</div>
+    <div class="stat-sub">dal ${stats.primo?fmtRoma(stats.primo, false):'—'}</div>
   </div>
   <div class="stat-card orange">
     <div class="stat-label">⚡ Magnitudo massima</div>
@@ -833,15 +988,19 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
     <span style="color:#455a64">☀ Kp index &nbsp;·&nbsp; 🌍 eventi FVG/giorno</span>
   </div>
   <div class="panel-body" style="overflow-x:auto">
-    <svg width="100%" viewBox="0 0 ${W} ${totalH+14}" style="overflow:visible;min-width:520px">
+    <svg width="100%" viewBox="0 0 ${W} ${svgH}" style="overflow:visible;min-width:520px">
       <defs><filter id="glow"><feGaussianBlur stdDeviation="3" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
       <text x="${PAD}" y="11" fill="#26c6da" font-size="10" font-family="monospace" font-weight="700">☀ SOLARE — Kp index (max/giorno)</text>
-      ${kpBars}
-      <line x1="${PAD}" y1="${H_KP+GAP/2}" x2="${W-PAD}" y2="${H_KP+GAP/2}" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
-      <text x="${PAD}" y="${H_KP+GAP+11}" fill="#69f0ae" font-size="10" font-family="monospace" font-weight="700">🌍 SISMICITÀ FVG — eventi/giorno</text>
-      ${sismoBars}
-      ${xLabels}
-      <text x="${W-PAD+5}" y="${H_KP}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
+      <g transform="translate(0,${T_TIT})">
+        ${kpBars}
+        <text x="${W-PAD+5}" y="${H_KP}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
+      </g>
+      <line x1="${PAD}" y1="${T_TIT+H_KP+GAP/2}" x2="${W-PAD}" y2="${T_TIT+H_KP+GAP/2}" stroke="rgba(255,255,255,.05)" stroke-width="1" stroke-dasharray="4,4"/>
+      <text x="${PAD}" y="${T_TIT+H_KP+GAP+11}" fill="#69f0ae" font-size="10" font-family="monospace" font-weight="700">🌍 SISMICITÀ FVG — eventi/giorno</text>
+      <g transform="translate(0,${Y_SISMO})">
+        ${sismoBars}
+        ${xLabels}
+      </g>
     </svg>
     <div style="display:flex;gap:18px;margin-top:14px;font-size:.7em;font-family:'Share Tech Mono',monospace;flex-wrap:wrap;color:#546e7a">
       <span><span style="color:#ff1744">■</span> Kp≥7 Tempesta forte</span>
@@ -865,13 +1024,13 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
     ${coincRows}
     <div style="margin-top:16px;padding:12px 16px;background:rgba(38,198,218,.04);border-radius:8px;border-left:3px solid rgba(38,198,218,.25)">
       <div style="font-size:.72em;color:#546e7a;font-family:'Share Tech Mono',monospace;line-height:1.9">
-        ℹ METODOLOGIA: correlazione osservazionale. Il dataset cresce ogni giorno.<br>
-        Delay +24h/+48h/+72h post-tempesta in sviluppo (TODO 2 — Progetto ECHO).<br>
-        Significatività statistica aumenta con l'accumulo dei dati.
+        ℹ METODOLOGIA: correlazione osservazionale sugli ultimi 30 giorni.<br>
+        Il ritardo +24h/+48h/+72h dopo una tempesta, su 40 anni di dati, è nell'Archivio storico qui sotto.
       </div>
     </div>
   </div>
 </div>
+${renderStorico(storico)}
 
 <!-- ============================================================ -->
 <!-- SEZIONE CAMPI FLEGREI                                       -->
@@ -910,14 +1069,18 @@ ${(()=>{if(!ingvStatus||ingvStatus.online===false){const lc=ingvStatus&&ingvStat
       📡 TIMELINE CORRELAZIONE CF — ultimi 30 giorni
     </div>
     <div style="overflow-x:auto">
-      <svg width="100%" viewBox="0 0 ${W} ${totalH+14}" style="overflow:visible;min-width:520px">
+      <svg width="100%" viewBox="0 0 ${W} ${svgH}" style="overflow:visible;min-width:520px">
         <text x="${PAD}" y="11" fill="${kpColor(parseFloat(kpNow)||0)}" font-size="10" font-family="monospace" font-weight="700">☀ SOLARE — Kp index (max/giorno)</text>
-        ${cfKpBarsSync}
-        <text x="${W-PAD+4}" y="${H_KP-1}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
-        <line x1="${PAD}" y1="${H_KP+GAP/2}" x2="${W-PAD}" y2="${H_KP+GAP/2}" stroke="rgba(224,64,251,.12)" stroke-width="1" stroke-dasharray="4,3"/>
-        <text x="${PAD}" y="${H_KP+GAP-4}" fill="#e040fb" font-size="10" font-family="monospace" font-weight="700">🌋 SISMICITÀ CF — eventi/giorno (M≥0.0)</text>
-        ${cfBars}
-        ${cfXLabels}
+        <g transform="translate(0,${T_TIT})">
+          ${cfKpBarsSync}
+          <text x="${W-PAD+4}" y="${H_KP-1}" fill="#455a64" font-size="8" font-family="monospace">${maxKp.toFixed(0)}</text>
+        </g>
+        <line x1="${PAD}" y1="${T_TIT+H_KP+GAP/2}" x2="${W-PAD}" y2="${T_TIT+H_KP+GAP/2}" stroke="rgba(224,64,251,.12)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="${PAD}" y="${T_TIT+H_KP+GAP+11}" fill="#e040fb" font-size="10" font-family="monospace" font-weight="700">🌋 SISMICITÀ CF — eventi/giorno (M≥0.0)</text>
+        <g transform="translate(0,${Y_SISMO})">
+          ${cfBars}
+          ${cfXLabels}
+        </g>
       </svg>
       <div style="display:flex;gap:18px;margin-top:14px;font-size:.7em;font-family:'Share Tech Mono',monospace;flex-wrap:wrap;color:#546e7a">
         <span><span style="color:#ff1744">■</span> Kp≥7</span>
@@ -1406,6 +1569,16 @@ function renderRadiazione() {
       <div class="sub" id="ctxWindDensity">densità —</div>
     </div>
     <div class="mini">
+      <div class="lbl">🧲 Bz — campo magnetico</div>
+      <div class="val" id="ctxBz" style="color:#546e7a">—</div>
+      <div class="sub" id="ctxBzSub">componente nord-sud a L1 · negativo = porta aperta</div>
+    </div>
+    <div class="mini">
+      <div class="lbl">⏱ Arrivo a Terra</div>
+      <div class="val" id="ctxEta" style="font-size:1.1em">—</div>
+      <div class="sub" id="ctxEtaSub">tempo di volo da L1 (≈1,5 mln km)</div>
+    </div>
+    <div class="mini">
       <div class="lbl">⚡ Raggi X (livello attuale)</div>
       <div class="val" id="ctxFlare" style="color:#546e7a">—</div>
       <div class="sub">flusso GOES in classe A/B/C/M/X — non un brillamento in corso; un flare M/X spesso precede un evento protonico</div>
@@ -1441,6 +1614,16 @@ function renderRadiazione() {
   </div>
 
   <div class="panel">
+    <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">🧲 VENTO SOLARE A L1 — Bz ultime 3 ore (live NOAA RTSW)</div>
+    <div id="chartBz" style="overflow-x:auto"><div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">caricamento dati L1…</div></div>
+    <div class="legend">
+      <span><span style="color:#69f0ae">▬</span> Bz nord (&gt;0): magnetosfera chiusa</span>
+      <span><span style="color:#ff6d00">▬</span> Bz sud (&lt;0): il vento entra — conta la durata</span>
+    </div>
+    <div class="note" id="l1Note" style="display:none"></div>
+  </div>
+
+  <div class="panel">
     <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">📈 FLUSSO PROTONI &gt;10 MeV — scala logaritmica, soglie S1-S5</div>
     <div id="chartP" style="overflow-x:auto"></div>
     <div class="legend">
@@ -1456,7 +1639,17 @@ function renderRadiazione() {
     <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">📈 FLUSSO ELETTRONI &gt;2 MeV — scala logaritmica</div>
     <div id="chartE" style="overflow-x:auto"></div>
     <div class="legend">
-      <span><span style="color:#7cc7ff">▬</span> soglia rischio "surface charging" ≈ 1.000 pfu (convenzione operativa satelliti)</span>
+      <span><span style="color:#7cc7ff">▬</span> soglia allerta NOAA elettroni &gt;2 MeV = 1.000 pfu (rischio cariche interne nei satelliti)</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lbl" style="color:#7cc7ff;margin-bottom:10px">🔮 PREVISIONE Kp — ultime 24h osservate + 3 giorni previsti (NOAA SWPC)</div>
+    <div id="chartKp" style="overflow-x:auto"><div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">caricamento previsione…</div></div>
+    <div class="legend">
+      <span>▮ pieno = osservato · ▮ medio = stimato · ▯ chiaro = previsto</span>
+      <span><span style="color:#ff6d00">▬</span> Kp 5 = tempesta G1</span>
+      <span><span style="color:#e040fb">▬</span> Kp 7 = soglia aurora alla latitudine del FVG</span>
     </div>
   </div>
 
@@ -1488,6 +1681,16 @@ function renderRadiazione() {
       <div class="val" id="derStreak" style="color:#69f0ae">—</div>
       <div class="sub">S0, dal giorno più recente a ritroso</div>
     </div>
+    <div class="mini">
+      <div class="lbl">⏳ Elettroni ≥1.000 pfu — 24h</div>
+      <div class="val" id="derE2Hours" style="color:#546e7a">—</div>
+      <div class="sub" id="derP10Hours">ore sopra soglia allerta · protoni ≥S1: —</div>
+    </div>
+    <div class="mini">
+      <div class="lbl">🌌 Aurora dal FVG — 3 giorni</div>
+      <div class="val" id="auroraVal" style="color:#546e7a">—</div>
+      <div class="sub" id="auroraSub">dalla previsione Kp NOAA</div>
+    </div>
   </aside>
 
 </div>
@@ -1502,9 +1705,9 @@ const flareColor = c => !c?'#546e7a':c[0]==='X'?'#ff1744':c[0]==='M'?'#ff6d00':c
 const trendLabel = t => t==='up'?'▲ in salita':t==='down'?'▼ in calo':t==='stable'?'▬ stabile':'—';
 const trendColor = t => t==='up'?'#ff6d00':t==='down'?'#26c6da':'#546e7a';
 
-function logChart(rows, field, thresholds, mainColor){
+function logChart(rows, field, thresholds, mainColor, thrColors){
   const vals = rows.map(r=>r[field]).filter(v=>v!=null && v>0);
-  if(vals.length<2) return '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Dati insufficienti — attendere il prossimo ciclo di aggiornamento (cron 5×/giorno)</div>';
+  if(vals.length<2) return '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Dati insufficienti — attendere il prossimo ciclo di aggiornamento (cron 4×/giorno)</div>';
   const W=860,H=200,PAD=46;
   const allVals = vals.concat(thresholds||[]);
   const logMin = Math.floor(Math.log10(Math.max(Math.min(...allVals),1e-3)));
@@ -1521,7 +1724,7 @@ function logChart(rows, field, thresholds, mainColor){
   });
   const thrLines = (thresholds||[]).map((t,i)=>{
     const y=yOf(t);
-    const colors=['#26c6da','#ffd600','#ff6d00','#ff1744','#d500f9'];
+    const colors=thrColors||['#26c6da','#ffd600','#ff6d00','#ff1744','#d500f9'];
     if(y<0||y>H) return '';
     return '<line x1="'+PAD+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+y.toFixed(1)+'" stroke="'+colors[i]+'" stroke-width="1" stroke-dasharray="5,4" opacity="0.5"/>';
   }).join('');
@@ -1557,7 +1760,7 @@ async function load(){
     $('p100Val').textContent = fmt(lastRow.proton_100mev);
     $('e2Val').textContent = fmt(lastRow.electron_2mev);
     $('chartP').innerHTML = logChart(rows, 'proton_10mev', [10,100,1000,10000,100000], '#7cc7ff');
-    $('chartE').innerHTML = logChart(rows, 'electron_2mev', [], '#66bb6a');
+    $('chartE').innerHTML = logChart(rows, 'electron_2mev', [1000], '#66bb6a', ['#7cc7ff']);
 
     // Contesto — sinistra
     if(ctx.kp_now!=null){
@@ -1578,11 +1781,167 @@ async function load(){
       $('derP10Trend').innerHTML = '<span class="trend" style="background:'+trendColor(der.proton10_trend)+'22;color:'+trendColor(der.proton10_trend)+';border:1px solid '+trendColor(der.proton10_trend)+'44">'+trendLabel(der.proton10_trend)+'</span>';
     }
     if(der.s0_streak_days!=null) $('derStreak').textContent = der.s0_streak_days;
+    if(der.e2_h_above_1000!=null){
+      $('derE2Hours').textContent = fmtH(der.e2_h_above_1000);
+      $('derE2Hours').style.color = der.e2_h_above_1000>0 ? '#ffd600' : '#69f0ae';
+    }
+    if(der.p10_h_above_s1!=null) $('derP10Hours').textContent = 'ore sopra soglia allerta · protoni ≥S1: '+fmtH(der.p10_h_above_s1);
   }catch(e){
     $('chartP').innerHTML = '<div style="color:#ff6d00;font-size:.85em">Errore caricamento dati: '+e.message+'</div>';
   }
 }
 load();
+
+// ── Dati live dal browser: i feed NOAA hanno CORS aperto e arrivano compressi (~250 KB),
+//    mentre farli parsare al worker (4 MB di JSON) sforerebbe la CPU del piano Free.
+const SWPC = 'https://services.swpc.noaa.gov';
+const L1_KM = 1.5e6;
+const fmtH = h => (h===0 ? '0' : h.toFixed(1).replace('.',','))+' h';
+const tUTC = t => new Date(String(t).endsWith('Z') ? t : t+'Z');
+const hhmm = d => d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'});
+const bzColor = b => b>=0?'#69f0ae':b>-5?'#ffd600':b>-10?'#ff6d00':'#ff1744';
+async function getJ(u){ const r=await fetch(u); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+
+// rtsw_*_1m: dal più recente, mescola più sonde → solo 'active', in ordine di tempo, ultimi N minuti
+function activeSeries(raw, field, minutes){
+  if(!Array.isArray(raw)) return [];
+  const out = raw.filter(r => r && r.active && r[field]!=null)
+    .map(r => ({t:tUTC(r.time_tag), v:parseFloat(r[field]), r:r}))
+    .filter(p => !isNaN(p.t) && Number.isFinite(p.v))
+    .sort((a,b) => a.t-b.t);
+  if(!out.length) return out;
+  const cut = out[out.length-1].t - minutes*60000;
+  return out.filter(p => p.t>=cut);
+}
+
+function bzChart(series){
+  if(series.length<2) return '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Dati Bz non disponibili</div>';
+  const W=860,H=150,PAD=46,MID=H/2;
+  const m = Math.max(5, ...series.map(p=>Math.abs(p.v)))*1.15;
+  const t0=series[0].t, t1=series[series.length-1].t, span=Math.max(1,t1-t0);
+  const x = t => PAD+(t-t0)/span*(W-PAD*2);
+  const y = v => MID - v/m*MID;
+  let path='', prev=null;
+  series.forEach(p => {
+    const gap = prev && (p.t-prev.t)>5*60000;
+    path += ((!prev||gap)?'M':'L')+x(p.t).toFixed(1)+','+y(p.v).toFixed(1)+' ';
+    prev = p;
+  });
+  const area = 'M'+x(t0).toFixed(1)+','+MID+' '
+    + series.map(p => 'L'+x(p.t).toFixed(1)+','+y(p.v).toFixed(1)).join(' ')
+    + ' L'+x(t1).toFixed(1)+','+MID+' Z';
+  const last = series[series.length-1];
+  return '<svg width="100%" viewBox="0 0 '+W+' '+(H+24)+'" style="overflow:visible;min-width:560px">'
+    + '<defs><clipPath id="bzSud"><rect x="0" y="'+MID+'" width="'+W+'" height="'+MID+'"/></clipPath></defs>'
+    + '<path d="'+area+'" fill="#ff6d00" opacity="0.28" clip-path="url(#bzSud)"/>'
+    + '<line x1="'+PAD+'" y1="'+MID+'" x2="'+(W-PAD)+'" y2="'+MID+'" stroke="#546e7a" stroke-width="1"/>'
+    + '<path d="'+path+'" fill="none" stroke="#7cc7ff" stroke-width="1.6"/>'
+    + '<circle cx="'+x(last.t).toFixed(1)+'" cy="'+y(last.v).toFixed(1)+'" r="4" fill="'+bzColor(last.v)+'"/>'
+    + '<text x="'+(PAD-6)+'" y="10" text-anchor="end" fill="#69f0ae" font-size="9" font-family="monospace">+'+m.toFixed(0)+'</text>'
+    + '<text x="'+(PAD-6)+'" y="'+(MID+3)+'" text-anchor="end" fill="#546e7a" font-size="9" font-family="monospace">0 nT</text>'
+    + '<text x="'+(PAD-6)+'" y="'+H+'" text-anchor="end" fill="#ff6d00" font-size="9" font-family="monospace">−'+m.toFixed(0)+'</text>'
+    + '<text x="'+PAD+'" y="'+(H+18)+'" fill="#455a64" font-size="9" font-family="monospace">'+hhmm(t0)+'</text>'
+    + '<text x="'+(W-PAD)+'" y="'+(H+18)+'" text-anchor="end" fill="#455a64" font-size="9" font-family="monospace">'+hhmm(t1)+' (ora italiana)</text>'
+    + '</svg>';
+}
+
+async function loadL1(){
+  const [wRes, mRes] = await Promise.allSettled([
+    getJ(SWPC+'/json/rtsw/rtsw_wind_1m.json'),
+    getJ(SWPC+'/json/rtsw/rtsw_mag_1m.json'),
+  ]);
+  const wind = wRes.status==='fulfilled' ? activeSeries(wRes.value, 'proton_speed', 180) : [];
+  const bz   = mRes.status==='fulfilled' ? activeSeries(mRes.value, 'bz_gsm', 180) : [];
+  let speed = null;
+
+  if(wind.length){
+    const w = wind[wind.length-1];
+    speed = w.v;
+    const dens = parseFloat(w.r.proton_density);
+    const vecchio = (Date.now()-w.t) > 15*60000;
+    $('ctxWindSpeed').textContent = Math.round(speed)+' km/s';
+    $('ctxWindSpeed').style.color = speed<400?'#69f0ae':speed<550?'#ffd600':speed<700?'#ff6d00':'#ff1744';
+    $('ctxWindDensity').textContent = (Number.isFinite(dens)?'densità '+dens.toFixed(1)+' n/cc · ':'')+(vecchio?'dato delle ':'live ')+hhmm(w.t);
+    const etaMin = L1_KM/speed/60;
+    $('ctxEta').textContent = '≈ '+Math.round(etaMin)+' min';
+    $('ctxEtaSub').textContent = 'il vento misurato alle '+hhmm(w.t)+' arriva verso le '+hhmm(new Date(w.t.getTime()+etaMin*60000));
+  }
+
+  $('chartBz').innerHTML = bzChart(bz);
+  if(bz.length){
+    const b = bz[bz.length-1];
+    const bt = parseFloat(b.r.bt);
+    $('ctxBz').textContent = (b.v>0?'+':'')+b.v.toFixed(1)+' nT';
+    $('ctxBz').style.color = bzColor(b.v);
+    // da quanto tempo Bz è a sud senza interruzioni
+    let i = bz.length-1;
+    while(i>0 && bz[i-1].v<0) i--;
+    const sudMin = b.v<0 ? Math.round((b.t-bz[i].t)/60000) : 0;
+    $('ctxBzSub').textContent = (Number.isFinite(bt)?'Bt '+bt.toFixed(1)+' nT · ':'')
+      + (b.v<0 ? 'a sud da '+(i===0?'oltre 3 h':sudMin+' min') : 'a nord: magnetosfera chiusa');
+
+    // accoppiamento: campo elettrico del vento Ey = v·Bs (Bs = parte sud di Bz), media 30 min
+    if(speed!=null){
+      const rec = bz.filter(p => p.t >= b.t-30*60000);
+      const bzMed = rec.reduce((a,p)=>a+p.v,0)/rec.length;
+      const ey = speed*Math.max(0,-bzMed)*1e-3;
+      const giudizio = ey<0.5?'trascurabile: il vento scivola attorno alla magnetosfera'
+        : ey<2?'debole'
+        : ey<5?'moderato: se dura ore può portare a una tempesta G1'
+        : 'forte: tempesta geomagnetica probabile nelle prossime ore';
+      $('l1Note').style.display = 'block';
+      $('l1Note').innerHTML = 'ACCOPPIAMENTO VENTO-MAGNETOSFERA (v·Bs, media 30 min): <b style="color:'+(ey<0.5?'#69f0ae':ey<2?'#26c6da':ey<5?'#ffd600':'#ff1744')+'">'
+        + ey.toFixed(2).replace('.',',')+' mV/m</b> — '+giudizio+'.<br>'
+        + 'La velocità da sola non basta: un vento veloce con Bz a nord fa poco, uno medio con Bz a sud per ore può scatenare una tempesta.';
+    }
+  }
+}
+
+async function loadKpForecast(){
+  const raw = await getJ(SWPC+'/products/noaa-planetary-k-index-forecast.json');
+  // il feed è passato nel tempo da array-di-array (header in [0]) ad array di oggetti
+  const rows = (Array.isArray(raw)?raw:[])
+    .map(r => Array.isArray(r) ? {t:r[0], kp:parseFloat(r[1]), obs:r[2]} : {t:r.time_tag, kp:parseFloat(r.kp), obs:r.observed})
+    .filter(r => r.t && r.t!=='time_tag' && Number.isFinite(r.kp))
+    .map(r => ({kp:r.kp, obs:String(r.obs), d:tUTC(r.t)}))
+    .filter(r => r.d.getTime() >= Date.now()-24*3600000);
+  if(!rows.length){ $('chartKp').innerHTML = '<div style="color:#455a64;font-size:.85em;padding:20px;text-align:center">Previsione non disponibile</div>'; return; }
+
+  const W=860,H=150,PAD=46,KMAX=9;
+  const bw = (W-PAD*2)/rows.length;
+  const y = k => H - k/KMAX*H;
+  let bars='', days='';
+  rows.forEach((r,i) => {
+    // NOAA: 'observed' = definitivo, 'estimated' = provvisorio (fascia in corso), 'predicted' = previsione
+    const prev = r.obs==='predicted', stim = r.obs==='estimated';
+    const c = kpColor(r.kp), top = Math.min(y(r.kp), H-2);
+    bars += '<rect x="'+(PAD+i*bw+1).toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+Math.max(1,bw-2).toFixed(1)+'" height="'+(H-top).toFixed(1)+'" fill="'+c+'" opacity="'+(prev?0.3:stim?0.6:0.9)+'"'+(prev?' stroke="'+c+'" stroke-width="1"':'')+'><title>'+r.d.toLocaleString('it-IT',{timeZone:'Europe/Rome',weekday:'short',hour:'2-digit',minute:'2-digit'})+' — Kp '+r.kp.toFixed(2)+' ('+(prev?'previsto':stim?'stimato':'osservato')+')</title></rect>';
+    if(r.d.getUTCHours()===0)
+      days += '<line x1="'+(PAD+i*bw).toFixed(1)+'" y1="0" x2="'+(PAD+i*bw).toFixed(1)+'" y2="'+H+'" stroke="#263238" stroke-width="1"/>'
+        + '<text x="'+(PAD+i*bw+3).toFixed(1)+'" y="'+(H+16)+'" fill="#546e7a" font-size="9" font-family="monospace">'+r.d.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',timeZone:'UTC'})+'</text>';
+  });
+  const hl = (k,c) => '<line x1="'+PAD+'" y1="'+y(k).toFixed(1)+'" x2="'+(W-PAD)+'" y2="'+y(k).toFixed(1)+'" stroke="'+c+'" stroke-dasharray="5,4" opacity="0.6"/>'
+    + '<text x="'+(PAD-6)+'" y="'+(y(k)+3).toFixed(1)+'" text-anchor="end" fill="'+c+'" font-size="9" font-family="monospace">'+k+'</text>';
+  $('chartKp').innerHTML = '<svg width="100%" viewBox="0 0 '+W+' '+(H+24)+'" style="overflow:visible;min-width:560px">'
+    + days + bars + hl(5,'#ff6d00') + hl(7,'#e040fb') + '</svg>';
+
+  // Semaforo aurora: a ~46°N geografici (≈41° geomagnetici) serve Kp ≥7 per vederla in foto verso nord
+  const fut = rows.filter(r => r.obs!=='observed' && r.d.getTime() >= Date.now()-3*3600000);
+  if(fut.length){
+    const maxF = Math.max(...fut.map(r=>r.kp));
+    const quando = fut.find(r => r.kp===maxF).d.toLocaleString('it-IT',{timeZone:'Europe/Rome',weekday:'long',hour:'2-digit',minute:'2-digit'});
+    const [txt,col,sub] = maxF>=8 ? ['PROBABILE','#e040fb','Kp '+maxF.toFixed(1)+' previsto ('+quando+'): visibile anche a occhio nudo, cielo buio verso nord']
+      : maxF>=7 ? ['POSSIBILE','#69f0ae','Kp '+maxF.toFixed(1)+' previsto ('+quando+'): in foto a lunga esposizione, orizzonte nord libero']
+      : maxF>=6 ? ['IMPROBABILE','#ffd600','Kp massimo previsto '+maxF.toFixed(1)+': serve almeno Kp 7 alla nostra latitudine']
+      : ['NO','#546e7a','Kp massimo previsto '+maxF.toFixed(1)+': troppo basso per il FVG'];
+    $('auroraVal').textContent = txt;
+    $('auroraVal').style.color = col;
+    $('auroraSub').textContent = sub;
+  }
+}
+
+loadL1().catch(e => { $('chartBz').innerHTML = '<div style="color:#ff6d00;font-size:.85em">Dati L1 non disponibili: '+e.message+'</div>'; });
+loadKpForecast().catch(e => { $('chartKp').innerHTML = '<div style="color:#ff6d00;font-size:.85em">Previsione non disponibile: '+e.message+'</div>'; });
 </script>
 </body>
 </html>`;
@@ -2892,303 +3251,6 @@ if (_token) tryAuth(_token).then(ok => {
 </html>`;
 }
 
-// (renderOthello già definita sopra)
-function _deleteme() {
-  return `<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Othello &#9679; ECHO Games UNUSED</title>
-<meta name="author" content="Gimmy Pignolo">
-<meta name="robots" content="noindex">
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;overflow-x:hidden}
-body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
-.wrap{position:relative;z-index:1;width:100%;max-width:540px;text-align:center}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 18px;border-bottom:1px solid rgba(38,198,218,.15);margin-bottom:14px}
-.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
-.back:hover{background:rgba(38,198,218,.2)}
-.gtitle{font-family:'Share Tech Mono',monospace;font-size:.95em;color:#26c6da;letter-spacing:.1em}
-.sbar{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:10px;gap:8px}
-.ps{display:flex;align-items:center;gap:7px;font-family:'Share Tech Mono',monospace;font-size:.82em}
-.disc{width:18px;height:18px;border-radius:50%;flex-shrink:0}
-.disc-b{background:radial-gradient(circle at 35% 35%,#666,#111)}
-.disc-w{background:radial-gradient(circle at 35% 35%,#fff,#ccc)}
-.sv{font-size:1.3em;font-weight:700}
-#status{font-family:'Share Tech Mono',monospace;font-size:.78em;color:#90a4ae;flex:1;text-align:center}
-#cvs{border-radius:12px;cursor:pointer;touch-action:none;max-width:100%;display:block;margin:0 auto}
-.brow{display:flex;gap:10px;justify-content:center;margin-top:10px}
-.gbtn{padding:7px 20px;border-radius:7px;border:1px solid rgba(38,198,218,.3);background:rgba(38,198,218,.1);color:#26c6da;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.82em;transition:background .1s,transform .1s}
-.gbtn:hover{background:rgba(38,198,218,.25)}
-.gbtn:active{background:rgba(38,198,218,.45);transform:scale(.96)}
-.diff{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:8px}
-.dlbl{font-family:'Share Tech Mono',monospace;font-size:.7em;color:#546e7a}
-.dbtn{padding:4px 12px;border-radius:5px;border:1px solid rgba(38,198,218,.18);background:transparent;color:#546e7a;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.7em;transition:all .15s}
-.dbtn.on{background:rgba(38,198,218,.15);border-color:rgba(38,198,218,.45);color:#26c6da}
-footer{margin-top:16px;font-size:.7em;color:#263238;font-family:'Share Tech Mono',monospace}
-footer a{color:#26c6da;text-decoration:none}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <div class="topbar">
-    <a class="back" href="/newtab">&#8592; Home</a>
-    <span class="gtitle">&#9679; OTHELLO</span>
-    <span style="width:80px"></span>
-  </div>
-  <div class="sbar">
-    <div class="ps"><div class="disc disc-b"></div><span>Tu</span><span class="sv" id="sb">2</span></div>
-    <div id="status">Il tuo turno (&#9679;)</div>
-    <div class="ps"><span class="sv" id="sw">2</span><span>AI</span><div class="disc disc-w"></div></div>
-  </div>
-  <canvas id="cvs" width="480" height="480"></canvas>
-  <div class="brow">
-    <button class="gbtn" onclick="newGame()">&#8635; Nuova partita</button>
-    <button class="gbtn" onclick="undoMove()">&#8592; Annulla</button>
-  </div>
-  <div class="diff">
-    <span class="dlbl">Difficolt&agrave;:</span>
-    <button class="dbtn" id="d0" onclick="setDiff(0)">Facile</button>
-    <button class="dbtn on" id="d1" onclick="setDiff(1)">Normale</button>
-    <button class="dbtn" id="d2" onclick="setDiff(2)">Esperto</button>
-  </div>
-  <footer>ECHO Games // <a href="/newtab">&#8592; home</a> &nbsp;|&nbsp; &copy; 2026 Gimmy Pignolo</footer>
-</div>
-<script>
-var SIZE=8,CELL=60;
-var BLACK=1,WHITE=-1,EMPTY=0;
-var DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
-var WEIGHTS=[
-  [120,-20,20,5,5,20,-20,120],
-  [-20,-40,-5,-5,-5,-5,-40,-20],
-  [20,-5,15,3,3,15,-5,20],
-  [5,-5,3,3,3,3,-5,5],
-  [5,-5,3,3,3,3,-5,5],
-  [20,-5,15,3,3,15,-5,20],
-  [-20,-40,-5,-5,-5,-5,-40,-20],
-  [120,-20,20,5,5,20,-20,120]
-];
-var DEPTHS=[3,5,7];
-var board,turn,over,validMoves,history,thinking,diffLevel=1;
-var cvs=document.getElementById('cvs');
-var ctx=cvs.getContext('2d');
-var statusEl=document.getElementById('status');
-
-function resize(){var m=Math.min(window.innerWidth-40,480);cvs.style.width=m+'px';cvs.style.height=m+'px';}
-resize();window.addEventListener('resize',resize);
-
-function setDiff(d){
-  diffLevel=d;
-  for(var i=0;i<3;i++)document.getElementById('d'+i).classList.toggle('on',i===d);
-  newGame();
-}
-
-function mkBoard(){
-  var b=[];for(var r=0;r<8;r++){b[r]=[];for(var c=0;c<8;c++)b[r][c]=EMPTY;}
-  b[3][3]=WHITE;b[3][4]=BLACK;b[4][3]=BLACK;b[4][4]=WHITE;
-  return b;
-}
-
-function cloneBoard(bd){return bd.map(function(row){return row.slice();});}
-
-function getFlips(bd,r,c,p){
-  if(bd[r][c]!==EMPTY)return[];
-  var res=[];
-  for(var d=0;d<DIRS.length;d++){
-    var dr=DIRS[d][0],dc=DIRS[d][1],line=[];
-    var nr=r+dr,nc=c+dc;
-    while(nr>=0&&nr<8&&nc>=0&&nc<8&&bd[nr][nc]===-p){line.push([nr,nc]);nr+=dr;nc+=dc;}
-    if(line.length&&nr>=0&&nr<8&&nc>=0&&nc<8&&bd[nr][nc]===p)
-      for(var i=0;i<line.length;i++)res.push(line[i]);
-  }
-  return res;
-}
-
-function getValid(bd,p){
-  var m=[];
-  for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(getFlips(bd,r,c,p).length)m.push([r,c]);
-  return m;
-}
-
-function applyMove(bd,r,c,p){
-  var nb=cloneBoard(bd),flips=getFlips(nb,r,c,p);
-  for(var i=0;i<flips.length;i++)nb[flips[i][0]][flips[i][1]]=p;
-  nb[r][c]=p;return nb;
-}
-
-function countPieces(bd,p){var n=0;for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]===p)n++;return n;}
-function countEmpty(bd){var n=0;for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]===EMPTY)n++;return n;}
-
-function evalBoard(bd,rp){
-  var score=0;
-  for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(bd[r][c]!==EMPTY)score+=bd[r][c]*WEIGHTS[r][c];
-  var my=getValid(bd,rp).length,opp=getValid(bd,-rp).length;
-  if(my+opp>0)score+=rp*10*(my-opp)/(my+opp);
-  return score*rp;
-}
-
-function minimax(bd,depth,alpha,beta,p,rp){
-  var moves=getValid(bd,p);
-  if(depth===0||(moves.length===0&&getValid(bd,-p).length===0))return[evalBoard(bd,rp),null];
-  if(moves.length===0){var r2=minimax(bd,depth-1,alpha,beta,-p,rp);return[r2[0],null];}
-  var bestM=moves[0];
-  if(p===rp){
-    var best=-1e9;
-    for(var i=0;i<moves.length;i++){
-      var v=minimax(applyMove(bd,moves[i][0],moves[i][1],p),depth-1,alpha,beta,-p,rp)[0];
-      if(v>best){best=v;bestM=moves[i];}
-      if(v>alpha)alpha=v;if(beta<=alpha)break;
-    }
-    return[best,bestM];
-  }else{
-    var best2=1e9;
-    for(var j=0;j<moves.length;j++){
-      var v2=minimax(applyMove(bd,moves[j][0],moves[j][1],p),depth-1,alpha,beta,-p,rp)[0];
-      if(v2<best2){best2=v2;bestM=moves[j];}
-      if(v2<beta)beta=v2;if(beta<=alpha)break;
-    }
-    return[best2,bestM];
-  }
-}
-
-function chooseAI(bd){
-  var empty=countEmpty(bd),depth=DEPTHS[diffLevel];
-  if(empty<=10)depth=Math.max(depth,8);
-  else if(empty<=16)depth=Math.max(depth,depth+1);
-  return minimax(bd,depth,-1e9,1e9,WHITE,WHITE)[1];
-}
-
-function updateScores(){
-  document.getElementById('sb').textContent=countPieces(board,BLACK);
-  document.getElementById('sw').textContent=countPieces(board,WHITE);
-}
-
-function newGame(){
-  board=mkBoard();turn=BLACK;over=false;history=[];thinking=false;
-  validMoves=getValid(board,BLACK);
-  statusEl.style.color='#90a4ae';statusEl.textContent='Il tuo turno (●)';
-  updateScores();draw();
-}
-
-function undoMove(){
-  if(thinking||history.length<2)return;
-  board=history[history.length-2];history.splice(-2);
-  turn=BLACK;over=false;thinking=false;
-  validMoves=getValid(board,BLACK);
-  statusEl.style.color='#90a4ae';statusEl.textContent='Annullato — il tuo turno (●)';
-  updateScores();draw();
-}
-
-function draw(){
-  var W=480,H=480;
-  ctx.fillStyle='#0d4c28';ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle='#136634';ctx.lineWidth=1;
-  for(var i=1;i<8;i++){
-    ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(W,i*CELL);ctx.stroke();
-  }
-  // star points
-  ctx.fillStyle='#1a7040';
-  [[2,2],[2,5],[5,2],[5,5]].forEach(function(p){
-    ctx.beginPath();ctx.arc(p[1]*CELL+CELL/2,p[0]*CELL+CELL/2,4,0,Math.PI*2);ctx.fill();
-  });
-  // valid move hints
-  if(turn===BLACK&&!over){
-    for(var m=0;m<validMoves.length;m++){
-      var vr=validMoves[m][0],vc=validMoves[m][1];
-      ctx.fillStyle='rgba(105,240,174,0.2)';
-      ctx.beginPath();ctx.arc(vc*CELL+30,vr*CELL+30,16,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='rgba(105,240,174,0.45)';ctx.lineWidth=1.5;
-      ctx.beginPath();ctx.arc(vc*CELL+30,vr*CELL+30,16,0,Math.PI*2);ctx.stroke();
-    }
-  }
-  // pieces
-  for(var r=0;r<8;r++)for(var c=0;c<8;c++){
-    if(board[r][c]===EMPTY)continue;
-    var x=c*CELL+30,y=r*CELL+30,isB=board[r][c]===BLACK;
-    ctx.save();
-    ctx.shadowColor='rgba(0,0,0,.65)';ctx.shadowBlur=8;ctx.shadowOffsetX=2;ctx.shadowOffsetY=3;
-    var g=ctx.createRadialGradient(x-7,y-7,2,x,y,23);
-    if(isB){g.addColorStop(0,'#5a5a5a');g.addColorStop(1,'#101010');}
-    else{g.addColorStop(0,'#ffffff');g.addColorStop(1,'#c8c8c8');}
-    ctx.fillStyle=g;
-    ctx.beginPath();ctx.arc(x,y,23,0,Math.PI*2);ctx.fill();
-    ctx.restore();
-  }
-}
-
-cvs.addEventListener('click',function(e){
-  if(turn!==BLACK||over||thinking)return;
-  var rect=cvs.getBoundingClientRect();
-  var sx=480/rect.width,sy=480/rect.height;
-  var x=(e.clientX-rect.left)*sx,y=(e.clientY-rect.top)*sy;
-  var c=Math.floor(x/CELL),r=Math.floor(y/CELL);
-  if(r<0||r>=8||c<0||c>=8)return;
-  var ok=false;
-  for(var i=0;i<validMoves.length;i++)if(validMoves[i][0]===r&&validMoves[i][1]===c){ok=true;break;}
-  if(!ok)return;
-  history.push(cloneBoard(board));
-  board=applyMove(board,r,c,BLACK);
-  updateScores();draw();
-  var aiM=getValid(board,WHITE);
-  if(aiM.length===0){
-    var plM=getValid(board,BLACK);
-    if(plM.length===0){endGame();return;}
-    statusEl.style.color='#ffb347';
-    statusEl.textContent='L\'AI salta — ancora il tuo turno (●)';
-    validMoves=plM;draw();return;
-  }
-  turn=WHITE;aiMove();
-});
-
-cvs.addEventListener('touchend',function(e){
-  e.preventDefault();
-  var t=e.changedTouches[0];
-  cvs.dispatchEvent(new MouseEvent('click',{clientX:t.clientX,clientY:t.clientY}));
-},{passive:false});
-
-function aiMove(){
-  thinking=true;
-  statusEl.style.color='#69f0ae';statusEl.textContent='AI sta pensando…';
-  setTimeout(function(){
-    var move=chooseAI(board);
-    if(move){
-      history.push(cloneBoard(board));
-      board=applyMove(board,move[0],move[1],WHITE);
-      updateScores();
-    }
-    turn=BLACK;thinking=false;
-    validMoves=getValid(board,BLACK);
-    draw();
-    if(validMoves.length===0){
-      var aiM2=getValid(board,WHITE);
-      if(aiM2.length===0){endGame();return;}
-      turn=WHITE;
-      statusEl.style.color='#ffb347';
-      statusEl.textContent='Nessuna mossa — l\'AI gioca ancora';
-      setTimeout(aiMove,600);
-    }else{
-      statusEl.style.color='#90a4ae';statusEl.textContent='Il tuo turno (●)';
-    }
-  },30);
-}
-
-function endGame(){
-  over=true;
-  var b=countPieces(board,BLACK),w=countPieces(board,WHITE);
-  if(b>w){statusEl.style.color='#69f0ae';statusEl.textContent='Hai vinto! ● '+b+' – '+w+' ○';}
-  else if(w>b){statusEl.style.color='#ff5252';statusEl.textContent='Ha vinto l\'AI! ● '+b+' – '+w+' ○';}
-  else{statusEl.style.color='#ffd600';statusEl.textContent='Pareggio! ● '+b+' – '+w+' ○';}
-  draw();
-}
-
-newGame();
-</script>
-</body>
-</html>`;
-}
 
 // ============================================================
 // NEWTAB — pagina nuova scheda personalizzata
@@ -6320,6 +6382,8 @@ function compactStrike(d, id, nowMs) {
 
 function strikeRow(s) { return LIGHTNING_COLS.map(k => (s[k] === undefined ? null : s[k])); }
 
+const LIGHTNING_DISABLED = true;
+
 export class LightningRelay {
   constructor(state, env) {
     this.state = state; this.env = env;
@@ -6590,11 +6654,46 @@ export class LightningRelay {
   }
 }
 
-export default {
+// ============================================================
+// CPU — piano Free: 10 ms a richiesta
+// ============================================================
+// Con [cache] enabled in wrangler.toml Cloudflare serve dalla cache del Worker
+// le GET con Cache-Control cacheabile SENZA avviare il codice (zero CPU).
+// Ogni risposta deve quindi dire esplicitamente se e quanto puo' stare in
+// cache: senza header la cache applicherebbe le TTL euristiche RFC 9111
+// (2 ore per un 200), anche su /update o sulle API dei giochi.
+// La versione del Worker fa parte della chiave: un deploy svuota la cache.
+const CACHE_TTL = {
+  "/": 300,                       // dashboard: i dati cambiano 4 volte al giorno (cron)
+  "/radiazione": 3600, "/chat": 3600, "/code": 3600, "/traduttore": 3600,
+  "/pixeldrain": 3600, "/forza4": 3600, "/othello": 3600,
+  "/api/radiation": 300, "/api/solar": 300, "/api/events": 300,
+  "/api/stats": 300, "/api/cf": 300,
+};
+function withCachePolicy(request, res) {
+  if (res.status === 101 || res.webSocket) return res;   // WebSocket fulmini: intoccabile
+  if (request.method !== "GET" && request.method !== "HEAD") return res;
+  if (res.headers.has("Cache-Control")) return res;      // la route ha gia' deciso
+  const ttl = CACHE_TTL[new URL(request.url).pathname];
+  const out = new Response(res.body, res);
+  out.headers.set("Cache-Control", ttl && res.status === 200 ? "public, max-age=" + ttl : "no-store");
+  return out;
+}
+
+const worker = {
   async fetch(request, env) {
     const url    = new URL(request.url);
     const db     = env.DB;
     const SECRET = getUpdateSecret(env);
+
+    // Bot e scanner chiedono robots.txt, favicon e percorsi a caso: prima
+    // finivano tutti sul ramo di default e costruivano l'intera dashboard.
+    if (url.pathname === "/robots.txt") {
+      return new Response("User-agent: *\nAllow: /\n", { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" } });
+    }
+    if (url.pathname === "/favicon.ico") {
+      return new Response(null, { status: 204, headers: { "Cache-Control": "public, max-age=604800" } });
+    }
 
     // ============================================================
     // METOP — pagina del visualizzatore polari (servita su /polar) e proxy
@@ -6608,12 +6707,12 @@ export default {
       // redeploy si vede subito, invece di restare nascosto fino a 5 minuti
       // dietro la cache del browser — capitato durante lo sviluppo del globo.
       return new Response(METOP_HTML || "<h1>METOP</h1><p>Pagina non ancora generata: esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
-        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
+        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
     }
 
     if (url.pathname === "/modis-europa" || url.pathname === "/modis-viewer") {
       return new Response(MODIS_HTML || "<h1>MODIS Europa</h1><p>Esegui <code>node build-metop.mjs</code> e ridistribuisci.</p>",
-        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
+        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
     }
 
     // Fulmini live (Blitzortung, feed punto reale — vedi il commento sulla
@@ -6623,6 +6722,12 @@ export default {
     // viewer, /lightning/status e' un JSON di debug (connesso? quante
     // scariche viste? ultimo errore?).
     if (url.pathname === "/lightning/ws" || url.pathname === "/lightning/status") {
+      // Spento dal 2026-11-02: la connessione TCP diretta al broker MQTT e'
+      // la causa piu' probabile delle segnalazioni di abuso "Network" dell'11/10
+      // che hanno fatto bloccare il worker. Il DO non viene piu' svegliato.
+      if (LIGHTNING_DISABLED) return new Response(JSON.stringify({
+        error: "Fulmini live disattivati"
+      }), { status: 410, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" } });
       if (!env.LIGHTNING_RELAY) return new Response(JSON.stringify({
         error: "Durable Object LIGHTNING_RELAY non configurato: serve un wrangler deploy con la migrazione aggiunta a wrangler.toml"
       }), { status: 503, headers: { "Content-Type": "application/json" } });
@@ -7117,7 +7222,6 @@ export default {
 
     if (url.pathname === "/api/radiation") {
       try {
-        await initDB();
         const [recent, daily] = await Promise.all([
           db.prepare(
             `SELECT time_tag, proton_10mev, proton_100mev, electron_2mev, s_scale, kp_now, wind_speed, wind_density, xray_flux, flare_class
@@ -7164,7 +7268,11 @@ export default {
           if (s==null || parseInt(s)===0) s0Streak++; else break;
         }
 
+        // campioni da 5 min sopra soglia nelle ultime 24h → ore
+        const hoursAbove = (field, thr) => !last24h.length ? null : last24h.filter(r => r[field]!=null && r[field]>=thr).length*5/60;
         const derived = {
+          p10_h_above_s1:   hoursAbove('proton_10mev', 10),
+          e2_h_above_1000:  hoursAbove('electron_2mev', 1000),
           proton10_24h:  range('proton_10mev'),
           electron2_24h: range('electron_2mev'),
           proton10_trend: trendOf('proton_10mev'),
@@ -7179,7 +7287,6 @@ export default {
 
     if (url.pathname === "/api/solar") {
       try {
-        await initDB();
         const { results } = await db.prepare(
           `SELECT date(time_tag) as giorno, MAX(kp_index) as kp_max, AVG(kp_index) as kp_avg
            FROM dati_solari GROUP BY giorno ORDER BY giorno DESC LIMIT 60`
@@ -7370,16 +7477,30 @@ export default {
       }
     }
 
+    // Solo "/" e' la dashboard: qualunque altro percorso e' un 404 economico.
+    if (url.pathname !== "/" && url.pathname !== "/index.html") {
+      return new Response("404 — pagina non trovata", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
+    }
+
+    const leggiDashboard = () => Promise.all([
+      getDashboardData(db),
+      env.DB_CF ? getCFData(env.DB_CF) : Promise.resolve(null),
+    ]);
     try {
-      await initDB();
-      if (env.DB_CF) await initCFDB(env.DB_CF);
-      const [d, cfData] = await Promise.all([
-        getDashboardData(db),
-        env.DB_CF ? getCFData(env.DB_CF) : Promise.resolve(null),
-      ]);
+      let d, cfData;
+      try {
+        [d, cfData] = await leggiDashboard();
+      } catch (e) {
+        // DB nuovo, prima del primo cron: crea lo schema una volta e riprova
+        if (!/no such table/i.test(e.message || "")) throw e;
+        // (initCFDB crea terremoti + fetch_log: stesso schema per i due DB, salvaEventi li usa entrambi)
+        await Promise.all([initDB(), initCFDB(db), env.DB_CF ? initCFDB(env.DB_CF) : null]);
+        [d, cfData] = await leggiDashboard();
+      }
       let ingvStatus = null;
       try { if (env.F4_LEARN) { const raw = await env.F4_LEARN.get("ingv_status"); if (raw) ingvStatus = JSON.parse(raw); } } catch(_) {}
-      const html = renderDashboard(d, cfData, ingvStatus);
+      const storico = await leggiStorico(env);
+      const html = renderDashboard(d, cfData, ingvStatus, storico);
       return new Response(html,{headers:{"Content-Type":"text/html;charset=UTF-8"}});
     } catch(e) {
       return new Response(`<h1>Errore dashboard</h1><pre>${e.message}</pre>`,{status:500,headers:{"Content-Type":"text/html"}});
@@ -7422,9 +7543,12 @@ export default {
       if (env.DB_CF) await initCFDB(env.DB_CF);
 
       try {
+        // 7 giorni (era 2): INSERT OR IGNORE non duplica, e se il worker resta
+        // fermo qualche giorno il buco si richiude da solo (vedi incidente
+        // dell'11/10-7/11/2026 in MAINTENANCE.md, un mese di dati perso).
         [eventi, eventiCF] = await Promise.all([
-          fetchINGV(2),
-          fetchINGVCF(2),
+          fetchINGV(7),
+          fetchINGVCF(7),
         ]);
         if (env.F4_LEARN) await env.F4_LEARN.put("ingv_status", JSON.stringify({online:true, last_check:new Date().toISOString()}));
       } catch(ingvErr) {
@@ -7438,6 +7562,12 @@ export default {
       if (solare.kpData.length>0) await salvaSolare(env.DB, solare.kpData);
       radiazione = await fetchRadiazione(solare.kpData, solare.windData);
       if (radiazione.length>0) await salvaRadiazione(env.DB, radiazione);
+      // Archivio storico: ricalcolato dopo i nuovi dati, letto dalla dashboard da KV
+      try {
+        if (env.F4_LEARN) await env.F4_LEARN.put(STORICO_KV_KEY, JSON.stringify(await calcolaStorico(env.DB, env.DB_CF)));
+      } catch (eSt) {
+        await logDiag(env.DB, "cron", "storico_error", { error: String(eSt) }, "da_guardare");
+      }
       // kp/radiazione a 0 = NOAA non ha risposto (fetchSolare/fetchRadiazione
       // inghiottono i propri errori); ingvOk=false = INGV giu', non "nessun sisma".
       await logDiag(env.DB, "cron", "run", { ingvOk, eventi: eventi.length, eventiCF: eventiCF.length,
@@ -7449,5 +7579,12 @@ export default {
       // che questo Worker possa avere.
       await logDiag(env.DB, "cron", "error", { error: e.message, durataMs: Date.now() - t0 }, "bloccante");
     }
+  },
+};
+
+export default {
+  ...worker,
+  async fetch(request, env, ctx) {
+    return withCachePolicy(request, await worker.fetch(request, env, ctx));
   },
 };

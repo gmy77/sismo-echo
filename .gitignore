@@ -228,3 +228,4 @@ sismo-worker/node_modules/
 sismo-worker/.wrangler/
 # generati da scripts/build-pages-data.mjs (GitHub Actions)
 pages/api/
+sismo-worker/scripts/out/

@@ -3,6 +3,19 @@ main = "index.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Domini personalizzati del worker. Prima erano collegati solo dalla dashboard
+# e si sono persi quando lo script è stato ricreato (incidente 1101 del
+# 2026-11-07): qui il deploy li rimette sempre.
+# Con delle routes nel file, wrangler spegne workers.dev se non è esplicito:
+# va tenuto acceso (SismoGlobe e il viewer METOP usano sismo-fvg.gimmy077.workers.dev).
+workers_dev = true
+preview_urls = true
+routes = [
+  { pattern = "gimmycloud.net", custom_domain = true },
+  { pattern = "www.gimmycloud.net", custom_domain = true },
+  { pattern = "echo.gimmycloud.net", custom_domain = true },
+]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "terremoti-fvg"
@@ -33,9 +46,36 @@ class_name = "LightningRelay"
 tag = "v1"
 new_sqlite_classes = ["LightningRelay"]
 
+# Workers Caching: le GET con Cache-Control cacheabile vengono servite dalla
+# cache del Worker senza eseguire il codice (zero CPU, vitale col limite di
+# 10 ms del piano Free). La politica per route e' in withCachePolicy (index.js).
+[cache]
+enabled = true
+
+# Piano Workers Paid (dal 2026-11): tetto di CPU per invocazione, cosi' un
+# bug o un picco anomalo non brucia ore di CPU a consumo (default Paid: 30 s).
+[limits]
+cpu_ms = 5000
+
 [triggers]
 # Consolidati in un unico cron (stessi orari) per restare nel limite di 5 trigger/account del piano Free
 crons = ["0 8,13,18,23 * * *"]
 
 [observability]
+enabled = true
+head_sampling_rate = 1
+redact_query_string = false
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true
+
+[observability.issue_detection]
 enabled = true
