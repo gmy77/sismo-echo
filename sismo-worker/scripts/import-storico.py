@@ -132,9 +132,53 @@ def scrivi_kp(righe, file_sql):
             f.write(f"INSERT OR IGNORE INTO dati_solari (time_tag,kp_index) VALUES {valori};\n")
 
 
+GFZ_SOLE = "https://kp.gfz.de/app/files/Kp_ap_Ap_SN_F107_since_1932.txt"
+# Stesso schema creato da initDB() in index.js (il cron aggiorna gli ultimi 30 giorni dal nowcast GFZ)
+SQL_ATTIVITA_SOLARE = """CREATE TABLE IF NOT EXISTS attivita_solare (
+  giorno TEXT PRIMARY KEY, ap INTEGER, sn INTEGER, f107_obs REAL, f107_adj REAL, definitivo INTEGER
+);"""
+
+
+def scarica_attivita_solare():
+    """Una riga al giorno: Ap, numero di macchie solari (SN), flusso radio F10.7. -1 = mancante."""
+    righe = []
+    for linea in get(GFZ_SOLE).splitlines():
+        if not linea or linea.startswith("#"):
+            continue
+        c = linea.split()
+        # YYY MM DD days days_m Bsr dB Kp1..Kp8 ap1..ap8 Ap SN F10.7obs F10.7adj D
+        if len(c) < 28:
+            continue
+        try:
+            y, m, d = int(c[0]), int(c[1]), int(c[2])
+            ap, sn, fo, fa, defin = int(c[23]), int(c[24]), float(c[25]), float(c[26]), int(c[27])
+        except ValueError:
+            continue
+        neg = lambda v: None if v < 0 else v
+        righe.append((f"{y:04d}-{m:02d}-{d:02d}", neg(ap), neg(sn), neg(fo), neg(fa), defin))
+    return righe
+
+
+def scrivi_attivita_solare(righe, file_sql):
+    n = lambda v: "NULL" if v is None else repr(v)
+    with open(file_sql, "w", encoding="utf-8") as f:
+        f.write(SQL_ATTIVITA_SOLARE + "\n")
+        for i in range(0, len(righe), RIGHE_PER_INSERT * 2):
+            blocco = righe[i:i + RIGHE_PER_INSERT * 2]
+            valori = ",".join(f"({q(g)},{n(ap)},{n(sn)},{n(fo)},{n(fa)},{df})" for g, ap, sn, fo, fa, df in blocco)
+            # REPLACE: i valori preliminari degli ultimi mesi vengono corretti da GFZ
+            f.write(f"INSERT OR REPLACE INTO attivita_solare (giorno,ap,sn,f107_obs,f107_adj,definitivo) VALUES {valori};\n")
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # console Windows cp1252
     os.makedirs(OUT, exist_ok=True)
+    print("GFZ — attività solare giornaliera (Ap, macchie, F10.7)")
+    sole = scarica_attivita_solare()
+    scrivi_attivita_solare(sole, os.path.join(OUT, "sole.sql"))
+    print(f"  {len(sole)} giorni ({sole[0][0] if sole else '-'} → {sole[-1][0] if sole else '-'})")
+    if "--solo-sole" in sys.argv:
+        return
     print("INGV — Friuli Venezia Giulia")
     fvg = scarica_area(FVG, "FVG")
     scrivi_terremoti(fvg, os.path.join(OUT, "fvg.sql"))

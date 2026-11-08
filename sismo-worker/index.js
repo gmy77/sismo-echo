@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.13";
+const ECHO_VERSION = "3.14";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -411,6 +411,26 @@ async function calcolaStorico(db, dbCf) {
     fvg: correla(fvgD.results),
     cf:  correla(cfD.results),
   };
+}
+
+// Attività solare giornaliera GFZ (Ap, macchie SN, F10.7): lo storico dal 1932 lo
+// carica scripts/import-storico.py, il cron aggiorna gli ultimi ~30 giorni dal nowcast
+// (REPLACE perché i valori preliminari vengono corretti nei giorni successivi).
+const GFZ_SOLE_NOWCAST = "https://kp.gfz.de/app/files/Kp_ap_Ap_SN_F107_nowcast.txt";
+async function aggiornaAttivitaSolare(db) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS attivita_solare (
+    giorno TEXT PRIMARY KEY, ap INTEGER, sn INTEGER, f107_obs REAL, f107_adj REAL, definitivo INTEGER)`).run();
+  const res = await fetch(GFZ_SOLE_NOWCAST, { headers: { "User-Agent": "SismoFVG/2.0 gimmycloud.net" } });
+  if (!res.ok) throw new Error(`GFZ ${res.status}`);
+  const neg = v => (v < 0 || Number.isNaN(v)) ? null : v;
+  const righe = (await res.text()).split("\n").filter(l => l && !l.startsWith("#")).map(l => l.trim().split(/\s+/))
+    .filter(c => c.length >= 28)
+    .map(c => [`${c[0]}-${c[1].padStart(2, "0")}-${c[2].padStart(2, "0")}`,
+               neg(parseInt(c[23])), neg(parseInt(c[24])), neg(parseFloat(c[25])), neg(parseFloat(c[26])), parseInt(c[27]) || 0]);
+  if (!righe.length) return 0;
+  const ins = db.prepare(`INSERT OR REPLACE INTO attivita_solare (giorno,ap,sn,f107_obs,f107_adj,definitivo) VALUES (?,?,?,?,?,?)`);
+  await db.batch(righe.map(r => ins.bind(...r)));
+  return righe.length;
 }
 
 async function leggiStorico(env) {
@@ -1238,6 +1258,17 @@ ${renderStorico(storico)}
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
+      <a href="https://sismo.gimmycloud.net/terra.html" target="_blank" class="app-card" style="--app:#ffb74d"
+         data-tt-title="Echo Terra Dinamica" data-tt-badge="NUOVO"
+         data-tt="La Terra che si muove: durata del giorno al millisecondo e secondi intercalari (IERS), spostamento del polo e inclinazione dell'asse, scudo magnetico calcolato in tempo reale dal vento solare, Dst, Kp e ovale aurorale (NOAA), campo magnetico IGRF dal 1900 e gravità punto per punto.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🧭</div>
+        <div class="app-name">Echo Terra Dinamica</div>
+        <div class="app-desc">rotazione · asse · magnetosfera</div>
+        <div class="app-tag">IERS · NOAA</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
+
       <a href="/chat" class="app-card" style="--app:#26c6da"
          data-tt-title="Echo Chat" data-tt-badge="MODELLO NUOVO"
          data-tt="Assistente conversazionale su LLaMA 3.3 70B di Meta — subentrato a LLaMA 3 8B, deprecato da Cloudflare a maggio 2026. Quasi 9× più grande del precedente: risposte più accurate, contesto più ampio, italiano nativo.">
@@ -1390,6 +1421,8 @@ ${renderStorico(storico)}
   <div class="dock-sep"></div>
   <a class="dock-item" href="https://sismo.gimmycloud.net" target="_blank"
      data-tt-title="SISMO GLOBE" data-tt="Monitor globale 3D di terremoti in tempo reale — visualizzazione interattiva con dati USGS.">🌍</a>
+  <a class="dock-item" href="https://sismo.gimmycloud.net/terra.html" target="_blank"
+     data-tt-title="Terra Dinamica" data-tt="Rotazione, spostamento del polo, inclinazione dell'asse, scudo magnetico e gravità — dati IERS e NOAA.">🧭</a>
   <a class="dock-item" href="/polar"
      data-tt-title="METOP Polar" data-tt="Visualizzatore satelliti polari EUMETSAT — Metop-B/C, AVHRR, IASI, ASCAT.">🛰️</a>
 </nav>
@@ -3587,6 +3620,7 @@ body::after{
     <a class="app" href="https://astro.gimmycloud.net" target="_blank" style="--ac:#7e57c2"><span class="ai">🪐</span><span class="al">ASTRO</span></a>
     <a class="app" href="https://techno.gimmycloud.net" target="_blank" style="--ac:#ff6a00"><span class="ai">🎛️</span><span class="al">TECHNO</span></a>
     <a class="app" href="https://sismo.gimmycloud.net" target="_blank" style="--ac:#f44336"><span class="ai">🌍</span><span class="al">SISMO</span></a>
+    <a class="app" href="https://sismo.gimmycloud.net/terra.html" target="_blank" style="--ac:#ffb74d"><span class="ai">🧭</span><span class="al">TERRA</span></a>
     <a class="app" href="/polar" target="_blank" style="--ac:#00b8d4"><span class="ai">🛰️</span><span class="al">METOP</span></a>
   </div>
 </div>
@@ -7220,6 +7254,62 @@ const worker = {
       return new Response(renderRadiazione(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
     }
 
+    // Storico giornaliero del rilevatore di radiazione (da quando registra,
+    // 2026-02-28): un punto al giorno, per i grafici di SismoGlobe e simili.
+    if (url.pathname === "/api/radiation/history") {
+      try {
+        const { results } = await db.prepare(
+          `SELECT date(time_tag) AS giorno,
+                  MAX(s_scale) AS s_max,
+                  MAX(proton_10mev) AS p10_max, AVG(proton_10mev) AS p10_avg,
+                  MAX(proton_100mev) AS p100_max,
+                  MAX(electron_2mev) AS e2_max,
+                  MAX(xray_flux) AS xray_max,
+                  MAX(wind_speed) AS wind_max,
+                  MAX(kp_now) AS kp_max,
+                  COUNT(*) AS campioni
+           FROM radiazione_spaziale GROUP BY giorno ORDER BY giorno ASC`
+        ).all();
+        // Classe del brillamento più forte del giorno: la colonna è testo (B9.9, M1.2…),
+        // quindi la si ricava dal flusso X massimo con la stessa scala GOES.
+        const classeX = f => f == null ? null
+          : f >= 1e-4 ? "X" + (f / 1e-4).toFixed(1) : f >= 1e-5 ? "M" + (f / 1e-5).toFixed(1)
+          : f >= 1e-6 ? "C" + (f / 1e-6).toFixed(1) : f >= 1e-7 ? "B" + (f / 1e-7).toFixed(1) : "A" + (f / 1e-8).toFixed(1);
+        const days = results.map(r => ({ ...r, flare_max: classeX(r.xray_max) }));
+        // Attività solare GFZ (tabella attivita_solare, dal 1932): medie mensili per
+        // i cicli lunghi + giornaliero degli ultimi 2 anni. Se la tabella manca, si va avanti senza.
+        let sunMonthly = [], sunDaily = [], sunTop = [], sunYearly = [];
+        try {
+          // Tempeste record (Ap giornaliero più alto) e riepilogo per anno: giorni di
+          // tempesta (Ap>=30 ≈ G1+, Ap>=100 ≈ G4/G5) e macchie medie
+          const [t, y] = await Promise.all([
+            db.prepare(`SELECT giorno, ap, sn FROM attivita_solare WHERE ap IS NOT NULL ORDER BY ap DESC LIMIT 12`).all(),
+            db.prepare(`SELECT substr(giorno,1,4) AS anno, AVG(sn) AS sn, AVG(f107_obs) AS f107,
+                               SUM(ap >= 30) AS tempeste, SUM(ap >= 100) AS estreme, MAX(ap) AS ap_max
+                        FROM attivita_solare GROUP BY anno ORDER BY anno`).all(),
+          ]);
+          sunTop = t.results;
+          sunYearly = y.results.map(x => ({ ...x, sn: x.sn == null ? null : Math.round(x.sn * 10) / 10, f107: x.f107 == null ? null : Math.round(x.f107 * 10) / 10 }));
+        } catch (_) {}
+        try {
+          const [m, d] = await Promise.all([
+            db.prepare(`SELECT substr(giorno,1,7) AS mese, AVG(sn) AS sn, AVG(f107_obs) AS f107, AVG(ap) AS ap, MAX(ap) AS ap_max
+                        FROM attivita_solare GROUP BY mese ORDER BY mese`).all(),
+            db.prepare(`SELECT giorno, sn, f107_obs AS f107, ap FROM attivita_solare
+                        WHERE giorno >= date('now','-730 days') ORDER BY giorno`).all(),
+          ]);
+          const r1 = v => v == null ? null : Math.round(v * 10) / 10;
+          sunMonthly = m.results.map(x => ({ mese: x.mese, sn: r1(x.sn), f107: r1(x.f107), ap: r1(x.ap), ap_max: x.ap_max }));
+          sunDaily = d.results;
+        } catch (_) {}
+        return new Response(JSON.stringify({ since: days[0]?.giorno || null, days, sun: { monthly: sunMonthly, daily: sunDaily, top: sunTop, yearly: sunYearly } }), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=3600" },
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      }
+    }
+
     if (url.pathname === "/api/radiation") {
       try {
         const [recent, daily] = await Promise.all([
@@ -7562,6 +7652,8 @@ const worker = {
       if (solare.kpData.length>0) await salvaSolare(env.DB, solare.kpData);
       radiazione = await fetchRadiazione(solare.kpData, solare.windData);
       if (radiazione.length>0) await salvaRadiazione(env.DB, radiazione);
+      try { await aggiornaAttivitaSolare(env.DB); }
+      catch (eSole) { await logDiag(env.DB, "cron", "attivita_solare_error", { error: String(eSole) }, "da_guardare"); }
       // Archivio storico: ricalcolato dopo i nuovi dati, letto dalla dashboard da KV
       try {
         if (env.F4_LEARN) await env.F4_LEARN.put(STORICO_KV_KEY, JSON.stringify(await calcolaStorico(env.DB, env.DB_CF)));
