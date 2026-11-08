@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.13";
+const ECHO_VERSION = "3.14";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -1258,6 +1258,17 @@ ${renderStorico(storico)}
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
+      <a href="https://sismo.gimmycloud.net/terra.html" target="_blank" class="app-card" style="--app:#ffb74d"
+         data-tt-title="Echo Terra Dinamica" data-tt-badge="NUOVO"
+         data-tt="La Terra che si muove: durata del giorno al millisecondo e secondi intercalari (IERS), spostamento del polo e inclinazione dell'asse, scudo magnetico calcolato in tempo reale dal vento solare, Dst, Kp e ovale aurorale (NOAA), campo magnetico IGRF dal 1900 e gravità punto per punto.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🧭</div>
+        <div class="app-name">Echo Terra Dinamica</div>
+        <div class="app-desc">rotazione · asse · magnetosfera</div>
+        <div class="app-tag">IERS · NOAA</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
+
       <a href="/chat" class="app-card" style="--app:#26c6da"
          data-tt-title="Echo Chat" data-tt-badge="MODELLO NUOVO"
          data-tt="Assistente conversazionale su LLaMA 3.3 70B di Meta — subentrato a LLaMA 3 8B, deprecato da Cloudflare a maggio 2026. Quasi 9× più grande del precedente: risposte più accurate, contesto più ampio, italiano nativo.">
@@ -1410,6 +1421,8 @@ ${renderStorico(storico)}
   <div class="dock-sep"></div>
   <a class="dock-item" href="https://sismo.gimmycloud.net" target="_blank"
      data-tt-title="SISMO GLOBE" data-tt="Monitor globale 3D di terremoti in tempo reale — visualizzazione interattiva con dati USGS.">🌍</a>
+  <a class="dock-item" href="https://sismo.gimmycloud.net/terra.html" target="_blank"
+     data-tt-title="Terra Dinamica" data-tt="Rotazione, spostamento del polo, inclinazione dell'asse, scudo magnetico e gravità — dati IERS e NOAA.">🧭</a>
   <a class="dock-item" href="/polar"
      data-tt-title="METOP Polar" data-tt="Visualizzatore satelliti polari EUMETSAT — Metop-B/C, AVHRR, IASI, ASCAT.">🛰️</a>
 </nav>
@@ -3607,6 +3620,7 @@ body::after{
     <a class="app" href="https://astro.gimmycloud.net" target="_blank" style="--ac:#7e57c2"><span class="ai">🪐</span><span class="al">ASTRO</span></a>
     <a class="app" href="https://techno.gimmycloud.net" target="_blank" style="--ac:#ff6a00"><span class="ai">🎛️</span><span class="al">TECHNO</span></a>
     <a class="app" href="https://sismo.gimmycloud.net" target="_blank" style="--ac:#f44336"><span class="ai">🌍</span><span class="al">SISMO</span></a>
+    <a class="app" href="https://sismo.gimmycloud.net/terra.html" target="_blank" style="--ac:#ffb74d"><span class="ai">🧭</span><span class="al">TERRA</span></a>
     <a class="app" href="/polar" target="_blank" style="--ac:#00b8d4"><span class="ai">🛰️</span><span class="al">METOP</span></a>
   </div>
 </div>
