@@ -323,6 +323,60 @@ errori. Ora il build raddoppia i backslash e usa un replacer a funzione
 con `metop-viewer.html`**. Non basta cercare la stringa col grep, perché il
 file sorgente e il letterale hanno escape diversi.
 
+## Aggiungere un'app alla ECHO SUITE (procedura, dal 2026-11-12)
+
+Quando Gimmy dice «collegalo a sismo» o «metti l'etichetta come le altre»
+intende **una scheda nella griglia ECHO SUITE** della dashboard
+(`gimmycloud.net`), cioè questo repo. NON intende un riquadro nella barra di
+SismoGlobe (`sismo.gimmycloud.net`, repo `sismoglobe`).
+
+Cosa è successo il 2026-11-12: per ECHO Constellation ho messo solo
+l'etichetta «satelliti» su SismoGlobe e ho detto «fatto». Gimmy ha risposto
+con uno screenshot della griglia: «Non vedo Echo Constellation». L'errore è
+stato cercare «le altre etichette» nel primo repo con «sismo» nel nome,
+invece di guardare dove stanno elencate tutte le app. Regola: un'app nuova
+«esiste» quando compare nella ECHO SUITE; se la richiesta è ambigua, si
+guarda prima qui.
+
+Tutto sta in `sismo-worker/index.js`, sul ramo di lavoro `deploy/paid` (poi
+PR verso `main`). Per ogni app si toccano **quattro punti** (modelli: commit
+`7bda1f8` per Echo Terra Dinamica, `88440b2` per Echo Constellation):
+
+1. **Scheda** `<a class="app-card">` dentro `<div class="suite-grid">`:
+   nome «Echo …», colore in `style="--app:#…"`, `data-tt-title`,
+   `data-tt-badge="NUOVO"`, `data-tt` (descrizione lunga del tooltip), icona,
+   `app-desc` (tre parole), `app-tag` (la fonte dei dati), `app-go`
+   («APRI →»). Le app esterne hanno `target="_blank"`.
+2. **Voce nel dock**: `<a class="dock-item">` dentro `<nav id="dock">`.
+3. **Scorciatoia nella nuova scheda**: `<a class="app">` con
+   `<span class="al">` in maiuscolo e corta (TERRA, ORBITE, METOP).
+4. **`ECHO_VERSION`** +0.01 a mano. Il commento accanto parla di un hook
+   pre-commit, ma sul PC di Gimmy non è installato (`.git/hooks` è vuoto).
+
+L'intestazione della griglia dice «8 moduli» da tempo, anche se le schede
+sono di più: non è mai stata aggiornata con le aggiunte. Cambiarla solo se
+Gimmy lo chiede.
+
+**Come verificare senza pubblicare.** `wrangler dev` su questo PC NON parte:
+workerd va in `std::terminate()` appena avviato (provato il 2026-11-12 con
+wrangler 4.105 e `--local`; la CPU è un i5-750 del 2009). Quindi:
+
+- sintassi: copiare `index.js` in un file `.mjs` temporaneo e lanciare
+  `node --check` (con l'estensione `.js` Node lo tratta come CommonJS);
+- aspetto: estrarre con uno script il blocco `<style>` che precede la griglia,
+  l'HTML dal commento `ECHO SUITE — launcher grid 2026` fino a `</nav>` del
+  dock, metterli in una pagina statica e aprirla con
+  `python -m http.server`. Il blocco non ha dati dinamici (una sola
+  interpolazione), quindi quello che si vede è quello che andrà online;
+- contare le schede (`.app-card`) e leggere i nomi nell'ordine: è il modo
+  più rapido per accorgersi di una scheda finita nel posto sbagliato.
+
+**Pubblicazione.** La scheda si vede online solo dopo `wrangler deploy` da
+`sismo-worker`: il push su GitHub non basta. Vale la regola di sopra: il
+deploy lo fa Gimmy, oppure Claude con il suo ok esplicito per quel deploy.
+Prima di dire «fatto» va aperta la pagina vera e controllato che la scheda
+ci sia.
+
 ## Da fare
 
 ### Courtesy notice Blitzortung
