@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.14";
+const ECHO_VERSION = "3.15";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -1269,6 +1269,17 @@ ${renderStorico(storico)}
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
+      <a href="https://echo-constellation.gimmy077.workers.dev" target="_blank" class="app-card" style="--app:#8c9eff"
+         data-tt-title="Echo Constellation" data-tt-badge="NUOVO"
+         data-tt="I satelliti in tempo reale su una mappa piatta del mondo: ISS e Tiangong, Starlink, GPS, GLONASS, Galileo, BeiDou e altre costellazioni, ognuna attivabile da sola, con traiettorie animate, passaggi sopra casa e grafici. Posizioni calcolate dagli elementi orbitali di CelesTrak.">
+        <div class="app-glow"></div>
+        <div class="app-icon">💫</div>
+        <div class="app-name">Echo Constellation</div>
+        <div class="app-desc">satelliti live · mappa piatta</div>
+        <div class="app-tag">CelesTrak</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
+
       <a href="/chat" class="app-card" style="--app:#26c6da"
          data-tt-title="Echo Chat" data-tt-badge="MODELLO NUOVO"
          data-tt="Assistente conversazionale su LLaMA 3.3 70B di Meta — subentrato a LLaMA 3 8B, deprecato da Cloudflare a maggio 2026. Quasi 9× più grande del precedente: risposte più accurate, contesto più ampio, italiano nativo.">
@@ -1423,6 +1434,8 @@ ${renderStorico(storico)}
      data-tt-title="SISMO GLOBE" data-tt="Monitor globale 3D di terremoti in tempo reale — visualizzazione interattiva con dati USGS.">🌍</a>
   <a class="dock-item" href="https://sismo.gimmycloud.net/terra.html" target="_blank"
      data-tt-title="Terra Dinamica" data-tt="Rotazione, spostamento del polo, inclinazione dell'asse, scudo magnetico e gravità — dati IERS e NOAA.">🧭</a>
+  <a class="dock-item" href="https://echo-constellation.gimmy077.workers.dev" target="_blank"
+     data-tt-title="Echo Constellation" data-tt="Satelliti in tempo reale su mappa piatta — ISS, Starlink, GPS, GLONASS, Galileo e altre costellazioni, dati CelesTrak.">💫</a>
   <a class="dock-item" href="/polar"
      data-tt-title="METOP Polar" data-tt="Visualizzatore satelliti polari EUMETSAT — Metop-B/C, AVHRR, IASI, ASCAT.">🛰️</a>
 </nav>
@@ -3621,6 +3634,7 @@ body::after{
     <a class="app" href="https://techno.gimmycloud.net" target="_blank" style="--ac:#ff6a00"><span class="ai">🎛️</span><span class="al">TECHNO</span></a>
     <a class="app" href="https://sismo.gimmycloud.net" target="_blank" style="--ac:#f44336"><span class="ai">🌍</span><span class="al">SISMO</span></a>
     <a class="app" href="https://sismo.gimmycloud.net/terra.html" target="_blank" style="--ac:#ffb74d"><span class="ai">🧭</span><span class="al">TERRA</span></a>
+    <a class="app" href="https://echo-constellation.gimmy077.workers.dev" target="_blank" style="--ac:#8c9eff"><span class="ai">💫</span><span class="al">ORBITE</span></a>
     <a class="app" href="/polar" target="_blank" style="--ac:#00b8d4"><span class="ai">🛰️</span><span class="al">METOP</span></a>
   </div>
 </div>
