@@ -379,6 +379,13 @@ ci sia.
 
 ## Da fare
 
+### ECHO SUITE: intestazione della griglia (chiesto da Gimmy il 2026-11-12, per il 13)
+- [ ] Portare l'intestazione della griglia da «8 moduli» a «13 moduli»
+  (`sismo-worker/index.js`, riga con `8 moduli · Cloudflare AI · edge`, subito
+  sotto il titolo `ECHO SUITE — app & strumenti`). Le schede sono 13 dal
+  2026-11-12. Poi `ECHO_VERSION` +0.01, verifica come da procedura qui sopra,
+  deploy con l'ok di Gimmy e PR da `deploy/paid` verso `main`.
+
 ### Courtesy notice Blitzortung
 - [ ] Aggiungere un commento alla issue di cortesia aperta da Gimmy su
   `mrk-its/homeassistant-blitzortung`: le tessere sono passate da 9 a 15
