@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.16";
+const ECHO_VERSION = "3.17";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -1242,7 +1242,7 @@ ${renderStorico(storico)}
 <div class="panel" id="suite" style="margin-top:28px">
   <div class="panel-header">
     <span>🚀 <span class="acc">ECHO SUITE</span> — app &amp; strumenti</span>
-    <span style="color:#455a64">12 moduli · Cloudflare AI · edge</span>
+    <span style="color:#455a64">13 moduli · Cloudflare AI · edge</span>
   </div>
   <div class="panel-body">
     <div class="suite-grid">
@@ -1277,6 +1277,17 @@ ${renderStorico(storico)}
         <div class="app-name">Echo Constellation</div>
         <div class="app-desc">satelliti live · mappa piatta</div>
         <div class="app-tag">CelesTrak</div>
+        <div class="app-go">APRI <span>→</span></div>
+      </a>
+
+      <a href="https://saa-observatory.gimmy077.workers.dev" target="_blank" class="app-card" style="--app:#f43f5e"
+         data-tt-title="Echo SAA" data-tt-badge="NUOVO"
+         data-tt="Anomalia del Sud Atlantico: il punto dove il campo magnetico terrestre è più debole. Mappa del campo calcolata dal modello IGRF-14 per ogni anno dal 1900 al 2030, al suolo o alla quota della ISS, con deriva verso ovest e secondo minimo africano. Storico NOAA di protoni, elettroni, Kp e Dst accumulato su Cloudflare D1 due volte al giorno.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🧲</div>
+        <div class="app-name">Echo SAA</div>
+        <div class="app-desc">anomalia Sud Atlantico · IGRF</div>
+        <div class="app-tag">IGRF-14 · NOAA</div>
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
@@ -1423,6 +1434,8 @@ ${renderStorico(storico)}
      data-tt-title="Terra Dinamica" data-tt="Rotazione, spostamento del polo, inclinazione dell'asse, scudo magnetico e gravità — dati IERS e NOAA.">🧭</a>
   <a class="dock-item" href="https://echo-constellation.gimmy077.workers.dev" target="_blank"
      data-tt-title="Echo Constellation" data-tt="Satelliti in tempo reale su mappa piatta — ISS, Starlink, GPS, GLONASS, Galileo e altre costellazioni, dati CelesTrak.">💫</a>
+  <a class="dock-item" href="https://saa-observatory.gimmy077.workers.dev" target="_blank"
+     data-tt-title="Echo SAA" data-tt="Anomalia del Sud Atlantico — campo IGRF-14 dal 1900 al 2030 e storico NOAA su Cloudflare D1.">🧲</a>
   <a class="dock-item" href="/polar"
      data-tt-title="METOP Polar" data-tt="Visualizzatore satelliti polari EUMETSAT — Metop-B/C, AVHRR, IASI, ASCAT.">🛰️</a>
 </nav>
@@ -3401,6 +3414,7 @@ body::after{
     <a class="app" href="https://sismo.gimmycloud.net" target="_blank" style="--ac:#f44336"><span class="ai">🌍</span><span class="al">SISMO</span></a>
     <a class="app" href="https://sismo.gimmycloud.net/terra.html" target="_blank" style="--ac:#ffb74d"><span class="ai">🧭</span><span class="al">TERRA</span></a>
     <a class="app" href="https://echo-constellation.gimmy077.workers.dev" target="_blank" style="--ac:#8c9eff"><span class="ai">💫</span><span class="al">ORBITE</span></a>
+    <a class="app" href="https://saa-observatory.gimmy077.workers.dev" target="_blank" style="--ac:#f43f5e"><span class="ai">🧲</span><span class="al">SAA</span></a>
     <a class="app" href="/polar" target="_blank" style="--ac:#00b8d4"><span class="ai">🛰️</span><span class="al">METOP</span></a>
   </div>
 </div>
