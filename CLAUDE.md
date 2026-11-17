@@ -353,9 +353,8 @@ PR verso `main`). Per ogni app si toccano **quattro punti** (modelli: commit
 4. **`ECHO_VERSION`** +0.01 a mano. Il commento accanto parla di un hook
    pre-commit, ma sul PC di Gimmy non è installato (`.git/hooks` è vuoto).
 
-L'intestazione della griglia dice «8 moduli» da tempo, anche se le schede
-sono di più: non è mai stata aggiornata con le aggiunte. Cambiarla solo se
-Gimmy lo chiede.
+L'intestazione della griglia riporta il numero di schede («12 moduli» dalla
+3.16): quando si aggiunge o si toglie una scheda va aggiornata anche lei.
 
 **Come verificare senza pubblicare.** `wrangler dev` su questo PC NON parte:
 workerd va in `std::terminate()` appena avviato (provato il 2026-11-12 con
@@ -380,11 +379,13 @@ ci sia.
 ## Da fare
 
 ### ECHO SUITE: intestazione della griglia (chiesto da Gimmy il 2026-11-12, per il 13)
-- [ ] Portare l'intestazione della griglia da «8 moduli» a «13 moduli»
-  (`sismo-worker/index.js`, riga con `8 moduli · Cloudflare AI · edge`, subito
-  sotto il titolo `ECHO SUITE — app & strumenti`). Le schede sono 13 dal
-  2026-11-12. Poi `ECHO_VERSION` +0.01, verifica come da procedura qui sopra,
-  deploy con l'ok di Gimmy e PR da `deploy/paid` verso `main`.
+- [x] Intestazione portata da «8 moduli» a «12 moduli» il 2026-11-13
+  (`ECHO_VERSION` 3.16). Sono 12 e non 13 perché lo stesso giorno è stato
+  tolto Echo Storage: PixelDrain è morto, Gimmy ha chiesto di levarlo dal
+  progetto. Rimossi scheda, voce del dock, scorciatoia nella nuova scheda,
+  pagina `/pixeldrain`, rotta `/api/pd/files` e voce di cache.
+- [ ] Deploy della 3.16 con l'ok di Gimmy, poi PR da `deploy/paid` verso
+  `main`. Dopo il deploy si può cancellare il segreto `PIXELDRAIN_KEY`.
 
 ### Courtesy notice Blitzortung
 - [ ] Aggiungere un commento alla issue di cortesia aperta da Gimmy su

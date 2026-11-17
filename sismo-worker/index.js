@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.15";
+const ECHO_VERSION = "3.16";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -1242,7 +1242,7 @@ ${renderStorico(storico)}
 <div class="panel" id="suite" style="margin-top:28px">
   <div class="panel-header">
     <span>🚀 <span class="acc">ECHO SUITE</span> — app &amp; strumenti</span>
-    <span style="color:#455a64">8 moduli · Cloudflare AI · edge</span>
+    <span style="color:#455a64">12 moduli · Cloudflare AI · edge</span>
   </div>
   <div class="panel-body">
     <div class="suite-grid">
@@ -1310,17 +1310,6 @@ ${renderStorico(storico)}
         <div class="app-name">Echo Translate</div>
         <div class="app-desc">EN ↔ IT istantaneo</div>
         <div class="app-tag">Cloudflare AI</div>
-        <div class="app-go">APRI <span>→</span></div>
-      </a>
-
-      <a href="/pixeldrain" class="app-card" style="--app:#ab47bc"
-         data-tt-title="Echo Storage"
-         data-tt="File manager privato collegato a PixelDrain via API: elenco, anteprima e link di condivisione dei tuoi file cloud. Accesso riservato con token lato server.">
-        <div class="app-glow"></div>
-        <div class="app-icon">📁</div>
-        <div class="app-name">Echo Storage</div>
-        <div class="app-desc">file manager privato</div>
-        <div class="app-tag">PixelDrain</div>
         <div class="app-go">APRI <span>→</span></div>
       </a>
 
@@ -1422,8 +1411,6 @@ ${renderStorico(storico)}
      data-tt-title="Echo Code" data-tt="Assistente di programmazione — GLM 4.7 Flash, 131k token di contesto.">⌨️</a>
   <a class="dock-item" href="/traduttore"
      data-tt-title="Echo Translate" data-tt="Traduzione neurale istantanea EN ↔ IT.">🌐</a>
-  <a class="dock-item" href="/pixeldrain"
-     data-tt-title="Echo Storage" data-tt="File manager privato su PixelDrain, accesso riservato.">📁</a>
   <div class="dock-sep"></div>
   <a class="dock-item" href="/forza4"
      data-tt-title="Forza 4" data-tt="Il classico gioco a gettoni, 2 giocatori sullo stesso schermo.">🔴</a>
@@ -3079,226 +3066,6 @@ document.getElementById('src-text').addEventListener('keydown', e => {
 }
 
 // ============================================================
-// PIXELDRAIN FILE MANAGER
-// ============================================================
-function renderPixeldrain() {
-  return `<!DOCTYPE html>
-<html lang="it">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PixelDrain — ECHO Storage</title>
-<meta name="robots" content="noindex,nofollow">
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#080e14;color:#eceff1;font-family:'Exo 2',sans-serif;min-height:100vh;padding:20px;overflow-x:hidden}
-body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(38,198,218,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(38,198,218,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
-.wrap{position:relative;z-index:1;max-width:960px;margin:0 auto}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 18px;border-bottom:1px solid rgba(38,198,218,.15);margin-bottom:20px}
-.back{background:rgba(38,198,218,.1);border:1px solid rgba(38,198,218,.3);color:#26c6da;padding:7px 14px;border-radius:6px;text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:.76em}
-.back:hover{background:rgba(38,198,218,.2)}
-.title{text-align:center}
-.title h1{font-size:1.6em;font-weight:800;color:#26c6da;letter-spacing:.05em}
-.title sub{font-size:.7em;color:#546e7a;font-family:'Share Tech Mono',monospace}
-
-/* auth panel */
-#auth-panel{background:rgba(255,255,255,.03);border:1px solid rgba(38,198,218,.2);border-radius:14px;padding:36px;max-width:400px;margin:60px auto;text-align:center}
-#auth-panel h2{color:#26c6da;margin-bottom:8px;font-size:1.2em}
-#auth-panel p{color:#546e7a;font-size:.82em;margin-bottom:20px;font-family:'Share Tech Mono',monospace}
-#token-input{width:100%;background:#0d1820;border:1px solid rgba(38,198,218,.3);color:#eceff1;padding:10px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.9em;margin-bottom:12px;outline:none}
-#token-input:focus{border-color:#26c6da}
-#auth-btn{width:100%;background:rgba(38,198,218,.15);border:1px solid rgba(38,198,218,.4);color:#26c6da;padding:10px;border-radius:8px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.9em;transition:background .15s}
-#auth-btn:hover{background:rgba(38,198,218,.3)}
-#auth-err{color:#ef5350;font-size:.8em;margin-top:8px;display:none}
-
-/* stats bar */
-#stats-bar{display:flex;gap:16px;margin-bottom:18px;flex-wrap:wrap}
-.stat-chip{background:rgba(38,198,218,.07);border:1px solid rgba(38,198,218,.15);border-radius:8px;padding:8px 16px;font-family:'Share Tech Mono',monospace;font-size:.78em;color:#80deea}
-.stat-chip span{color:#26c6da;font-weight:700}
-
-/* search */
-#search-wrap{margin-bottom:16px}
-#search{width:100%;background:#0d1820;border:1px solid rgba(38,198,218,.2);color:#eceff1;padding:9px 14px;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.85em;outline:none}
-#search:focus{border-color:#26c6da}
-
-/* file grid */
-#file-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
-.file-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:14px;transition:border-color .15s,background .15s;cursor:default}
-.file-card:hover{border-color:rgba(38,198,218,.35);background:rgba(38,198,218,.04)}
-.file-icon{font-size:1.8em;margin-bottom:6px;line-height:1}
-.file-name{font-size:.82em;color:#eceff1;word-break:break-all;margin-bottom:6px;font-weight:600}
-.file-meta{font-size:.72em;color:#546e7a;font-family:'Share Tech Mono',monospace;margin-bottom:10px;line-height:1.6}
-.file-actions{display:flex;gap:8px}
-.btn-view,.btn-dl{padding:5px 12px;border-radius:6px;font-size:.74em;font-family:'Share Tech Mono',monospace;text-decoration:none;border:1px solid;transition:background .12s}
-.btn-view{background:rgba(38,198,218,.1);border-color:rgba(38,198,218,.3);color:#26c6da}
-.btn-view:hover{background:rgba(38,198,218,.25)}
-.btn-dl{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:#90a4ae}
-.btn-dl:hover{background:rgba(255,255,255,.1)}
-
-/* loading / empty */
-#loading{text-align:center;padding:60px;color:#546e7a;font-family:'Share Tech Mono',monospace;display:none}
-#loading .spinner{width:36px;height:36px;border:3px solid rgba(38,198,218,.15);border-top-color:#26c6da;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px}
-@keyframes spin{to{transform:rotate(360deg)}}
-#empty{text-align:center;padding:60px;color:#546e7a;font-family:'Share Tech Mono',monospace;display:none}
-#main-panel{display:none}
-
-footer{margin-top:30px;text-align:center;font-size:.7em;color:#263238;font-family:'Share Tech Mono',monospace}
-footer a{color:#26c6da;text-decoration:none}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <div class="topbar">
-    <a href="/" class="back">&#8592; ECHO Monitor</a>
-    <div class="title">
-      <h1>ECHO Storage</h1>
-      <sub>PixelDrain File Manager // privato</sub>
-    </div>
-    <div style="width:90px"></div>
-  </div>
-
-  <!-- AUTH -->
-  <div id="auth-panel">
-    <h2>Accesso richiesto</h2>
-    <p>Inserisci il token di accesso ECHO</p>
-    <input id="token-input" type="password" placeholder="token...">
-    <button id="auth-btn">Accedi</button>
-    <div id="auth-err">Token non valido</div>
-  </div>
-
-  <!-- MAIN -->
-  <div id="main-panel">
-    <div id="stats-bar">
-      <div class="stat-chip">File: <span id="s-count">—</span></div>
-      <div class="stat-chip">Dimensione: <span id="s-size">—</span></div>
-    </div>
-    <div id="search-wrap">
-      <input id="search" type="text" placeholder="Cerca file..." oninput="filterFiles()">
-    </div>
-    <div id="loading"><div class="spinner"></div>Caricamento file...</div>
-    <div id="empty">Nessun file trovato</div>
-    <div id="file-list"></div>
-  </div>
-</div>
-<footer>SISMO FVG ☀ PROGETTO ECHO v${ECHO_VERSION} &mdash; <a href="https://gimmycloud.net" target="_blank">gimmycloud.net</a></footer>
-
-<script>
-let _allFiles = [];
-let _token = localStorage.getItem('pd_token') || '';
-
-const ICONS = {
-  video: '🎬', audio: '🎵', image: '🖼️', pdf: '📄',
-  zip: '🗜️', rar: '🗜️', '7z': '🗜️', tar: '🗜️', gz: '🗜️',
-  txt: '📝', json: '📋', xml: '📋', csv: '📊',
-  exe: '⚙️', dmg: '⚙️', iso: '💿', default: '📁'
-};
-
-function fileIcon(name, mime) {
-  if (mime && mime.startsWith('video')) return ICONS.video;
-  if (mime && mime.startsWith('audio')) return ICONS.audio;
-  if (mime && mime.startsWith('image')) return ICONS.image;
-  if (mime === 'application/pdf') return ICONS.pdf;
-  const ext = (name.split('.').pop() || '').toLowerCase();
-  return ICONS[ext] || ICONS.default;
-}
-
-function fmtSize(bytes) {
-  if (!bytes) return '—';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
-  if (bytes < 1073741824) return (bytes/1048576).toFixed(1) + ' MB';
-  return (bytes/1073741824).toFixed(2) + ' GB';
-}
-
-function fmtDate(d) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-
-function totalSize(files) {
-  return files.reduce((a,f) => a + (f.size||0), 0);
-}
-
-function renderCard(f) {
-  return '<div class="file-card">' +
-    '<div class="file-icon">' + fileIcon(f.name, f.mime_type) + '</div>' +
-    '<div class="file-name">' + escHtml(f.name) + '</div>' +
-    '<div class="file-meta">' +
-      fmtSize(f.size) + '<br>' +
-      fmtDate(f.date_upload) +
-      (f.views ? '<br>' + f.views + ' visualizzazioni' : '') +
-    '</div>' +
-    '<div class="file-actions">' +
-      '<a class="btn-view" href="https://pixeldrain.com/u/' + f.id + '" target="_blank">Apri</a>' +
-      '<a class="btn-dl" href="https://pixeldrain.com/api/file/' + f.id + '?download" target="_blank">Download</a>' +
-    '</div>' +
-  '</div>';
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function filterFiles() {
-  const q = document.getElementById('search').value.toLowerCase();
-  const filtered = q ? _allFiles.filter(f => f.name.toLowerCase().includes(q)) : _allFiles;
-  document.getElementById('file-list').innerHTML = filtered.map(renderCard).join('');
-  document.getElementById('empty').style.display = filtered.length ? 'none' : 'block';
-  document.getElementById('file-list').style.display = filtered.length ? 'grid' : 'none';
-}
-
-async function loadFiles(token) {
-  document.getElementById('loading').style.display = 'block';
-  document.getElementById('file-list').style.display = 'none';
-  document.getElementById('empty').style.display = 'none';
-  try {
-    const res = await fetch('/api/pd/files?token=' + encodeURIComponent(token));
-    if (res.status === 401) { document.getElementById('loading').style.display='none'; return false; }
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Errore API');
-    _allFiles = (data.files || []).sort((a,b) => new Date(b.date_upload) - new Date(a.date_upload));
-    document.getElementById('s-count').textContent = _allFiles.length;
-    document.getElementById('s-size').textContent = fmtSize(totalSize(_allFiles));
-    document.getElementById('loading').style.display = 'none';
-    filterFiles();
-    return true;
-  } catch(e) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('empty').textContent = 'Errore: ' + e.message;
-    document.getElementById('empty').style.display = 'block';
-    return true;
-  }
-}
-
-async function tryAuth(token) {
-  const ok = await loadFiles(token);
-  if (ok) {
-    localStorage.setItem('pd_token', token);
-    document.getElementById('auth-panel').style.display = 'none';
-    document.getElementById('main-panel').style.display = 'block';
-  } else {
-    document.getElementById('auth-err').style.display = 'block';
-  }
-}
-
-document.getElementById('auth-btn').addEventListener('click', () => {
-  const t = document.getElementById('token-input').value.trim();
-  if (t) tryAuth(t);
-});
-document.getElementById('token-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('auth-btn').click();
-});
-
-// Auto-login se token in localStorage
-if (_token) tryAuth(_token).then(ok => {
-  if (!ok) localStorage.removeItem('pd_token');
-});
-</script>
-</body>
-</html>`;
-}
-
-
-// ============================================================
 // NEWTAB — pagina nuova scheda personalizzata
 // ============================================================
 function renderNewtab() {
@@ -3627,7 +3394,6 @@ body::after{
     <a class="app" href="/chat" target="_blank" style="--ac:#26c6da"><span class="ai">🧠</span><span class="al">CHAT</span></a>
     <a class="app" href="/code" target="_blank" style="--ac:#66bb6a"><span class="ai">⌨️</span><span class="al">CODE</span></a>
     <a class="app" href="/traduttore" target="_blank" style="--ac:#ffd600"><span class="ai">🌐</span><span class="al">TRANSLATE</span></a>
-    <a class="app" href="/pixeldrain" target="_blank" style="--ac:#ab47bc"><span class="ai">📁</span><span class="al">STORAGE</span></a>
     <a class="app" href="/forza4" target="_blank" style="--ac:#ff6d00"><span class="ai">🔴</span><span class="al">FORZA 4</span></a>
     <a class="app" href="/othello" target="_blank" style="--ac:#69f0ae"><span class="ai">⚫</span><span class="al">OTHELLO</span></a>
     <a class="app" href="https://astro.gimmycloud.net" target="_blank" style="--ac:#7e57c2"><span class="ai">🪐</span><span class="al">ASTRO</span></a>
@@ -6714,7 +6480,7 @@ export class LightningRelay {
 const CACHE_TTL = {
   "/": 300,                       // dashboard: i dati cambiano 4 volte al giorno (cron)
   "/radiazione": 3600, "/chat": 3600, "/code": 3600, "/traduttore": 3600,
-  "/pixeldrain": 3600, "/forza4": 3600, "/othello": 3600,
+  "/forza4": 3600, "/othello": 3600,
   "/api/radiation": 300, "/api/solar": 300, "/api/events": 300,
   "/api/stats": 300, "/api/cf": 300,
 };
@@ -7518,23 +7284,6 @@ const worker = {
       } catch(e) {
         return new Response(JSON.stringify({error: e.message}), {status:500, headers:{"Content-Type":"application/json"}});
       }
-    }
-
-    if (url.pathname === "/pixeldrain") {
-      return new Response(renderPixeldrain(), {headers: {"Content-Type": "text/html;charset=UTF-8"}});
-    }
-
-    if (url.pathname === "/api/pd/files") {
-      if (url.searchParams.get("token") !== SECRET)
-        return new Response(JSON.stringify({error:"Non autorizzato"}), {status:401, headers:{"Content-Type":"application/json"}});
-      if (!env.PIXELDRAIN_KEY)
-        return new Response(JSON.stringify({error:"PIXELDRAIN_KEY non configurata nell'ambiente Cloudflare"}), {status:500, headers:{"Content-Type":"application/json"}});
-      const auth = btoa(`:${env.PIXELDRAIN_KEY}`);
-      const pdRes = await fetch("https://pixeldrain.com/api/user/files", {
-        headers: {"Authorization": `Basic ${auth}`, "User-Agent": "SismoFVG/2.0 gimmycloud.net"}
-      });
-      const pdData = await pdRes.json();
-      return new Response(JSON.stringify(pdData), {status: pdRes.status, headers:{"Content-Type":"application/json"}});
     }
 
     if (url.pathname === "/forza4") {

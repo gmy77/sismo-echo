@@ -42,7 +42,6 @@ App integrate, tutte servite dallo stesso Worker:
 | 🧠 **Echo Chat** | assistente IA personale | LLaMA 3 · Cloudflare AI |
 | ⌨️ **Echo Code** | debug · spiega · genera codice | Code Llama |
 | 🌍 **Echo Translate** | EN ↔ IT istantaneo | Cloudflare AI |
-| 📁 **Echo Storage** | file manager privato | PixelDrain API |
 | 🔴 **Forza 4** | classico, 2 giocatori | Canvas |
 | ⚫ **Othello** | reversi con AI che impara | minimax + KV learning |
 
