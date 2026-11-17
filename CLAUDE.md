@@ -388,8 +388,8 @@ ci sia.
   13 moduli) pubblicate insieme il 2026-11-17 con l'ok di Gimmy, versione
   `09a61d32`; verificato su gimmycloud.net (v3.17, scheda presente, niente
   PixelDrain). Poi PR da `deploy/paid` verso `main`.
-- [ ] Cancellare il segreto `PIXELDRAIN_KEY` (non più usato): solo con l'ok
-  di Gimmy.
+- [x] Segreto `PIXELDRAIN_KEY` già cancellato da Gimmy (il sito PixelDrain è
+  chiuso); verificato il 2026-11-17: resta solo `UPDATE_SECRET`.
 
 ### Courtesy notice Blitzortung
 - [ ] Aggiungere un commento alla issue di cortesia aperta da Gimmy su
