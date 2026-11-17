@@ -43,7 +43,7 @@ Il token deve avere permessi minimi e revocabili. Non salvare mai token nel codi
 Secret del Worker (Cloudflare, `npx wrangler secret put <NOME>` da questa cartella):
 
 - `UPDATE_SECRET` — **obbligatorio**. Protegge `/update`, `/update-solar`, `/diag/ingest` (`?token=`). Se manca, `getUpdateSecret()` restituisce `""` e un `?token=` vuoto passa: va sempre impostato. Rigenerato il 2026-11-07 (copia cartacea + Documenti + OneDrive del proprietario).
-- `PIXELDRAIN_KEY` — non più usato (Pixeldrain dismesso); la rotta relativa risponde con errore.
+- `PIXELDRAIN_KEY` — non più usato: Echo Storage (`/pixeldrain`, `/api/pd/files`) è stato tolto dal codice nella 3.16 (2026-11-13). Il segreto può essere cancellato da Cloudflare con `wrangler secret delete PIXELDRAIN_KEY`.
 
 ## Cartella di deploy
 

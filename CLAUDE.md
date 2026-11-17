@@ -353,9 +353,8 @@ PR verso `main`). Per ogni app si toccano **quattro punti** (modelli: commit
 4. **`ECHO_VERSION`** +0.01 a mano. Il commento accanto parla di un hook
    pre-commit, ma sul PC di Gimmy non è installato (`.git/hooks` è vuoto).
 
-L'intestazione della griglia dice «8 moduli» da tempo, anche se le schede
-sono di più: non è mai stata aggiornata con le aggiunte. Cambiarla solo se
-Gimmy lo chiede.
+L'intestazione della griglia riporta il numero di schede («12 moduli» dalla
+3.16): quando si aggiunge o si toglie una scheda va aggiornata anche lei.
 
 **Come verificare senza pubblicare.** `wrangler dev` su questo PC NON parte:
 workerd va in `std::terminate()` appena avviato (provato il 2026-11-12 con
@@ -378,6 +377,19 @@ Prima di dire «fatto» va aperta la pagina vera e controllato che la scheda
 ci sia.
 
 ## Da fare
+
+### ECHO SUITE: intestazione della griglia (chiesto da Gimmy il 2026-11-12, per il 13)
+- [x] Intestazione portata da «8 moduli» a «12 moduli» il 2026-11-13
+  (`ECHO_VERSION` 3.16). Sono 12 e non 13 perché lo stesso giorno è stato
+  tolto Echo Storage: PixelDrain è morto, Gimmy ha chiesto di levarlo dal
+  progetto. Rimossi scheda, voce del dock, scorciatoia nella nuova scheda,
+  pagina `/pixeldrain`, rotta `/api/pd/files` e voce di cache.
+- [x] 3.16 e 3.17 (scheda Echo SAA → saa-observatory.gimmy077.workers.dev,
+  13 moduli) pubblicate insieme il 2026-11-17 con l'ok di Gimmy, versione
+  `09a61d32`; verificato su gimmycloud.net (v3.17, scheda presente, niente
+  PixelDrain). Poi PR da `deploy/paid` verso `main`.
+- [ ] Cancellare il segreto `PIXELDRAIN_KEY` (non più usato): solo con l'ok
+  di Gimmy.
 
 ### Courtesy notice Blitzortung
 - [ ] Aggiungere un commento alla issue di cortesia aperta da Gimmy su
