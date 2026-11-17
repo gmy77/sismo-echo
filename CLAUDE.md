@@ -384,8 +384,12 @@ ci sia.
   tolto Echo Storage: PixelDrain è morto, Gimmy ha chiesto di levarlo dal
   progetto. Rimossi scheda, voce del dock, scorciatoia nella nuova scheda,
   pagina `/pixeldrain`, rotta `/api/pd/files` e voce di cache.
-- [ ] Deploy della 3.16 con l'ok di Gimmy, poi PR da `deploy/paid` verso
-  `main`. Dopo il deploy si può cancellare il segreto `PIXELDRAIN_KEY`.
+- [x] 3.16 e 3.17 (scheda Echo SAA → saa-observatory.gimmy077.workers.dev,
+  13 moduli) pubblicate insieme il 2026-11-17 con l'ok di Gimmy, versione
+  `09a61d32`; verificato su gimmycloud.net (v3.17, scheda presente, niente
+  PixelDrain). Poi PR da `deploy/paid` verso `main`.
+- [ ] Cancellare il segreto `PIXELDRAIN_KEY` (non più usato): solo con l'ok
+  di Gimmy.
 
 ### Courtesy notice Blitzortung
 - [ ] Aggiungere un commento alla issue di cortesia aperta da Gimmy su
