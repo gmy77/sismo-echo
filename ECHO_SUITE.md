@@ -39,7 +39,7 @@ Nel dock ci sono anche Monitor, Campi Flegrei, Eventi FVG (pagine interne del wo
 
 | App | Dove si apre | Cartella locale | Repo GitHub (ramo) | Versione |
 |---|---|---|---|---|
-| ECHO Tab (pagina iniziale Edge) | https://sismo-echo-tab.pages.dev | `repos\sismo-echo-tab` | `gmy77/sismo-echo-tab` (`main`), `deploy.bat` | 3.6.0 |
+| ECHO Tab (pagina iniziale Edge) | https://sismo-echo-tab.pages.dev | `repos\sismo-echo-tab` | `gmy77/sismo-echo-tab` (`main`), `deploy.bat` | 3.7.0 — un'etichetta per ogni scheda della griglia |
 | ECHO Cosmic Ray (desktop Rust) | `dist\Radiazione Cosmica.exe` | `repos\cosmic-ray-dashboard` | `gmy77/ECHO-Cosmic-Ray` (`master`) | 0.3.0 |
 | Fasce di Van Allen (desktop Rust) | `dist\vanallen.exe` + Worker https://van-allen-history.gimmy077.workers.dev | `repos\van-allen-dashboard` | `gmy77/van-allen-dashboard` (`main`) | 0.1.0 — scheda nella griglia non ancora fatta |
 
@@ -55,4 +55,5 @@ Nel dock ci sono anche Monitor, Campi Flegrei, Eventi FVG (pagine interne del wo
 2. `<a class="dock-item">` nel `<nav id="dock">`;
 3. scorciatoia `<a class="app">` nella pagina nuova scheda;
 4. `ECHO_VERSION` +0.01 a mano;
-5. aggiornare questo file.
+5. aggiungere l'etichetta anche in ECHO Tab (`repos\sismo-echo-tab\index.html`, blocco `.links`, stesso ordine della griglia) e poi `deploy.bat`;
+6. aggiornare questo file.
