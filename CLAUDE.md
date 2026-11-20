@@ -325,6 +325,10 @@ file sorgente e il letterale hanno escape diversi.
 
 ## Aggiungere un'app alla ECHO SUITE (procedura, dal 2026-11-12)
 
+**Catalogo di tutte le schede** (cartella locale, repo GitHub, hosting,
+versione, lavori aperti): `ECHO_SUITE.md` nella radice del repo. Va
+aggiornato ogni volta che si aggiunge, sposta o toglie una scheda.
+
 Quando Gimmy dice «collegalo a sismo» o «metti l'etichetta come le altre»
 intende **una scheda nella griglia ECHO SUITE** della dashboard
 (`gimmycloud.net`), cioè questo repo. NON intende un riquadro nella barra di
