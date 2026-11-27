@@ -9,7 +9,7 @@ Per aggiungere una scheda: vedi i quattro punti in fondo.
 ## Schede dentro il worker sismo-fvg (stesso codice, stesso deploy)
 
 Codice: `C:\Users\gimmy\repos\sismo-echo\sismo-worker\index.js` · repo `gmy77/sismo-echo` ·
-ramo di lavoro `deploy/paid` (poi PR verso `main`) · versione **3.17** (`ECHO_VERSION`, riga 8).
+ramo di lavoro `deploy/paid` (poi PR verso `main`) · versione **3.18** (`ECHO_VERSION`, riga 8).
 Pubblicazione: `wrangler deploy` dentro `sismo-worker` (solo con l'ok di Gimmy).
 
 | Scheda | Percorso | Dove nel codice | Note |
@@ -34,12 +34,13 @@ Nel dock ci sono anche Monitor, Campi Flegrei, Eventi FVG (pagine interne del wo
 | Echo SAA | https://saa-observatory.gimmy077.workers.dev | `repos\south-atlantic-anomaly-dashboard` | `gmy77/south-atlantic-anomaly-dashboard` (`main`) | Worker `saa-observatory` + D1 | — |
 | AstroSandbox | https://astro.gimmycloud.net | `repos\Physics\SimulatoreSostanze` | `gmy77/astrosandbox` (`main`) | GitHub Pages (CNAME) | v1.1.0 |
 | TechnoLab 95 | https://techno.gimmycloud.net | `repos\technolab` | `gmy77/technolab` (`main`) | GitHub Pages (CNAME) | — |
+| Echo Hydrogen · Terraferma 1532 | https://gmy77.github.io/hydrogen-terraferma/ | `repos\hydrogen-terraferma` | `gmy77/hydrogen-terraferma` (`main`) | GitHub Pages | v2 (27/11/2026) — scheda aggiunta in ECHO 3.18 e ECHO Tab 3.8.0 |
 
 ## Famiglia ECHO fuori dalla griglia
 
 | App | Dove si apre | Cartella locale | Repo GitHub (ramo) | Versione |
 |---|---|---|---|---|
-| ECHO Tab (pagina iniziale Edge) | https://sismo-echo-tab.pages.dev | `repos\sismo-echo-tab` | `gmy77/sismo-echo-tab` (`main`), `deploy.bat` | 3.7.0 — un'etichetta per ogni scheda della griglia |
+| ECHO Tab (pagina iniziale Edge) | https://sismo-echo-tab.pages.dev | `repos\sismo-echo-tab` | `gmy77/sismo-echo-tab` (`main`), `deploy.bat` | 3.8.0 — un'etichetta per ogni scheda della griglia |
 | ECHO Cosmic Ray (desktop Rust) | `dist\Radiazione Cosmica.exe` | `repos\cosmic-ray-dashboard` | `gmy77/ECHO-Cosmic-Ray` (`master`) | 0.3.0 |
 | Fasce di Van Allen (desktop Rust) | `dist\vanallen.exe` + Worker https://van-allen-history.gimmy077.workers.dev | `repos\van-allen-dashboard` | `gmy77/van-allen-dashboard` (`main`) | 0.1.0 — scheda nella griglia non ancora fatta |
 

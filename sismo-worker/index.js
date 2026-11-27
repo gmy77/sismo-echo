@@ -5,7 +5,7 @@
 // ============================================================
 
 // auto-bumped dal pre-commit hook — non modificare a mano (major bump: sì, a mano)
-const ECHO_VERSION = "3.17";
+const ECHO_VERSION = "3.18";
 
 const INGV_URL    = "https://webservices.ingv.it/fdsnws/event/1/query";
 const NOAA_KP     = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
@@ -1368,6 +1368,17 @@ ${renderStorico(storico)}
         <div class="app-go">SUONA <span>→</span></div>
       </a>
 
+      <a href="https://gmy77.github.io/hydrogen-terraferma/" target="_blank" class="app-card" style="--app:#d4a24c"
+         data-tt-title="Echo Hydrogen · Terraferma 1532" data-tt-badge="NUOVO"
+         data-tt="Simulazione di un borgo vicentino del Cinquecento: i paesani sbagliano, imparano, si insegnano le cose, votano in vicinia e costruiscono cisterne, rogge, mulini e granai quando il borgo ne ha bisogno. Ombre, luci, cronaca datata. Un singolo file HTML — su GitHub.">
+        <div class="app-glow"></div>
+        <div class="app-icon">🏰</div>
+        <div class="app-name">Echo Hydrogen</div>
+        <div class="app-desc">borgo 1532 · paesani che imparano</div>
+        <div class="app-tag">History Lab</div>
+        <div class="app-go">GIOCA <span>→</span></div>
+      </a>
+
       <a href="https://sismo.gimmycloud.net" target="_blank" class="app-card" style="--app:#ff3b30"
          data-tt-title="SismoGlobe" data-tt-badge="NUOVO"
          data-tt="Monitoraggio dei terremoti di tutto il pianeta in tempo reale su globo 3D con confini nazionali: feed USGS live, avvisi sui nuovi sismi, cerchi e anelli proporzionali alla magnitudo, istogramma 30 giorni ed energia rilasciata. Open source su GitHub.">
@@ -1427,6 +1438,8 @@ ${renderStorico(storico)}
      data-tt-title="Forza 4" data-tt="Il classico gioco a gettoni, 2 giocatori sullo stesso schermo.">🔴</a>
   <a class="dock-item" href="/othello"
      data-tt-title="Othello" data-tt="Reversi contro un'IA che impara partita dopo partita.">⚫</a>
+  <a class="dock-item" href="https://gmy77.github.io/hydrogen-terraferma/" target="_blank"
+     data-tt-title="Echo Hydrogen" data-tt="Borgo vicentino del 1532: i paesani imparano dagli errori, votano in vicinia e costruiscono.">🏰</a>
   <div class="dock-sep"></div>
   <a class="dock-item" href="https://sismo.gimmycloud.net" target="_blank"
      data-tt-title="SISMO GLOBE" data-tt="Monitor globale 3D di terremoti in tempo reale — visualizzazione interattiva con dati USGS.">🌍</a>
@@ -3411,6 +3424,7 @@ body::after{
     <a class="app" href="/othello" target="_blank" style="--ac:#69f0ae"><span class="ai">⚫</span><span class="al">OTHELLO</span></a>
     <a class="app" href="https://astro.gimmycloud.net" target="_blank" style="--ac:#7e57c2"><span class="ai">🪐</span><span class="al">ASTRO</span></a>
     <a class="app" href="https://techno.gimmycloud.net" target="_blank" style="--ac:#ff6a00"><span class="ai">🎛️</span><span class="al">TECHNO</span></a>
+    <a class="app" href="https://gmy77.github.io/hydrogen-terraferma/" target="_blank" style="--ac:#d4a24c"><span class="ai">🏰</span><span class="al">HYDROGEN</span></a>
     <a class="app" href="https://sismo.gimmycloud.net" target="_blank" style="--ac:#f44336"><span class="ai">🌍</span><span class="al">SISMO</span></a>
     <a class="app" href="https://sismo.gimmycloud.net/terra.html" target="_blank" style="--ac:#ffb74d"><span class="ai">🧭</span><span class="al">TERRA</span></a>
     <a class="app" href="https://echo-constellation.gimmy077.workers.dev" target="_blank" style="--ac:#8c9eff"><span class="ai">💫</span><span class="al">ORBITE</span></a>
